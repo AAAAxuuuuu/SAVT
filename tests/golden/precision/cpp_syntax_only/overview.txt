@@ -1,0 +1,43 @@
+[overview]
+overview nodes: 3
+overview edges: 3
+overview groups: 4
+overview stages: 3
+overview flows: 2
+- [entry_point_module] App role=procedure_centric stage=entry in=0 out=2
+  summary: entry procedure_centric module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 C/C++. Example files: App/main.cpp. Top symbols: main.
+- [entry_point_module] App/frontend role=presentation stage=core in=1 out=1
+  summary: entry presentation module in stage core with 2 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 1 method(s). Reachable from an entry module. Tech mix: 2 C/C++. Example files: App/frontend/view/MainWindow.cpp, App/frontend/view/MainWindow.h. Top symbols: MainWindow, show.
+- [module] App/backend role=interaction stage=leaf in=2 out=0
+  summary: interaction module in stage leaf with 3 file(s), 1 class(es), 1 struct(s), 0 enum(s), 0 function(s), 2 method(s). Reachable from an entry module. Tech mix: 3 C/C++. Example files: App/backend/model/Task.h, App/backend/service/TaskService.cpp, App/backend/service/TaskService.h. Top symbols: Task, TaskService, current, nextId.
+
+[overview edges]
+- depends_on: App/frontend -> App/backend (weight=2)
+- depends_on: App -> App/backend (weight=1)
+- depends_on: App -> App/frontend (weight=2)
+
+[overview groups]
+- [folder_cluster] App nodes=3 expanded=yes
+  summary: Folder cluster 'App' containing 3 module(s).
+- [role_cluster] interaction nodes=1 expanded=no
+  summary: Role cluster 'interaction' containing 1 module(s).
+- [role_cluster] presentation nodes=1 expanded=no
+  summary: Role cluster 'presentation' containing 1 module(s).
+- [role_cluster] procedure_centric nodes=1 expanded=no
+  summary: Role cluster 'procedure_centric' containing 1 module(s).
+
+[overview stages]
+- stage 0 (entry): 1 module(s)
+- stage 1 (core): 1 module(s)
+- stage 2 (leaf): 1 module(s)
+
+[overview flows]
+- App -> App/backend (weight=3, stage_span=2)
+  summary: Starts at App, traverses 3 module(s) across 2 stage hop(s), and reaches App/backend with cumulative dependency weight 3.
+  path: App -> App/frontend -> App/backend
+- App -> App/frontend (weight=3, stage_span=1)
+  summary: Starts at App, traverses 2 module(s) across 1 stage hop(s), and reaches App/frontend with cumulative dependency weight 3.
+  path: App -> App/frontend
+
+[overview diagnostics]
+- Derived 3 overview module(s) from 6 discovered file(s); average 2 file(s) per module.

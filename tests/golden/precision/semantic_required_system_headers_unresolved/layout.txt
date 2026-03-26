@@ -1,0 +1,8 @@
+[module layout]
+layers: 1
+canvas: 320 x 140
+positioned modules: 1
+- (root) layer=0 order=0 pos=(0, 0)
+
+[layout diagnostics]
+- none

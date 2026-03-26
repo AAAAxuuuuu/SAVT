@@ -1,0 +1,38 @@
+{
+  "rootPath": "<fixture_root>",
+  "engine": "tree-sitter",
+  "precisionLevel": "syntax_fallback",
+  "semanticStatusCode": "backend_unavailable",
+  "semanticStatusMessage": "This build does not include the Clang/LibTooling semantic backend. Reconfigure with SAVT_ENABLE_CLANG_TOOLING=ON to enable semantic analysis.",
+  "compilationDatabasePath": "<fixture_root>/compile_commands.json",
+  "semanticAnalysisRequested": true,
+  "semanticAnalysisEnabled": false,
+  "summary": {
+    "discoveredFiles": 2,
+    "parsedFiles": 1,
+    "nodeCount": 5,
+    "edgeCount": 5,
+    "inferredNodeCount": 5,
+    "semanticNodeCount": 0,
+    "inferredEdgeCount": 5,
+    "semanticEdgeCount": 0
+  },
+  "nodes": [
+    {"id": 1, "kind": "file", "displayName": "compile_commands.json", "qualifiedName": "compile_commands.json", "identityKey": "file:compile_commands.json", "filePath": "compile_commands.json", "line": 0, "factSource": "inferred"},
+    {"id": 2, "kind": "file", "displayName": "main.cpp", "qualifiedName": "main.cpp", "identityKey": "file:main.cpp", "filePath": "main.cpp", "line": 0, "factSource": "inferred"},
+    {"id": 3, "kind": "module", "displayName": "(root)", "qualifiedName": "module:(root)", "identityKey": "module:(root)", "filePath": "(root)", "line": 0, "factSource": "inferred"},
+    {"id": 4, "kind": "function", "displayName": "helper", "qualifiedName": "helper", "identityKey": "", "filePath": "main.cpp", "line": 0, "factSource": "inferred"},
+    {"id": 5, "kind": "function", "displayName": "main", "qualifiedName": "main", "identityKey": "", "filePath": "main.cpp", "line": 4, "factSource": "inferred"}
+  ],
+  "edges": [
+    {"fromId": 3, "toId": 1, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 2, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 2, "toId": 4, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 2, "toId": 5, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 4, "kind": "calls", "weight": 1, "supportCount": 1, "factSource": "inferred"}
+  ],
+  "diagnostics": [
+    "This build does not include the Clang/LibTooling semantic backend. Reconfigure with SAVT_ENABLE_CLANG_TOOLING=ON to enable semantic analysis.",
+    "Analyzer precision mode: semantic_preferred"
+  ]
+}

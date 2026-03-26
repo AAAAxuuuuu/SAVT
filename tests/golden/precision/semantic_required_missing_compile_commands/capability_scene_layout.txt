@@ -1,0 +1,9 @@
+[capability scene layout]
+canvas: 1040 x 360
+nodes: 0
+edges: 0
+groups: 0
+
+[scene diagnostics]
+- No overview nodes were available, so no capability graph could be derived.
+- No visible capability nodes found for capability scene layout.

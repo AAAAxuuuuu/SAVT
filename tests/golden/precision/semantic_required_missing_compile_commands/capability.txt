@@ -1,0 +1,17 @@
+[capability graph]
+capability nodes: 0
+capability edges: 0
+capability flows: 0
+capability groups: 0
+
+[capability edges]
+- none
+
+[capability groups]
+- none
+
+[capability flows]
+- none
+
+[capability diagnostics]
+- No overview nodes were available, so no capability graph could be derived.

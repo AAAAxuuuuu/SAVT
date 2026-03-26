@@ -1,0 +1,15 @@
+[capability scene layout]
+canvas: 1040 x 360
+nodes: 1
+edges: 0
+groups: 2
+- node 1 lane=1 order=0 rect=(396, 28, 248, 116)
+- group#1 visibleNodes=1 bounds=(378, 10, 284, 152)
+- group#2 visibleNodes=1 bounds=(378, 10, 284, 152)
+
+[scene diagnostics]
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.
+- No explicit entry capability was detected; the graph relies on inferred roots only.
+- No infrastructure cluster was derived; the project may be mostly workflow-oriented or the current role heuristics need refinement.
+- No multi-step capability flow was derived from the current module dependency graph.

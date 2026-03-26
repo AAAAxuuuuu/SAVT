@@ -1,0 +1,54 @@
+[capability graph]
+capability nodes: 5
+capability edges: 2
+capability flows: 2
+capability groups: 7
+- [entry] Src Main Bootstrap role=type_centric modules=1 visible=yes priority=1238 stages=0
+  responsibility: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。
+  summary: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。 Covers 1 module(s) and 1 file(s), spans stage 0. It is reachable from an entry capability. Folder scope: Src. Main modules: src/main/bootstrap. Example files: src/main/java/com/example/schedule/ScheduleApplication.java. Key symbols: ScheduleApplication. Supporting roles inside this cluster: type_centric. It is shown in the default view.
+- [capability] Src Main Controller role=interaction modules=1 visible=yes priority=772 stages=0
+  responsibility: 承担项目中某项核心业务能力，参与主要的用户可见工作流。
+  summary: 承担项目中某项核心业务能力，参与主要的用户可见工作流。 Covers 1 module(s) and 1 file(s), spans stage 0, and appears in 2 main flow(s). Folder scope: Src. Main modules: src/main/controller. Example files: src/main/java/com/example/schedule/controller/ScheduleController.java. Key symbols: ScheduleController. Supporting roles inside this cluster: interaction. Direct collaborators: Src Main Service. It is shown in the default view.
+- [capability] Src Main Service role=analysis modules=1 visible=yes priority=784 stages=1
+  responsibility: 负责核心的数据分析或业务逻辑处理，将输入转化为结构化的结果。
+  summary: 负责核心的数据分析或业务逻辑处理，将输入转化为结构化的结果。 Covers 1 module(s) and 2 file(s), spans stage 1, and appears in 2 main flow(s). Folder scope: Src. Main modules: src/main/service. Example files: src/main/java/com/example/schedule/service/GradeService.java, src/main/java/com/example/schedule/service/LoginService.java. Key symbols: GradeService, LoginService. Supporting roles inside this cluster: analysis. Direct collaborators: Src Main Controller, Src Main Model. It is shown in the default view.
+- [infrastructure] (root) role=type_centric modules=1 visible=yes priority=278 stages=0
+  responsibility: 提供底层支撑服务，保持核心能力流程的稳定性和可复用性。
+  summary: 提供底层支撑服务，保持核心能力流程的稳定性和可复用性。 Covers 1 module(s) and 1 file(s), spans stage 0. Main modules: (root). Example files: pom.xml. Key symbols: none. Supporting roles inside this cluster: type_centric. It is shown in the default view.
+- [infrastructure] Src Main Model role=core_model modules=1 visible=yes priority=402 stages=2
+  responsibility: 提供底层支撑服务，保持核心能力流程的稳定性和可复用性。
+  summary: 提供底层支撑服务，保持核心能力流程的稳定性和可复用性。 Covers 1 module(s) and 1 file(s), spans stage 2, and appears in 1 main flow(s). Folder scope: Src. Main modules: src/main/model. Example files: src/main/java/com/example/schedule/model/Course.java. Key symbols: Course. Supporting roles inside this cluster: core_model. Direct collaborators: Src Main Service. It is shown in the default view.
+
+[capability edges]
+- enables: Src Main Controller -> Src Main Service (weight=2, visible=yes)
+  summary: Src Main Controller hands work to Src Main Service to continue the main capability flow (aggregated weight=2)
+- uses_infrastructure: Src Main Service -> Src Main Model (weight=2, visible=yes)
+  summary: Src Main Service relies on Src Main Model for shared support during execution (aggregated weight=2)
+
+[capability groups]
+- [lane] Capability Lane nodes=2 expanded=yes hidden=0
+  summary: Capability Lane containing 2 node(s).
+- [lane] Entry Lane nodes=1 expanded=yes hidden=0
+  summary: Entry Lane containing 1 node(s).
+- [lane] Infrastructure Lane nodes=2 expanded=yes hidden=0
+  summary: Infrastructure Lane containing 2 node(s).
+- [role_cluster] Analysis nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'analysis' containing 1 node(s).
+- [role_cluster] Core Model nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'core_model' containing 1 node(s).
+- [role_cluster] Interaction nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'interaction' containing 1 node(s).
+- [role_cluster] Type Centric nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'type_centric' containing 1 node(s).
+
+[capability flows]
+- Src Main Controller -> Src Main Model (weight=4, stage_span=2)
+  summary: Starts at Src Main Controller, crosses 3 capability step(s), spans 2 stage hop(s), and reaches Src Main Model with aggregate weight 4.
+  path: Src Main Controller -> Src Main Service -> Src Main Model
+- Src Main Controller -> Src Main Service (weight=2, stage_span=1)
+  summary: Starts at Src Main Controller, crosses 2 capability step(s), spans 1 stage hop(s), and reaches Src Main Service with aggregate weight 2.
+  path: Src Main Controller -> Src Main Service
+
+[capability diagnostics]
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.

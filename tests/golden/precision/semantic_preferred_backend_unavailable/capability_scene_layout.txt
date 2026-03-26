@@ -1,0 +1,14 @@
+[capability scene layout]
+canvas: 1040 x 360
+nodes: 1
+edges: 0
+groups: 1
+- node 1 lane=0 order=0 rect=(40, 28, 248, 116)
+- group#1 visibleNodes=1 bounds=(22, 10, 284, 152)
+
+[scene diagnostics]
+- Capability graph is based on fallback analysis because semantic analysis was unavailable.
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.
+- No infrastructure cluster was derived; the project may be mostly workflow-oriented or the current role heuristics need refinement.
+- No multi-step capability flow was derived from the current module dependency graph.

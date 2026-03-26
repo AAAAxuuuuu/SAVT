@@ -1,0 +1,18 @@
+# 编译输出目录
+build/
+target/
+out/
+Debug/
+Release/
+
+# IDE 配置文件
+.vscode/
+.idea/
+
+# 其他大文件
+*.mp4
+*.zip、
+
+# 忽略第三方嵌套仓库（如果这些库是必须的，后续建议用 Git Submodule 正规方式引入）
+tools/
+third_party/

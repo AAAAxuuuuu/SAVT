@@ -1,0 +1,36 @@
+[precision summary]
+primary engine: tree-sitter
+precision level: syntax
+semantic requested: false
+semantic enabled: false
+semantic status code: not_requested
+semantic status message: Semantic analysis was not requested for this run.
+compilation database: (none)
+discovered files: 6
+parsed files: 5
+raw nodes: 17
+raw edges: 19
+edge support total: 19
+semantic nodes: 0 (0.0%)
+inferred nodes: 17 (100.0%)
+semantic edges: 0 (0.0%)
+inferred edges: 19 (100.0%)
+
+[edge kinds]
+contains: 11
+calls: 0
+includes: 4
+inherits: 0
+uses_type: 0
+overrides: 0
+depends_on: 4
+
+[derived views]
+overview nodes: 6
+overview edges: 4
+overview flows: 4
+capability nodes: 6
+capability edges: 4
+capability flows: 4
+visible capability nodes: 6
+visible capability edges: 4

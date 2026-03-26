@@ -1,0 +1,7 @@
+[module layout]
+layers: 0
+canvas: 0 x 0
+positioned modules: 0
+
+[layout diagnostics]
+- No module nodes found for layout.

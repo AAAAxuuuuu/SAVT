@@ -1,0 +1,29 @@
+[overview]
+overview nodes: 1
+overview edges: 0
+overview groups: 2
+overview stages: 1
+overview flows: 0
+- [module] (root) role=interaction stage=entry in=0 out=0
+  summary: interaction module in stage entry with 2 file(s), 0 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 C/C++, 1 Data. Example files: compile_commands.json, main.cpp. Top symbols: none.
+
+[overview edges]
+- none
+
+[overview groups]
+- [folder_cluster] (root) nodes=1 expanded=yes
+  summary: Folder cluster '(root)' containing 1 module(s).
+- [role_cluster] interaction nodes=1 expanded=no
+  summary: Role cluster 'interaction' containing 1 module(s).
+
+[overview stages]
+- stage 0 (entry): 1 module(s)
+
+[overview flows]
+- none
+
+[overview diagnostics]
+- Derived 1 overview module(s) from 2 discovered file(s); average 2 file(s) per module.
+- No explicit entry module was detected; overview entry points are inferred from dependency roots only.
+- Cross-artifact inventory captured QML/Web/Python/Data-backed modules in addition to C/C++ modules.
+- No multi-module main flow could be derived from the current dependency graph.

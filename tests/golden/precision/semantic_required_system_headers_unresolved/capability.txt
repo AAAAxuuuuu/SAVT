@@ -1,0 +1,28 @@
+[capability graph]
+capability nodes: 1
+capability edges: 0
+capability flows: 0
+capability groups: 2
+- [capability] (root) role=interaction modules=1 visible=yes priority=596 stages=0
+  responsibility: 承担项目中某项核心业务能力，参与主要的用户可见工作流。
+  summary: 承担项目中某项核心业务能力，参与主要的用户可见工作流。 Covers 1 module(s) and 2 file(s), spans stage 0. It is reachable from an entry capability. Main modules: (root). Example files: compile_commands.json, main.cpp. Key symbols: none. Supporting roles inside this cluster: interaction. It is shown in the default view.
+
+[capability edges]
+- none
+
+[capability groups]
+- [lane] Capability Lane nodes=1 expanded=yes hidden=0
+  summary: Capability Lane containing 1 node(s).
+- [role_cluster] Interaction nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'interaction' containing 1 node(s).
+
+[capability flows]
+- none
+
+[capability diagnostics]
+- Capability graph is based on fallback analysis because semantic analysis was unavailable.
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.
+- No explicit entry capability was detected; the graph relies on inferred roots only.
+- No infrastructure cluster was derived; the project may be mostly workflow-oriented or the current role heuristics need refinement.
+- No multi-step capability flow was derived from the current module dependency graph.

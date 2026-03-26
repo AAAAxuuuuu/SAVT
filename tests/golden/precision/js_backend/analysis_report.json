@@ -1,0 +1,63 @@
+{
+  "rootPath": "<fixture_root>",
+  "engine": "tree-sitter",
+  "precisionLevel": "syntax",
+  "semanticStatusCode": "not_requested",
+  "semanticStatusMessage": "Semantic analysis was not requested for this run.",
+  "compilationDatabasePath": "",
+  "semanticAnalysisRequested": false,
+  "semanticAnalysisEnabled": false,
+  "summary": {
+    "discoveredFiles": 6,
+    "parsedFiles": 5,
+    "nodeCount": 17,
+    "edgeCount": 19,
+    "inferredNodeCount": 17,
+    "semanticNodeCount": 0,
+    "inferredEdgeCount": 19,
+    "semanticEdgeCount": 0
+  },
+  "nodes": [
+    {"id": 1, "kind": "file", "displayName": "package.json", "qualifiedName": "package.json", "identityKey": "file:package.json", "filePath": "package.json", "line": 0, "factSource": "inferred"},
+    {"id": 2, "kind": "file", "displayName": "scheduleController.js", "qualifiedName": "src/controllers/scheduleController.js", "identityKey": "file:src/controllers/scheduleController.js", "filePath": "src/controllers/scheduleController.js", "line": 0, "factSource": "inferred"},
+    {"id": 3, "kind": "file", "displayName": "schedule.js", "qualifiedName": "src/routes/schedule.js", "identityKey": "file:src/routes/schedule.js", "filePath": "src/routes/schedule.js", "line": 0, "factSource": "inferred"},
+    {"id": 4, "kind": "file", "displayName": "server.js", "qualifiedName": "src/server.js", "identityKey": "file:src/server.js", "filePath": "src/server.js", "line": 0, "factSource": "inferred"},
+    {"id": 5, "kind": "file", "displayName": "scheduleService.js", "qualifiedName": "src/services/scheduleService.js", "identityKey": "file:src/services/scheduleService.js", "filePath": "src/services/scheduleService.js", "line": 0, "factSource": "inferred"},
+    {"id": 6, "kind": "file", "displayName": "scheduleStore.js", "qualifiedName": "src/stores/scheduleStore.js", "identityKey": "file:src/stores/scheduleStore.js", "filePath": "src/stores/scheduleStore.js", "line": 0, "factSource": "inferred"},
+    {"id": 7, "kind": "module", "displayName": "(root)", "qualifiedName": "module:(root)", "identityKey": "module:(root)", "filePath": "(root)", "line": 0, "factSource": "inferred"},
+    {"id": 8, "kind": "module", "displayName": "src/controllers", "qualifiedName": "module:src/controllers", "identityKey": "module:src/controllers", "filePath": "src/controllers", "line": 0, "factSource": "inferred"},
+    {"id": 9, "kind": "module", "displayName": "src/routes", "qualifiedName": "module:src/routes", "identityKey": "module:src/routes", "filePath": "src/routes", "line": 0, "factSource": "inferred"},
+    {"id": 10, "kind": "module", "displayName": "src/server", "qualifiedName": "module:src/server", "identityKey": "module:src/server", "filePath": "src/server", "line": 0, "factSource": "inferred"},
+    {"id": 11, "kind": "module", "displayName": "src/services", "qualifiedName": "module:src/services", "identityKey": "module:src/services", "filePath": "src/services", "line": 0, "factSource": "inferred"},
+    {"id": 12, "kind": "module", "displayName": "src/stores", "qualifiedName": "module:src/stores", "identityKey": "module:src/stores", "filePath": "src/stores", "line": 0, "factSource": "inferred"},
+    {"id": 13, "kind": "function", "displayName": "scheduleController", "qualifiedName": "scheduleController", "identityKey": "", "filePath": "src/controllers/scheduleController.js", "line": 2, "factSource": "inferred"},
+    {"id": 14, "kind": "function", "displayName": "buildScheduleRoutes", "qualifiedName": "buildScheduleRoutes", "identityKey": "", "filePath": "src/routes/schedule.js", "line": 2, "factSource": "inferred"},
+    {"id": 15, "kind": "function", "displayName": "bootstrapServer", "qualifiedName": "bootstrapServer", "identityKey": "", "filePath": "src/server.js", "line": 3, "factSource": "inferred"},
+    {"id": 16, "kind": "function", "displayName": "scheduleService", "qualifiedName": "scheduleService", "identityKey": "", "filePath": "src/services/scheduleService.js", "line": 2, "factSource": "inferred"},
+    {"id": 17, "kind": "function", "displayName": "readSchedule", "qualifiedName": "readSchedule", "identityKey": "", "filePath": "src/stores/scheduleStore.js", "line": 0, "factSource": "inferred"}
+  ],
+  "edges": [
+    {"fromId": 7, "toId": 1, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 8, "toId": 2, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 9, "toId": 3, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 10, "toId": 4, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 11, "toId": 5, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 12, "toId": 6, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 2, "toId": 5, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 2, "toId": 13, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 2, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 14, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 4, "toId": 3, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 4, "toId": 15, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 6, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 16, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 6, "toId": 17, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 8, "toId": 11, "kind": "depends_on", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 9, "toId": 8, "kind": "depends_on", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 10, "toId": 9, "kind": "depends_on", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 11, "toId": 12, "kind": "depends_on", "weight": 1, "supportCount": 1, "factSource": "inferred"}
+  ],
+  "diagnostics": [
+    "Analyzer precision mode: syntax_only"
+  ]
+}

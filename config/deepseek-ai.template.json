@@ -1,0 +1,9 @@
+{
+    "provider":  "deepseek",
+    "enabled":  false,
+    "baseUrl":  "https://api.deepseek.com",
+    "endpointPath":  "",
+    "model":  "deepseek-chat",
+    "apiKey":  "replace-with-your-ai-api-key",
+    "timeoutMs":  30000
+}

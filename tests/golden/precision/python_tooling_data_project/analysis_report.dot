@@ -1,0 +1,32 @@
+digraph SAVT {
+  rankdir=LR;
+  graph [fontname="Cascadia Mono"];
+  node [shape=box, fontname="Cascadia Mono"];
+  edge [fontname="Cascadia Mono"];
+  n1 [label="file\nreport_builder.py"];
+  n2 [label="file\nschedule.json"];
+  n3 [label="file\nschedule_store.py"];
+  n4 [label="file\nformatting.py"];
+  n5 [label="file\nbuild_graph.py"];
+  n6 [label="module\nanalytics"];
+  n7 [label="module\ndata"];
+  n8 [label="module\nstorage"];
+  n9 [label="module\nsupport"];
+  n10 [label="module\ntools"];
+  n11 [label="function\nbuild_report"];
+  n12 [label="function\nload_schedule"];
+  n13 [label="function\nnormalize_name"];
+  n14 [label="function\nmain"];
+  n6 -> n1 [label="contains"];
+  n7 -> n2 [label="contains"];
+  n8 -> n3 [label="contains"];
+  n9 -> n4 [label="contains"];
+  n10 -> n5 [label="contains"];
+  n1 -> n8 [label="includes"];
+  n1 -> n11 [label="contains"];
+  n3 -> n9 [label="includes"];
+  n3 -> n12 [label="contains"];
+  n4 -> n13 [label="contains"];
+  n5 -> n6 [label="includes"];
+  n5 -> n14 [label="contains"];
+}

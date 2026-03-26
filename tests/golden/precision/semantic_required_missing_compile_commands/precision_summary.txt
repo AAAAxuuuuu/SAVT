@@ -1,0 +1,36 @@
+[precision summary]
+primary engine: none
+precision level: blocked_semantic_required
+semantic requested: true
+semantic enabled: false
+semantic status code: missing_compile_commands
+semantic status message: Semantic analysis is blocked because no compile_commands.json was found for the target project.
+compilation database: (none)
+discovered files: 0
+parsed files: 0
+raw nodes: 0
+raw edges: 0
+edge support total: 0
+semantic nodes: 0 (0.0%)
+inferred nodes: 0 (0.0%)
+semantic edges: 0 (0.0%)
+inferred edges: 0 (0.0%)
+
+[edge kinds]
+contains: 0
+calls: 0
+includes: 0
+inherits: 0
+uses_type: 0
+overrides: 0
+depends_on: 0
+
+[derived views]
+overview nodes: 0
+overview edges: 0
+overview flows: 0
+capability nodes: 0
+capability edges: 0
+capability flows: 0
+visible capability nodes: 0
+visible capability edges: 0

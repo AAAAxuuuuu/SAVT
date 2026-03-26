@@ -1,0 +1,13 @@
+[module layout]
+layers: 5
+canvas: 1600 x 280
+positioned modules: 6
+- src/server layer=0 order=0 pos=(0, 0)
+- (root) layer=0 order=1 pos=(0, 140)
+- src/routes layer=1 order=0 pos=(320, 0)
+- src/controllers layer=2 order=0 pos=(640, 0)
+- src/services layer=3 order=0 pos=(960, 0)
+- src/stores layer=4 order=0 pos=(1280, 0)
+
+[layout diagnostics]
+- none

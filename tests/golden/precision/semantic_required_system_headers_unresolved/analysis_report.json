@@ -1,0 +1,41 @@
+{
+  "rootPath": "<fixture_root>",
+  "engine": "libclang-cindex",
+  "precisionLevel": "blocked_semantic_required",
+  "semanticStatusCode": "system_headers_unresolved",
+  "semanticStatusMessage": "compile_commands.json was found, but libclang could not resolve required system headers.",
+  "compilationDatabasePath": "<fixture_root>/compile_commands.json",
+  "semanticAnalysisRequested": true,
+  "semanticAnalysisEnabled": false,
+  "summary": {
+    "discoveredFiles": 2,
+    "parsedFiles": 0,
+    "nodeCount": 3,
+    "edgeCount": 2,
+    "inferredNodeCount": 3,
+    "semanticNodeCount": 0,
+    "inferredEdgeCount": 2,
+    "semanticEdgeCount": 0
+  },
+  "nodes": [
+    {"id": 1, "kind": "file", "displayName": "compile_commands.json", "qualifiedName": "compile_commands.json", "identityKey": "file:compile_commands.json", "filePath": "compile_commands.json", "line": 0, "factSource": "inferred"},
+    {"id": 2, "kind": "file", "displayName": "main.cpp", "qualifiedName": "main.cpp", "identityKey": "file:main.cpp", "filePath": "main.cpp", "line": 0, "factSource": "inferred"},
+    {"id": 3, "kind": "module", "displayName": "(root)", "qualifiedName": "module:(root)", "identityKey": "module:(root)", "filePath": "(root)", "line": 0, "factSource": "inferred"}
+  ],
+  "edges": [
+    {"fromId": 3, "toId": 1, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 2, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"}
+  ],
+  "diagnostics": [
+    "warning: argument unused during compilation: '-nostdinc++' [-Wunused-command-line-argument]",
+    "<fixture_root>/main.cpp:1:10: error: 'vector' file not found",
+    "<fixture_root>/main.cpp:4:5: error: use of undeclared identifier 'std'",
+    "<fixture_root>/main.cpp:4:20: error: expected '(' for function-style cast or type construction",
+    "<fixture_root>/main.cpp:4:22: error: use of undeclared identifier 'values'",
+    "<fixture_root>/main.cpp:5:29: error: use of undeclared identifier 'values'",
+    "Semantic analysis blocked by unresolved system headers for: <fixture_root>/main.cpp",
+    "Semantic backend parsed 0/1 project translation units; unresolved system-header failures: 1.",
+    "Semantic backend did not successfully parse any translation units.",
+    "Analyzer precision mode: semantic_required"
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "rootPath": "<fixture_root>",
+  "engine": "tree-sitter",
+  "precisionLevel": "syntax",
+  "semanticStatusCode": "not_requested",
+  "semanticStatusMessage": "Semantic analysis was not requested for this run.",
+  "compilationDatabasePath": "",
+  "semanticAnalysisRequested": false,
+  "semanticAnalysisEnabled": false,
+  "summary": {
+    "discoveredFiles": 6,
+    "parsedFiles": 5,
+    "nodeCount": 16,
+    "edgeCount": 17,
+    "inferredNodeCount": 16,
+    "semanticNodeCount": 0,
+    "inferredEdgeCount": 17,
+    "semanticEdgeCount": 0
+  },
+  "nodes": [
+    {"id": 1, "kind": "file", "displayName": "pom.xml", "qualifiedName": "pom.xml", "identityKey": "file:pom.xml", "filePath": "pom.xml", "line": 0, "factSource": "inferred"},
+    {"id": 2, "kind": "file", "displayName": "ScheduleApplication.java", "qualifiedName": "src/main/java/com/example/schedule/ScheduleApplication.java", "identityKey": "file:src/main/java/com/example/schedule/ScheduleApplication.java", "filePath": "src/main/java/com/example/schedule/ScheduleApplication.java", "line": 0, "factSource": "inferred"},
+    {"id": 3, "kind": "file", "displayName": "ScheduleController.java", "qualifiedName": "src/main/java/com/example/schedule/controller/ScheduleController.java", "identityKey": "file:src/main/java/com/example/schedule/controller/ScheduleController.java", "filePath": "src/main/java/com/example/schedule/controller/ScheduleController.java", "line": 0, "factSource": "inferred"},
+    {"id": 4, "kind": "file", "displayName": "Course.java", "qualifiedName": "src/main/java/com/example/schedule/model/Course.java", "identityKey": "file:src/main/java/com/example/schedule/model/Course.java", "filePath": "src/main/java/com/example/schedule/model/Course.java", "line": 0, "factSource": "inferred"},
+    {"id": 5, "kind": "file", "displayName": "GradeService.java", "qualifiedName": "src/main/java/com/example/schedule/service/GradeService.java", "identityKey": "file:src/main/java/com/example/schedule/service/GradeService.java", "filePath": "src/main/java/com/example/schedule/service/GradeService.java", "line": 0, "factSource": "inferred"},
+    {"id": 6, "kind": "file", "displayName": "LoginService.java", "qualifiedName": "src/main/java/com/example/schedule/service/LoginService.java", "identityKey": "file:src/main/java/com/example/schedule/service/LoginService.java", "filePath": "src/main/java/com/example/schedule/service/LoginService.java", "line": 0, "factSource": "inferred"},
+    {"id": 7, "kind": "module", "displayName": "(root)", "qualifiedName": "module:(root)", "identityKey": "module:(root)", "filePath": "(root)", "line": 0, "factSource": "inferred"},
+    {"id": 8, "kind": "module", "displayName": "src/main/bootstrap", "qualifiedName": "module:src/main/bootstrap", "identityKey": "module:src/main/bootstrap", "filePath": "src/main/bootstrap", "line": 0, "factSource": "inferred"},
+    {"id": 9, "kind": "module", "displayName": "src/main/controller", "qualifiedName": "module:src/main/controller", "identityKey": "module:src/main/controller", "filePath": "src/main/controller", "line": 0, "factSource": "inferred"},
+    {"id": 10, "kind": "module", "displayName": "src/main/model", "qualifiedName": "module:src/main/model", "identityKey": "module:src/main/model", "filePath": "src/main/model", "line": 0, "factSource": "inferred"},
+    {"id": 11, "kind": "module", "displayName": "src/main/service", "qualifiedName": "module:src/main/service", "identityKey": "module:src/main/service", "filePath": "src/main/service", "line": 0, "factSource": "inferred"},
+    {"id": 12, "kind": "class", "displayName": "ScheduleApplication", "qualifiedName": "ScheduleApplication", "identityKey": "", "filePath": "src/main/java/com/example/schedule/ScheduleApplication.java", "line": 5, "factSource": "inferred"},
+    {"id": 13, "kind": "class", "displayName": "ScheduleController", "qualifiedName": "ScheduleController", "identityKey": "", "filePath": "src/main/java/com/example/schedule/controller/ScheduleController.java", "line": 7, "factSource": "inferred"},
+    {"id": 14, "kind": "class", "displayName": "Course", "qualifiedName": "Course", "identityKey": "", "filePath": "src/main/java/com/example/schedule/model/Course.java", "line": 2, "factSource": "inferred"},
+    {"id": 15, "kind": "class", "displayName": "GradeService", "qualifiedName": "GradeService", "identityKey": "", "filePath": "src/main/java/com/example/schedule/service/GradeService.java", "line": 6, "factSource": "inferred"},
+    {"id": 16, "kind": "class", "displayName": "LoginService", "qualifiedName": "LoginService", "identityKey": "", "filePath": "src/main/java/com/example/schedule/service/LoginService.java", "line": 6, "factSource": "inferred"}
+  ],
+  "edges": [
+    {"fromId": 7, "toId": 1, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 8, "toId": 2, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 9, "toId": 3, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 10, "toId": 4, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 11, "toId": 5, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 11, "toId": 6, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 2, "toId": 12, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 5, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 6, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 13, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 4, "toId": 14, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 4, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 15, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 6, "toId": 4, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 6, "toId": 16, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 9, "toId": 11, "kind": "depends_on", "weight": 2, "supportCount": 2, "factSource": "inferred"},
+    {"fromId": 11, "toId": 10, "kind": "depends_on", "weight": 2, "supportCount": 2, "factSource": "inferred"}
+  ],
+  "diagnostics": [
+    "Analyzer precision mode: syntax_only"
+  ]
+}

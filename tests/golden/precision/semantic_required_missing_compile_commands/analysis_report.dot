@@ -1,0 +1,6 @@
+digraph SAVT {
+  rankdir=LR;
+  graph [fontname="Cascadia Mono"];
+  node [shape=box, fontname="Cascadia Mono"];
+  edge [fontname="Cascadia Mono"];
+}

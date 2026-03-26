@@ -1,0 +1,27 @@
+[capability scene layout]
+canvas: 1089.6 x 498.8
+nodes: 6
+edges: 4
+groups: 8
+- node 1 lane=0 order=0 rect=(40, 28, 260.4, 121.8)
+- node 4 lane=1 order=0 rect=(408.4, 28, 272.8, 127.6)
+- node 3 lane=1 order=1 rect=(408.4, 185.6, 272.8, 127.6)
+- node 5 lane=1 order=2 rect=(408.4, 343.2, 272.8, 127.6)
+- node 6 lane=2 order=0 rect=(789.2, 28, 260.4, 121.8)
+- node 2 lane=2 order=1 rect=(795.4, 179.8, 248, 116)
+- edge 3 1 -> 4 routeStart=(300.4, 88.9) routeEnd=(408.4, 91.8)
+- edge 1 3 -> 5 routeStart=(681.2, 249.4) routeEnd=(408.4, 407)
+- edge 2 4 -> 3 routeStart=(681.2, 91.8) routeEnd=(408.4, 249.4)
+- edge 4 5 -> 6 routeStart=(681.2, 407) routeEnd=(789.2, 88.9)
+- group#1 visibleNodes=1 bounds=(22, 10, 296.4, 157.8)
+- group#2 visibleNodes=1 bounds=(390.4, 10, 308.8, 163.6)
+- group#3 visibleNodes=3 bounds=(390.4, 10, 308.8, 478.8)
+- group#4 visibleNodes=1 bounds=(390.4, 167.6, 308.8, 163.6)
+- group#5 visibleNodes=1 bounds=(390.4, 325.2, 308.8, 163.6)
+- group#6 visibleNodes=1 bounds=(771.2, 10, 296.4, 157.8)
+- group#7 visibleNodes=2 bounds=(771.2, 10, 296.4, 303.8)
+- group#8 visibleNodes=1 bounds=(777.4, 161.8, 284, 152)
+
+[scene diagnostics]
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.

@@ -1,0 +1,53 @@
+{
+  "rootPath": "<fixture_root>",
+  "engine": "tree-sitter",
+  "precisionLevel": "syntax",
+  "semanticStatusCode": "not_requested",
+  "semanticStatusMessage": "Semantic analysis was not requested for this run.",
+  "compilationDatabasePath": "",
+  "semanticAnalysisRequested": false,
+  "semanticAnalysisEnabled": false,
+  "summary": {
+    "discoveredFiles": 5,
+    "parsedFiles": 4,
+    "nodeCount": 14,
+    "edgeCount": 12,
+    "inferredNodeCount": 14,
+    "semanticNodeCount": 0,
+    "inferredEdgeCount": 12,
+    "semanticEdgeCount": 0
+  },
+  "nodes": [
+    {"id": 1, "kind": "file", "displayName": "report_builder.py", "qualifiedName": "analytics/report_builder.py", "identityKey": "file:analytics/report_builder.py", "filePath": "analytics/report_builder.py", "line": 0, "factSource": "inferred"},
+    {"id": 2, "kind": "file", "displayName": "schedule.json", "qualifiedName": "data/schedule.json", "identityKey": "file:data/schedule.json", "filePath": "data/schedule.json", "line": 0, "factSource": "inferred"},
+    {"id": 3, "kind": "file", "displayName": "schedule_store.py", "qualifiedName": "storage/schedule_store.py", "identityKey": "file:storage/schedule_store.py", "filePath": "storage/schedule_store.py", "line": 0, "factSource": "inferred"},
+    {"id": 4, "kind": "file", "displayName": "formatting.py", "qualifiedName": "support/formatting.py", "identityKey": "file:support/formatting.py", "filePath": "support/formatting.py", "line": 0, "factSource": "inferred"},
+    {"id": 5, "kind": "file", "displayName": "build_graph.py", "qualifiedName": "tools/build_graph.py", "identityKey": "file:tools/build_graph.py", "filePath": "tools/build_graph.py", "line": 0, "factSource": "inferred"},
+    {"id": 6, "kind": "module", "displayName": "analytics", "qualifiedName": "module:analytics", "identityKey": "module:analytics", "filePath": "analytics", "line": 0, "factSource": "inferred"},
+    {"id": 7, "kind": "module", "displayName": "data", "qualifiedName": "module:data", "identityKey": "module:data", "filePath": "data", "line": 0, "factSource": "inferred"},
+    {"id": 8, "kind": "module", "displayName": "storage", "qualifiedName": "module:storage", "identityKey": "module:storage", "filePath": "storage", "line": 0, "factSource": "inferred"},
+    {"id": 9, "kind": "module", "displayName": "support", "qualifiedName": "module:support", "identityKey": "module:support", "filePath": "support", "line": 0, "factSource": "inferred"},
+    {"id": 10, "kind": "module", "displayName": "tools", "qualifiedName": "module:tools", "identityKey": "module:tools", "filePath": "tools", "line": 0, "factSource": "inferred"},
+    {"id": 11, "kind": "function", "displayName": "build_report", "qualifiedName": "build_report", "identityKey": "", "filePath": "analytics/report_builder.py", "line": 3, "factSource": "inferred"},
+    {"id": 12, "kind": "function", "displayName": "load_schedule", "qualifiedName": "load_schedule", "identityKey": "", "filePath": "storage/schedule_store.py", "line": 3, "factSource": "inferred"},
+    {"id": 13, "kind": "function", "displayName": "normalize_name", "qualifiedName": "normalize_name", "identityKey": "", "filePath": "support/formatting.py", "line": 0, "factSource": "inferred"},
+    {"id": 14, "kind": "function", "displayName": "main", "qualifiedName": "main", "identityKey": "", "filePath": "tools/build_graph.py", "line": 3, "factSource": "inferred"}
+  ],
+  "edges": [
+    {"fromId": 6, "toId": 1, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 7, "toId": 2, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 8, "toId": 3, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 9, "toId": 4, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 10, "toId": 5, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 1, "toId": 8, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 1, "toId": 11, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 9, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 12, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 4, "toId": 13, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 6, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 14, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"}
+  ],
+  "diagnostics": [
+    "Analyzer precision mode: syntax_only"
+  ]
+}

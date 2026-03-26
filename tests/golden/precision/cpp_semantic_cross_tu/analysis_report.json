@@ -1,0 +1,58 @@
+{
+  "rootPath": "<fixture_root>",
+  "engine": "libclang-cindex",
+  "precisionLevel": "semantic",
+  "semanticStatusCode": "semantic_ready",
+  "semanticStatusMessage": "Clang/LibTooling semantic backend completed successfully.",
+  "compilationDatabasePath": "<fixture_root>/compile_commands.json",
+  "semanticAnalysisRequested": true,
+  "semanticAnalysisEnabled": true,
+  "summary": {
+    "discoveredFiles": 4,
+    "parsedFiles": 2,
+    "nodeCount": 12,
+    "edgeCount": 19,
+    "inferredNodeCount": 5,
+    "semanticNodeCount": 7,
+    "inferredEdgeCount": 4,
+    "semanticEdgeCount": 15
+  },
+  "nodes": [
+    {"id": 1, "kind": "file", "displayName": "base.cpp", "qualifiedName": "base.cpp", "identityKey": "file:base.cpp", "filePath": "base.cpp", "line": 0, "factSource": "inferred"},
+    {"id": 2, "kind": "file", "displayName": "compile_commands.json", "qualifiedName": "compile_commands.json", "identityKey": "file:compile_commands.json", "filePath": "compile_commands.json", "line": 0, "factSource": "inferred"},
+    {"id": 3, "kind": "file", "displayName": "derived.cpp", "qualifiedName": "derived.cpp", "identityKey": "file:derived.cpp", "filePath": "derived.cpp", "line": 0, "factSource": "inferred"},
+    {"id": 4, "kind": "file", "displayName": "model.h", "qualifiedName": "model.h", "identityKey": "file:model.h", "filePath": "model.h", "line": 0, "factSource": "inferred"},
+    {"id": 5, "kind": "module", "displayName": "(root)", "qualifiedName": "module:(root)", "identityKey": "module:(root)", "filePath": "(root)", "line": 0, "factSource": "inferred"},
+    {"id": 6, "kind": "method", "displayName": "run", "qualifiedName": "Base::run", "identityKey": "c:@S@Base@F@run#", "filePath": "base.cpp", "line": 2, "factSource": "semantic"},
+    {"id": 7, "kind": "function", "displayName": "callBase", "qualifiedName": "callBase", "identityKey": "c:@F@callBase#&$@S@Base#", "filePath": "base.cpp", "line": 6, "factSource": "semantic"},
+    {"id": 8, "kind": "method", "displayName": "run", "qualifiedName": "Derived::run", "identityKey": "c:@S@Derived@F@run#", "filePath": "derived.cpp", "line": 2, "factSource": "semantic"},
+    {"id": 9, "kind": "function", "displayName": "makeBox", "qualifiedName": "makeBox", "identityKey": "c:@F@makeBox#", "filePath": "derived.cpp", "line": 6, "factSource": "semantic"},
+    {"id": 10, "kind": "struct", "displayName": "Base", "qualifiedName": "Base", "identityKey": "c:@S@Base", "filePath": "model.h", "line": 2, "factSource": "semantic"},
+    {"id": 11, "kind": "struct", "displayName": "Derived", "qualifiedName": "Derived", "identityKey": "c:@S@Derived", "filePath": "model.h", "line": 6, "factSource": "semantic"},
+    {"id": 12, "kind": "class", "displayName": "Box", "qualifiedName": "Box", "identityKey": "c:@ST>1#T@Box", "filePath": "model.h", "line": 11, "factSource": "semantic"}
+  ],
+  "edges": [
+    {"fromId": 5, "toId": 1, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 2, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 3, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 4, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 1, "toId": 4, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "semantic"},
+    {"fromId": 3, "toId": 4, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "semantic"},
+    {"fromId": 10, "toId": 6, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "semantic"},
+    {"fromId": 1, "toId": 7, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "semantic"},
+    {"fromId": 11, "toId": 8, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "semantic"},
+    {"fromId": 3, "toId": 9, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "semantic"},
+    {"fromId": 4, "toId": 10, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "semantic"},
+    {"fromId": 4, "toId": 11, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "semantic"},
+    {"fromId": 4, "toId": 12, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "semantic"},
+    {"fromId": 7, "toId": 10, "kind": "uses_type", "weight": 1, "supportCount": 3, "factSource": "semantic"},
+    {"fromId": 7, "toId": 6, "kind": "calls", "weight": 1, "supportCount": 1, "factSource": "semantic"},
+    {"fromId": 9, "toId": 12, "kind": "uses_type", "weight": 1, "supportCount": 3, "factSource": "semantic"},
+    {"fromId": 11, "toId": 10, "kind": "inherits", "weight": 1, "supportCount": 3, "factSource": "semantic"},
+    {"fromId": 8, "toId": 6, "kind": "calls", "weight": 1, "supportCount": 1, "factSource": "semantic"},
+    {"fromId": 8, "toId": 6, "kind": "overrides", "weight": 1, "supportCount": 3, "factSource": "semantic"}
+  ],
+  "diagnostics": [
+    "Analyzer precision mode: semantic_required"
+  ]
+}

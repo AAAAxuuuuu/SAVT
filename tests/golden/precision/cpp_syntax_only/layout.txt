@@ -1,0 +1,10 @@
+[module layout]
+layers: 3
+canvas: 960 x 140
+positioned modules: 3
+- App layer=0 order=0 pos=(0, 0)
+- App/frontend layer=1 order=0 pos=(320, 0)
+- App/backend layer=2 order=0 pos=(640, 0)
+
+[layout diagnostics]
+- none

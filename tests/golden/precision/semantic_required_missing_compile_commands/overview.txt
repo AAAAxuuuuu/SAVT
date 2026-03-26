@@ -1,0 +1,21 @@
+[overview]
+overview nodes: 0
+overview edges: 0
+overview groups: 0
+overview stages: 1
+overview flows: 0
+
+[overview edges]
+- none
+
+[overview groups]
+- none
+
+[overview stages]
+- stage 0 (entry): 0 module(s)
+
+[overview flows]
+- none
+
+[overview diagnostics]
+- No module-level overview nodes could be derived from the analysis report.

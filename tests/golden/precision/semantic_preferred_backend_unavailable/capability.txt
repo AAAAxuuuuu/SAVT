@@ -1,0 +1,26 @@
+[capability graph]
+capability nodes: 1
+capability edges: 0
+capability flows: 0
+capability groups: 1
+- [entry] (root) role=🔧 辅助工具 (Utils) modules=1 visible=yes priority=1246 stages=0
+  responsibility: 提供通用的边角料功能（如时间转换、字符串处理等）。
+  summary: 提供通用的边角料功能（如时间转换、字符串处理等）。 包含了 2 个源码文件。
+👉 核心类/函数: helper, main
+
+[capability edges]
+- none
+
+[capability groups]
+- [lane] Entry Lane nodes=1 expanded=yes hidden=0
+  summary: Entry Lane containing 1 node(s).
+
+[capability flows]
+- none
+
+[capability diagnostics]
+- Capability graph is based on fallback analysis because semantic analysis was unavailable.
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.
+- No infrastructure cluster was derived; the project may be mostly workflow-oriented or the current role heuristics need refinement.
+- No multi-step capability flow was derived from the current module dependency graph.

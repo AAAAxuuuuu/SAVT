@@ -1,0 +1,43 @@
+[capability graph]
+capability nodes: 3
+capability edges: 3
+capability flows: 2
+capability groups: 3
+- [entry] App role=procedure_centric modules=1 visible=yes priority=1486 stages=0
+  responsibility: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。
+  summary: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。 Covers 1 module(s) and 1 file(s), spans stage 0, and appears in 2 main flow(s). It is reachable from an entry capability. Main modules: App. Example files: App/main.cpp. Key symbols: main. Supporting roles inside this cluster: procedure_centric. Direct collaborators: App Backend, App Frontend. It is shown in the default view.
+- [entry] App Frontend role=🎨 界面展示 (UI) modules=1 visible=yes priority=1694 stages=1
+  responsibility: 负责渲染界面和处理用户的点击/滑动等操作。
+  summary: 负责渲染界面和处理用户的点击/滑动等操作。 包含了 2 个源码文件。
+👉 核心类/函数: MainWindow, show
+- [infrastructure] App Backend role=interaction modules=1 visible=yes priority=482 stages=2
+  responsibility: 提供底层支撑服务，保持核心能力流程的稳定性和可复用性。
+  summary: 提供底层支撑服务，保持核心能力流程的稳定性和可复用性。 Covers 1 module(s) and 3 file(s), spans stage 2, and appears in 1 main flow(s). It is reachable from an entry capability. Folder scope: App. Main modules: App/backend. Example files: App/backend/model/Task.h, App/backend/service/TaskService.cpp, App/backend/service/TaskService.h. Key symbols: Task, TaskService, current, nextId. Supporting roles inside this cluster: interaction. Direct collaborators: App, App Frontend. It is shown in the default view.
+
+[capability edges]
+- activates: App -> App Frontend (weight=2, visible=yes)
+  summary: App activates App Frontend as one of the first visible workflow steps (aggregated weight=2)
+- activates: App Frontend -> App Backend (weight=2, visible=yes)
+  summary: App Frontend activates App Backend as one of the first visible workflow steps (aggregated weight=2)
+- activates: App -> App Backend (weight=1, visible=yes)
+  summary: App activates App Backend as one of the first visible workflow steps (aggregated weight=1)
+
+[capability groups]
+- [lane] Entry Lane nodes=2 expanded=yes hidden=0
+  summary: Entry Lane containing 2 node(s).
+- [lane] Infrastructure Lane nodes=1 expanded=yes hidden=0
+  summary: Infrastructure Lane containing 1 node(s).
+- [role_cluster] Interaction nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'interaction' containing 1 node(s).
+
+[capability flows]
+- App -> App Backend (weight=3, stage_span=2)
+  summary: Starts at App, crosses 3 capability step(s), spans 2 stage hop(s), and reaches App Backend with aggregate weight 3.
+  path: App -> App Frontend -> App Backend
+- App -> App Frontend (weight=3, stage_span=1)
+  summary: Starts at App, crosses 2 capability step(s), spans 1 stage hop(s), and reaches App Frontend with aggregate weight 3.
+  path: App -> App Frontend
+
+[capability diagnostics]
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.

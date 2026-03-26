@@ -1,0 +1,48 @@
+[overview]
+overview nodes: 4
+overview edges: 1
+overview groups: 8
+overview stages: 2
+overview flows: 1
+- [entry_point_module] app role=procedure_centric stage=entry in=0 out=1
+  summary: entry procedure_centric module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 C/C++. Example files: app/main.cpp. Top symbols: main.
+- [module] backend role=interaction stage=leaf in=1 out=0
+  summary: interaction module in stage leaf with 3 file(s), 1 class(es), 1 struct(s), 0 enum(s), 0 function(s), 2 method(s). Reachable from an entry module. Tech mix: 3 C/C++. Example files: backend/facade/TrafficBackend.cpp, backend/facade/TrafficBackend.h, backend/model/Station.h. Top symbols: TrafficBackend, Station, currentStation, refresh.
+- [module] data role=data stage=entry in=0 out=0
+  summary: data module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Tech mix: 1 Data. Example files: data/metro.json. Top symbols: none.
+- [module] ui role=presentation stage=entry in=0 out=0
+  summary: presentation module in stage entry with 2 file(s), 0 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Tech mix: 2 QML. Example files: ui/MapShell.qml, ui/components/LegendPanel.qml. Top symbols: none.
+
+[overview edges]
+- depends_on: app -> backend (weight=2)
+
+[overview groups]
+- [folder_cluster] app nodes=1 expanded=yes
+  summary: Folder cluster 'app' containing 1 module(s).
+- [folder_cluster] backend nodes=1 expanded=yes
+  summary: Folder cluster 'backend' containing 1 module(s).
+- [folder_cluster] data nodes=1 expanded=yes
+  summary: Folder cluster 'data' containing 1 module(s).
+- [folder_cluster] ui nodes=1 expanded=yes
+  summary: Folder cluster 'ui' containing 1 module(s).
+- [role_cluster] data nodes=1 expanded=no
+  summary: Role cluster 'data' containing 1 module(s).
+- [role_cluster] interaction nodes=1 expanded=no
+  summary: Role cluster 'interaction' containing 1 module(s).
+- [role_cluster] presentation nodes=1 expanded=no
+  summary: Role cluster 'presentation' containing 1 module(s).
+- [role_cluster] procedure_centric nodes=1 expanded=no
+  summary: Role cluster 'procedure_centric' containing 1 module(s).
+
+[overview stages]
+- stage 0 (entry): 3 module(s)
+- stage 1 (leaf): 1 module(s)
+
+[overview flows]
+- app -> backend (weight=3, stage_span=1)
+  summary: Starts at app, traverses 2 module(s) across 1 stage hop(s), and reaches backend with cumulative dependency weight 3.
+  path: app -> backend
+
+[overview diagnostics]
+- Derived 4 overview module(s) from 7 discovered file(s); average 1.75 file(s) per module.
+- Cross-artifact inventory captured QML/Web/Python/Data-backed modules in addition to C/C++ modules.

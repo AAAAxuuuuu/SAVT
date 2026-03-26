@@ -1,0 +1,36 @@
+[precision summary]
+primary engine: libclang-cindex
+precision level: semantic
+semantic requested: true
+semantic enabled: true
+semantic status code: semantic_ready
+semantic status message: Clang/LibTooling semantic backend completed successfully.
+compilation database: <fixture_root>/compile_commands.json
+discovered files: 4
+parsed files: 2
+raw nodes: 12
+raw edges: 19
+edge support total: 27
+semantic nodes: 7 (58.3%)
+inferred nodes: 5 (41.7%)
+semantic edges: 15 (78.9%)
+inferred edges: 4 (21.1%)
+
+[edge kinds]
+contains: 11
+calls: 2
+includes: 2
+inherits: 1
+uses_type: 2
+overrides: 1
+depends_on: 0
+
+[derived views]
+overview nodes: 1
+overview edges: 0
+overview flows: 0
+capability nodes: 1
+capability edges: 0
+capability flows: 0
+visible capability nodes: 1
+visible capability edges: 0

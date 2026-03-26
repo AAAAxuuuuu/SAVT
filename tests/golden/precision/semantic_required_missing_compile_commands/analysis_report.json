@@ -1,0 +1,28 @@
+{
+  "rootPath": "<fixture_root>",
+  "engine": "none",
+  "precisionLevel": "blocked_semantic_required",
+  "semanticStatusCode": "missing_compile_commands",
+  "semanticStatusMessage": "Semantic analysis is blocked because no compile_commands.json was found for the target project.",
+  "compilationDatabasePath": "",
+  "semanticAnalysisRequested": true,
+  "semanticAnalysisEnabled": false,
+  "summary": {
+    "discoveredFiles": 0,
+    "parsedFiles": 0,
+    "nodeCount": 0,
+    "edgeCount": 0,
+    "inferredNodeCount": 0,
+    "semanticNodeCount": 0,
+    "inferredEdgeCount": 0,
+    "semanticEdgeCount": 0
+  },
+  "nodes": [
+  ],
+  "edges": [
+  ],
+  "diagnostics": [
+    "Semantic analysis requested, but no compile_commands.json was found.",
+    "Analyzer precision mode: semantic_required"
+  ]
+}

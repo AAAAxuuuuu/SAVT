@@ -1,0 +1,70 @@
+[capability graph]
+capability nodes: 6
+capability edges: 4
+capability flows: 4
+capability groups: 8
+- [entry] Src Server role=interaction modules=1 visible=yes priority=1722 stages=0
+  responsibility: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。
+  summary: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。 Covers 1 module(s) and 1 file(s), spans stage 0, and appears in 4 main flow(s). It is reachable from an entry capability. Folder scope: Src. Main modules: src/server. Example files: src/server.js. Key symbols: bootstrapServer. Supporting roles inside this cluster: interaction. Direct collaborators: Src Routes. It is shown in the default view.
+- [capability] Src Controllers role=interaction modules=1 visible=yes priority=956 stages=2
+  responsibility: 承担项目中某项核心业务能力，参与主要的用户可见工作流。
+  summary: 承担项目中某项核心业务能力，参与主要的用户可见工作流。 Covers 1 module(s) and 1 file(s), spans stage 2, and appears in 3 main flow(s). It is reachable from an entry capability. Folder scope: Src. Main modules: src/controllers. Example files: src/controllers/scheduleController.js. Key symbols: scheduleController. Supporting roles inside this cluster: interaction. Direct collaborators: Src Routes, Src Services. It is shown in the default view.
+- [capability] Src Routes role=🎨 界面展示 (UI) modules=1 visible=yes priority=1276 stages=1
+  responsibility: 负责渲染界面和处理用户的点击/滑动等操作。
+  summary: 负责渲染界面和处理用户的点击/滑动等操作。 包含了 1 个源码文件。
+👉 核心类/函数: buildScheduleRoutes
+- [capability] Src Services role=analysis modules=1 visible=yes priority=836 stages=3
+  responsibility: 负责核心的数据分析或业务逻辑处理，将输入转化为结构化的结果。
+  summary: 负责核心的数据分析或业务逻辑处理，将输入转化为结构化的结果。 Covers 1 module(s) and 1 file(s), spans stage 3, and appears in 2 main flow(s). It is reachable from an entry capability. Folder scope: Src. Main modules: src/services. Example files: src/services/scheduleService.js. Key symbols: scheduleService. Supporting roles inside this cluster: analysis. Direct collaborators: Src Controllers, Src Stores. It is shown in the default view.
+- [infrastructure] (root) role=data modules=1 visible=yes priority=278 stages=0
+  responsibility: 负责持久化存储配置、资源或项目运行数据，供其他模块读取和写入。
+  summary: 负责持久化存储配置、资源或项目运行数据，供其他模块读取和写入。 Covers 1 module(s) and 1 file(s), spans stage 0. Main modules: (root). Example files: package.json. Key symbols: none. Supporting roles inside this cluster: data. It is shown in the default view.
+- [infrastructure] Src Stores role=tooling modules=1 visible=yes priority=462 stages=4
+  responsibility: 构建或预处理阶段的辅助模块，在主运行时流程之外完成转换、验证或生成工作。
+  summary: 构建或预处理阶段的辅助模块，在主运行时流程之外完成转换、验证或生成工作。 Covers 1 module(s) and 1 file(s), spans stage 4, and appears in 1 main flow(s). It is reachable from an entry capability. Folder scope: Src. Main modules: src/stores. Example files: src/stores/scheduleStore.js. Key symbols: readSchedule. Supporting roles inside this cluster: tooling. Direct collaborators: Src Services. It is shown in the default view.
+
+[capability edges]
+- activates: Src Server -> Src Routes (weight=1, visible=yes)
+  summary: Src Server activates Src Routes as one of the first visible workflow steps (aggregated weight=1)
+- enables: Src Controllers -> Src Services (weight=1, visible=yes)
+  summary: Src Controllers hands work to Src Services to continue the main capability flow (aggregated weight=1)
+- enables: Src Routes -> Src Controllers (weight=1, visible=yes)
+  summary: Src Routes hands work to Src Controllers to continue the main capability flow (aggregated weight=1)
+- uses_infrastructure: Src Services -> Src Stores (weight=1, visible=yes)
+  summary: Src Services relies on Src Stores for shared support during execution (aggregated weight=1)
+
+[capability groups]
+- [lane] Capability Lane nodes=3 expanded=yes hidden=0
+  summary: Capability Lane containing 3 node(s).
+- [lane] Entry Lane nodes=1 expanded=yes hidden=0
+  summary: Entry Lane containing 1 node(s).
+- [lane] Infrastructure Lane nodes=2 expanded=yes hidden=0
+  summary: Infrastructure Lane containing 2 node(s).
+- [role_cluster] Analysis nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'analysis' containing 1 node(s).
+- [role_cluster] Data nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'data' containing 1 node(s).
+- [role_cluster] Interaction nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'interaction' containing 1 node(s).
+- [role_cluster] Tooling nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'tooling' containing 1 node(s).
+- [role_cluster] 🎨 界面展示 (UI) nodes=1 expanded=yes hidden=0
+  summary: Role cluster '🎨 界面展示 (UI)' containing 1 node(s).
+
+[capability flows]
+- Src Server -> Src Stores (weight=5, stage_span=4)
+  summary: Starts at Src Server, crosses 5 capability step(s), spans 4 stage hop(s), and reaches Src Stores with aggregate weight 5.
+  path: Src Server -> Src Routes -> Src Controllers -> Src Services -> Src Stores
+- Src Server -> Src Services (weight=4, stage_span=3)
+  summary: Starts at Src Server, crosses 4 capability step(s), spans 3 stage hop(s), and reaches Src Services with aggregate weight 4.
+  path: Src Server -> Src Routes -> Src Controllers -> Src Services
+- Src Server -> Src Controllers (weight=3, stage_span=2)
+  summary: Starts at Src Server, crosses 3 capability step(s), spans 2 stage hop(s), and reaches Src Controllers with aggregate weight 3.
+  path: Src Server -> Src Routes -> Src Controllers
+- Src Server -> Src Routes (weight=2, stage_span=1)
+  summary: Starts at Src Server, crosses 2 capability step(s), spans 1 stage hop(s), and reaches Src Routes with aggregate weight 2.
+  path: Src Server -> Src Routes
+
+[capability diagnostics]
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.

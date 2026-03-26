@@ -1,0 +1,50 @@
+[overview]
+overview nodes: 5
+overview edges: 2
+overview groups: 6
+overview stages: 3
+overview flows: 2
+- [entry_point_module] src/main/bootstrap role=type_centric stage=entry in=0 out=0
+  summary: entry type_centric module in stage entry with 1 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Reachable from an entry module. Tech mix: none. Example files: src/main/java/com/example/schedule/ScheduleApplication.java. Top symbols: ScheduleApplication.
+- [module] (root) role=type_centric stage=entry in=0 out=0
+  summary: type_centric module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Tech mix: none. Example files: pom.xml. Top symbols: none.
+- [module] src/main/controller role=interaction stage=entry in=0 out=1
+  summary: interaction module in stage entry with 1 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Tech mix: none. Example files: src/main/java/com/example/schedule/controller/ScheduleController.java. Top symbols: ScheduleController.
+- [module] src/main/model role=core_model stage=leaf in=1 out=0
+  summary: core_model module in stage leaf with 1 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Tech mix: none. Example files: src/main/java/com/example/schedule/model/Course.java. Top symbols: Course.
+- [module] src/main/service role=analysis stage=core in=1 out=1
+  summary: analysis module in stage core with 2 file(s), 2 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Tech mix: none. Example files: src/main/java/com/example/schedule/service/GradeService.java, src/main/java/com/example/schedule/service/LoginService.java. Top symbols: GradeService, LoginService.
+
+[overview edges]
+- depends_on: src/main/controller -> src/main/service (weight=2)
+- depends_on: src/main/service -> src/main/model (weight=2)
+
+[overview groups]
+- [folder_cluster] (root) nodes=1 expanded=yes
+  summary: Folder cluster '(root)' containing 1 module(s).
+- [folder_cluster] src nodes=4 expanded=yes
+  summary: Folder cluster 'src' containing 4 module(s).
+- [role_cluster] analysis nodes=1 expanded=no
+  summary: Role cluster 'analysis' containing 1 module(s).
+- [role_cluster] core_model nodes=1 expanded=no
+  summary: Role cluster 'core_model' containing 1 module(s).
+- [role_cluster] interaction nodes=1 expanded=no
+  summary: Role cluster 'interaction' containing 1 module(s).
+- [role_cluster] type_centric nodes=2 expanded=no
+  summary: Role cluster 'type_centric' containing 2 module(s).
+
+[overview stages]
+- stage 0 (entry): 3 module(s)
+- stage 1 (core): 1 module(s)
+- stage 2 (leaf): 1 module(s)
+
+[overview flows]
+- src/main/controller -> src/main/model (weight=4, stage_span=2)
+  summary: Starts at src/main/controller, traverses 3 module(s) across 2 stage hop(s), and reaches src/main/model with cumulative dependency weight 4.
+  path: src/main/controller -> src/main/service -> src/main/model
+- src/main/controller -> src/main/service (weight=2, stage_span=1)
+  summary: Starts at src/main/controller, traverses 2 module(s) across 1 stage hop(s), and reaches src/main/service with cumulative dependency weight 2.
+  path: src/main/controller -> src/main/service
+
+[overview diagnostics]
+- Derived 5 overview module(s) from 6 discovered file(s); average 1.2 file(s) per module.

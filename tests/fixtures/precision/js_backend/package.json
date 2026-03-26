@@ -1,0 +1,4 @@
+{
+  "name": "schedule-service",
+  "main": "src/server.js"
+}
