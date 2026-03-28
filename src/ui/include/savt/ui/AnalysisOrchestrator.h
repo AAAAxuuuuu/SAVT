@@ -10,7 +10,6 @@
 #include <QVariantList>
 #include <QVariantMap>
 
-#include <functional>
 #include <memory>
 
 namespace savt::ui {
@@ -36,21 +35,10 @@ struct PendingAnalysisResult {
 
 class AnalysisOrchestrator {
 public:
-    using ResultAssembler = std::function<void(
-        QPromise<void>& promise,
-        const QString& projectRootPath,
-        const savt::core::AnalysisReport& report,
-        const savt::core::ArchitectureOverview& overview,
-        const savt::core::CapabilityGraph& capabilityGraph,
-        const savt::layout::CapabilitySceneLayoutResult& capabilitySceneLayout,
-        const savt::layout::LayoutResult& layoutResult,
-        PendingAnalysisResult& result)>;
-
     static QString defaultProjectRootPath();
     static void run(
         QPromise<void>& promise,
         const QString& cleanedPath,
-        ResultAssembler assembler,
         const std::shared_ptr<PendingAnalysisResult>& output);
 };
 

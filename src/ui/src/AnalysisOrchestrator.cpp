@@ -1,7 +1,10 @@
 #include "savt/ui/AnalysisOrchestrator.h"
 
 #include "savt/analyzer/CppProjectAnalyzer.h"
+#include "savt/ui/AnalysisTextFormatter.h"
 #include "savt/ui/AstPreviewService.h"
+#include "savt/ui/ReportService.h"
+#include "savt/ui/SceneMapper.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -76,6 +79,54 @@ bool shouldAbortAnalysis(
     return true;
 }
 
+void populatePendingPresentation(
+    QPromise<void>& promise,
+    const QString& cleanedPath,
+    const core::AnalysisReport& report,
+    const core::ArchitectureOverview& overview,
+    const core::CapabilityGraph& capabilityGraph,
+    const layout::CapabilitySceneLayoutResult& capabilitySceneLayout,
+    const layout::LayoutResult& layoutResult,
+    PendingAnalysisResult& result) {
+    promise.setProgressValueAndText(96, QStringLiteral("整理 AST 预览..."));
+    if (promise.isCanceled()) {
+        return;
+    }
+
+    result.astFileItems = AstPreviewService::buildAstFileItems(report);
+    result.selectedAstFilePath =
+        AstPreviewService::chooseDefaultAstFilePath(result.astFileItems);
+    const auto astPreview =
+        AstPreviewService::buildPreview(cleanedPath, result.selectedAstFilePath);
+    result.astPreviewTitle = astPreview.title;
+    result.astPreviewSummary = astPreview.summary;
+    result.astPreviewText = astPreview.text;
+    if (promise.isCanceled()) {
+        return;
+    }
+
+    promise.setProgressValueAndText(98, QStringLiteral("整理可视化数据..."));
+    const auto sceneData =
+        SceneMapper::buildCapabilitySceneData(capabilityGraph, capabilitySceneLayout);
+    if (promise.isCanceled()) {
+        return;
+    }
+
+    result.statusMessage =
+        ReportService::buildStatusMessage(report, overview, capabilityGraph, layoutResult);
+    result.nodeItems = sceneData.nodeItems;
+    result.edgeItems = sceneData.edgeItems;
+    result.groupItems = sceneData.groupItems;
+    result.sceneWidth = sceneData.sceneWidth;
+    result.sceneHeight = sceneData.sceneHeight;
+    result.analysisReport = formatCapabilityReportMarkdown(report, capabilityGraph);
+    result.systemContextReport = formatSystemContextReportMarkdown(capabilityGraph);
+    result.systemContextData =
+        ReportService::buildSystemContextData(report, overview, capabilityGraph, cleanedPath);
+    result.systemContextCards =
+        ReportService::buildSystemContextCards(report, overview, capabilityGraph);
+}
+
 }  // namespace
 
 QString AnalysisOrchestrator::defaultProjectRootPath() {
@@ -97,7 +148,6 @@ QString AnalysisOrchestrator::defaultProjectRootPath() {
 void AnalysisOrchestrator::run(
     QPromise<void>& promise,
     const QString& cleanedPath,
-    ResultAssembler assembler,
     const std::shared_ptr<PendingAnalysisResult>& output) {
     PendingAnalysisResult result;
     clearPendingPresentation(result);
@@ -167,17 +217,15 @@ void AnalysisOrchestrator::run(
             return;
         }
 
-        if (assembler) {
-            assembler(
-                promise,
-                cleanedPath,
-                report,
-                overview,
-                capabilityGraph,
-                capabilitySceneLayout,
-                layoutResult,
-                result);
-        }
+        populatePendingPresentation(
+            promise,
+            cleanedPath,
+            report,
+            overview,
+            capabilityGraph,
+            capabilitySceneLayout,
+            layoutResult,
+            result);
         if (shouldAbortAnalysis(promise, result, QStringLiteral("整理分析结果"))) {
             if (output) {
                 *output = std::move(result);

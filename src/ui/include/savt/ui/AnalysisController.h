@@ -187,9 +187,6 @@ private:
     void resetAiState(bool keepSetupMessage = true);
     void finishAiReply(QNetworkReply* reply);
 
-    QString buildL4MarkdownReport() const;
-    QString buildL1SystemContext() const;
-
     QString m_projectRootPath;
     QString m_statusMessage;
     QString m_analysisReport;
@@ -231,4 +228,3 @@ private:
 };
 
 }  // namespace savt::ui
-
