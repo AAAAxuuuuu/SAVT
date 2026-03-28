@@ -27,7 +27,6 @@
     {"fromId": 3, "toId": 2, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"}
   ],
   "diagnostics": [
-    "warning: argument unused during compilation: '-nostdinc++' [-Wunused-command-line-argument]",
     "<fixture_root>/main.cpp:1:10: error: 'vector' file not found",
     "<fixture_root>/main.cpp:4:5: error: use of undeclared identifier 'std'",
     "<fixture_root>/main.cpp:4:20: error: expected '(' for function-style cast or type construction",

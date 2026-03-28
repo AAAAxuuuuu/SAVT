@@ -4,6 +4,25 @@
 
 ---
 
+## 分析引擎状态
+
+| 项目 | 值 |
+| --- | --- |
+| 当前精度 | 语义分析 |
+| 主引擎 | libclang-cindex |
+| 语义状态 | 已进入 Clang/LibTooling |
+| 语义状态码 | `semantic_ready` |
+| 编译数据库 | <fixture_root>/compile_commands.json |
+| 已发现源码文件 | 4 |
+| 已成功解析文件 | 2 |
+
+**状态说明：** Clang/LibTooling semantic backend completed successfully.
+
+**诊断日志：**
+- Analyzer precision mode: semantic_required
+
+---
+
 ## 项目概览
 
 | 指标 | 数值 |

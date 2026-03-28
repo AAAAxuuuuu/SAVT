@@ -196,8 +196,32 @@ CXCursor dereferenceEntityCursor(CXCursor cursor) {
     return cursor;
 }
 
-CXCursor normalizeDeclarationCursor(CXCursor cursor) {
+CXCursor normalizeTemplateEntityCursor(CXCursor cursor) {
     cursor = dereferenceEntityCursor(cursor);
+    if (isNullCursor(cursor)) {
+        return cursor;
+    }
+
+    const auto symbolKind = toSymbolKind(cursor);
+    if (!symbolKind.has_value() || !isTypeKind(*symbolKind)) {
+        return cursor;
+    }
+
+    const CXCursor specializedTemplate = clang_getSpecializedCursorTemplate(cursor);
+    if (isNullCursor(specializedTemplate)) {
+        return cursor;
+    }
+
+    const auto specializedKind = toSymbolKind(specializedTemplate);
+    if (!specializedKind.has_value() || !isTypeKind(*specializedKind)) {
+        return cursor;
+    }
+
+    return dereferenceEntityCursor(specializedTemplate);
+}
+
+CXCursor normalizeDeclarationCursor(CXCursor cursor) {
+    cursor = normalizeTemplateEntityCursor(cursor);
     if (isNullCursor(cursor)) {
         return cursor;
     }
@@ -344,6 +368,28 @@ void appendUniqueLocation(
     }
 }
 
+std::optional<std::string> findRegisteredTypeIdentityForLocation(
+    const std::string& qualifiedName,
+    const ProjectLocation& location,
+    const SemanticRegistry& registry) {
+    if (qualifiedName.empty()) {
+        return std::nullopt;
+    }
+
+    const std::string key = locationKey(location);
+    for (const auto& [identity, record] : registry.symbols) {
+        if (!isTypeKind(record.kind) || record.qualifiedName != qualifiedName) {
+            continue;
+        }
+
+        if (record.declarationLocationKeys.contains(key) || record.definitionLocationKeys.contains(key)) {
+            return identity;
+        }
+    }
+
+    return std::nullopt;
+}
+
 std::optional<std::string> registerSymbolFromCursor(CXCursor cursor, SemanticRegistry& registry) {
     if (registry.builder == nullptr) {
         return std::nullopt;
@@ -364,7 +410,26 @@ std::optional<std::string> registerSymbolFromCursor(CXCursor cursor, SemanticReg
         return std::nullopt;
     }
 
-    const std::string identityKey = identityFromCursor(cursor, *registry.builder);
+    std::string displayName = spellingForCursor(cursor);
+    std::string qualifiedName = qualifiedNameFromCursor(cursor);
+    if (displayName.empty()) {
+        displayName = qualifiedName;
+    }
+    if (qualifiedName.empty()) {
+        qualifiedName = displayName;
+    }
+
+    std::string identityKey;
+    if (isTypeKind(*symbolKind)) {
+        if (const auto existingIdentity =
+                findRegisteredTypeIdentityForLocation(qualifiedName, *location, registry);
+            existingIdentity.has_value()) {
+            identityKey = *existingIdentity;
+        }
+    }
+    if (identityKey.empty()) {
+        identityKey = identityFromCursor(cursor, *registry.builder);
+    }
     if (identityKey.empty()) {
         return std::nullopt;
     }
@@ -373,15 +438,6 @@ std::optional<std::string> registerSymbolFromCursor(CXCursor cursor, SemanticReg
     if (record.identityKey.empty()) {
         record.identityKey = identityKey;
         record.kind = *symbolKind;
-    }
-
-    std::string displayName = spellingForCursor(cursor);
-    std::string qualifiedName = qualifiedNameFromCursor(cursor);
-    if (displayName.empty()) {
-        displayName = qualifiedName;
-    }
-    if (qualifiedName.empty()) {
-        qualifiedName = displayName;
     }
 
     if (record.displayName.empty() && !displayName.empty()) {

@@ -23,6 +23,7 @@
   ],
   "diagnostics": [
     "Semantic analysis requested, but no compile_commands.json was found.",
+    "Compilation database search paths: <fixture_root>/compile_commands.json; <fixture_root>/.qtc_clangd/compile_commands.json; <fixture_root>/build/compile_commands.json; <fixture_root>/build/.qtc_clangd/compile_commands.json",
     "Analyzer precision mode: semantic_required"
   ]
 }
