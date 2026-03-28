@@ -29,7 +29,7 @@ This document defines the portable setup contract for that workflow.
 1. Run `scripts\dev\enter-semantic-env.bat` to open a shell with MSVC, Qt, and LLVM on `PATH`.
 2. Run `scripts\dev\configure-msvc-qt-debug.bat` to configure the shared `windows-msvc-qt-debug` preset with `SAVT_ENABLE_CLANG_TOOLING=ON`.
 3. Run `scripts\dev\build-msvc-qt-debug.bat` to build that preset.
-4. Run `scripts\dev\verify-windows-msvc-debug.bat` to execute the phase-0 baseline checks.
+4. Run `scripts\dev\verify-windows-msvc-semantic-probe.bat` to execute the phase-1 semantic readiness probe.
 5. If you need a Visual Studio generator build instead of Ninja, run `scripts\dev\configure-msvc-vs-debug.bat`.
 
 ## Expected failure modes
@@ -41,7 +41,26 @@ The repository should fail clearly in these cases instead of silently downgradin
 - MSVC environment cannot be initialized
 - the analyzed project does not provide a usable `compile_commands.json`
 
+## Standard runtime status codes
+
+The analyzer should now surface these states explicitly:
+
+- `semantic_ready`
+- `missing_compile_commands`
+- `backend_unavailable`
+- `llvm_not_found`
+- `llvm_headers_missing`
+- `libclang_not_found`
+- `compilation_database_load_failed`
+- `compilation_database_empty`
+- `system_headers_unresolved`
+- `translation_unit_parse_failed`
+
+`semantic_required` mode must stop on these blocked states.
+
+`semantic_preferred` mode may fall back to syntax analysis, but it must keep the blocked reason visible in status text, diagnostics, and the detailed report.
+
 ## Notes
 
 - `compile_commands.json` is required for semantic-required analysis of the target project.
-- The phase-0 baseline standardizes the setup and failure reporting path first; it does not claim that every project analyzed by SAVT already has full industrial-grade semantic extraction.
+- The phase-1 baseline standardizes build probing, runtime status codes, and blocked-reason reporting first; it does not claim that every project analyzed by SAVT already has full industrial-grade semantic extraction.

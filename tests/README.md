@@ -1,6 +1,6 @@
 # Tests
 
-This directory contains the automated backend and adapter checks used by the shared phase-0 baseline.
+This directory contains the automated backend and adapter checks used by the shared phase-0 and phase-1 baselines.
 
 Current test targets:
 
@@ -17,6 +17,14 @@ Recommended baseline entry points:
 
 ```bat
 scripts\dev\verify-windows-msvc-debug.bat
+```
+
+```bash
+./scripts/dev/verify-macos-semantic-probe.sh
+```
+
+```bat
+scripts\dev\verify-windows-msvc-semantic-probe.bat
 ```
 
 ```bat
@@ -37,3 +45,4 @@ Snapshot coverage lives under `tests/fixtures/precision/` and `tests/golden/prec
 - Syntax and heuristic fixtures run in all test builds.
 - Semantic-capable builds additionally cover semantic success and blocked-semantic fixtures such as missing `compile_commands.json` and unresolved system headers.
 - Builds without the semantic backend automatically switch to the fallback fixture set, including `semantic_preferred_backend_unavailable`.
+- Builds where `SAVT_ENABLE_CLANG_TOOLING=ON` is requested but LLVM is still unavailable use the dedicated fallback fixture `semantic_preferred_llvm_not_found`.

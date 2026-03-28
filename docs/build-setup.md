@@ -2,7 +2,7 @@
 
 ## Goal
 
-This document defines the shared phase-0 build baseline for SAVT.
+This document defines the shared phase-0 and phase-1 build baseline for SAVT.
 
 The repository keeps shared presets portable and avoids hard-coded machine paths. Local Qt, LLVM, and MinGW locations should come from environment variables or `CMakeUserPresets.json`.
 
@@ -72,12 +72,31 @@ cmake --build --preset macos-qt-debug --parallel
 ctest --preset macos-qt-debug
 ```
 
+### macOS semantic probe
+
+Use this when you want to verify phase-1 semantic readiness on macOS.
+
+```bash
+export SAVT_QT_ROOT="$HOME/Qt/6.9.2/macos"
+./scripts/dev/verify-macos-semantic-probe.sh
+```
+
+If `SAVT_LLVM_ROOT` is unset or points to an incomplete LLVM package, the configure step should still succeed and report a specific blocked reason such as `llvm_not_found`, `llvm_headers_missing`, or `libclang_not_found`.
+
 ### Windows MSVC
 
 ```bat
 set SAVT_QT_ROOT=C:\Qt\6.9.3\msvc2022_64
 set SAVT_LLVM_ROOT=D:\llvm\clang+llvm-21.1.7-x86_64-pc-windows-msvc
 scripts\dev\verify-windows-msvc-debug.bat
+```
+
+### Windows MSVC semantic probe
+
+```bat
+set SAVT_QT_ROOT=C:\Qt\6.9.3\msvc2022_64
+set SAVT_LLVM_ROOT=D:\llvm\clang+llvm-21.1.7-x86_64-pc-windows-msvc
+scripts\dev\verify-windows-msvc-semantic-probe.bat
 ```
 
 ### Windows MinGW
@@ -93,3 +112,4 @@ scripts\dev\verify-mingw-debug.bat
 - `config/deepseek-ai.local.json` is local-only and must not be committed.
 - `CMakeLists.txt.user` is local Qt Creator state and must not be committed.
 - `.qmlc`, `moc_*.cpp`, `qrc_*.cpp`, and similar Qt outputs are generated files and must not be committed.
+- Phase-1 semantic readiness is accepted when semantic mode either enters the backend successfully or reports a specific blocked reason with actionable diagnostics.

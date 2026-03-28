@@ -138,6 +138,13 @@ std::string firstDiagnosticOrNone(const savt::core::AnalysisReport& report) {
     return report.diagnostics.empty() ? std::string("<none>") : report.diagnostics.front();
 }
 
+bool isBuildTimeSemanticBackendUnavailableCode(const std::string& statusCode) {
+    return statusCode == "backend_unavailable" ||
+           statusCode == "llvm_not_found" ||
+           statusCode == "llvm_headers_missing" ||
+           statusCode == "libclang_not_found";
+}
+
 std::string symbolNameById(const savt::core::AnalysisReport& report, const std::size_t nodeId) {
     const auto iterator = std::find_if(report.nodes.begin(), report.nodes.end(), [&](const savt::core::SymbolNode& node) {
         return node.id == nodeId;
@@ -680,6 +687,10 @@ int main() { return 0; }
                return diagnostic.find("compile_commands.json") != std::string::npos;
            }),
            "diagnostics should mention the missing compilation database");
+    expect(std::any_of(report.diagnostics.begin(), report.diagnostics.end(), [](const std::string& diagnostic) {
+               return diagnostic.find("Compilation database search paths:") != std::string::npos;
+           }),
+           "diagnostics should record the compilation database search paths");
 
     fs::remove_all(tempRoot, errorCode);
 }
@@ -715,10 +726,13 @@ int main() { return helper(); }
 #else
     expect(report.precisionLevel == "syntax_fallback",
            "semantic-preferred mode should fall back to syntax when the backend is unavailable");
-    expect(report.semanticStatusCode == "backend_unavailable",
-           "backend-unavailable builds should expose the semantic backend status");
+    expect(isBuildTimeSemanticBackendUnavailableCode(report.semanticStatusCode),
+           "build-time backend failures should expose a specific semantic backend status, got " +
+               report.semanticStatusCode);
     expect(report.semanticStatusMessage.find("semantic backend") != std::string::npos ||
-               report.semanticStatusMessage.find("LLVM/Clang") != std::string::npos,
+               report.semanticStatusMessage.find("LLVM/Clang") != std::string::npos ||
+               report.semanticStatusMessage.find("clang-c/Index.h") != std::string::npos ||
+               report.semanticStatusMessage.find("libclang") != std::string::npos,
            "semantic status should explain why the backend is unavailable");
 #endif
 
@@ -1002,4 +1016,3 @@ int main() {
     std::cout << "[PASS] savt_backend_tests\n";
     return 0;
 }
-

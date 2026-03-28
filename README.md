@@ -15,7 +15,17 @@ The current repository is now structured to distinguish clearly between:
 - semantic-preferred analysis
 - semantic-required analysis
 
-At the moment, this workspace can detect compilation database readiness and enforce semantic-required mode, but the Clang/LibTooling backend itself is not yet built in this environment because LLVM/Clang is not installed and linked into the project.
+The repository now distinguishes these semantic readiness states explicitly:
+
+- `missing_compile_commands`
+- `backend_unavailable`
+- `llvm_not_found`
+- `llvm_headers_missing`
+- `libclang_not_found`
+- `system_headers_unresolved`
+- `translation_unit_parse_failed`
+
+That means semantic mode now either enters the Clang/LibTooling backend successfully, or stops with a specific blocked reason instead of silently degrading.
 
 ## Current backend capability
 
@@ -65,8 +75,16 @@ Useful entry points:
 ./scripts/dev/verify-macos-debug.sh
 ```
 
+```bash
+./scripts/dev/verify-macos-semantic-probe.sh
+```
+
 ```bat
 scripts\dev\verify-windows-msvc-debug.bat
+```
+
+```bat
+scripts\dev\verify-windows-msvc-semantic-probe.bat
 ```
 
 ```bat
@@ -79,6 +97,7 @@ See:
 
 - `docs/build-setup.md`
 - `docs/phase0-baseline-2026-03-28.md`
+- `docs/phase1-semantic-readiness-2026-03-28.md`
 - `docs/qtcreator-setup.md`
 - `docs/semantic-toolchain-setup.md`
 

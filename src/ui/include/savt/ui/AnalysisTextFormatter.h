@@ -8,7 +8,9 @@
 
 namespace savt::ui {
 
-QString formatCapabilityReportMarkdown(const savt::core::CapabilityGraph& graph);
+QString formatCapabilityReportMarkdown(
+    const savt::core::AnalysisReport& report,
+    const savt::core::CapabilityGraph& graph);
 QString formatSystemContextReportMarkdown(const savt::core::CapabilityGraph& graph);
 QString formatPrecisionSummary(
     const savt::core::AnalysisReport& report,

@@ -7,6 +7,21 @@
 namespace savt::analyzer {
 namespace {
 
+std::string joinPathList(const std::vector<std::filesystem::path>& paths, const std::size_t maxItems = 8) {
+    std::string text;
+    const std::size_t itemCount = std::min(paths.size(), maxItems);
+    for (std::size_t index = 0; index < itemCount; ++index) {
+        if (!text.empty()) {
+            text += "; ";
+        }
+        text += detail::normalizePath(paths[index]);
+    }
+    if (paths.size() > itemCount) {
+        text += "; ...";
+    }
+    return text;
+}
+
 void setSemanticStatus(
     savt::core::AnalysisReport& report,
     std::string code,
@@ -119,7 +134,8 @@ savt::core::AnalysisReport CppProjectAnalyzer::analyzeProject(
     const std::filesystem::path normalizedRoot = rootPath.lexically_normal();
     const bool semanticRequested = options.precision != AnalyzerPrecision::SyntaxOnly;
     const bool semanticRequired = options.precision == AnalyzerPrecision::SemanticRequired;
-    const auto compilationDatabasePath = detail::locateCompilationDatabase(normalizedRoot, options);
+    const auto compilationDatabaseProbe = detail::probeCompilationDatabase(normalizedRoot, options);
+    const auto& compilationDatabasePath = compilationDatabaseProbe.resolvedPath;
     const auto backendInfo = detail::semanticBackendBuildInfo();
 
     std::vector<std::string> preflightDiagnostics;
@@ -131,6 +147,15 @@ savt::core::AnalysisReport CppProjectAnalyzer::analyzeProject(
     if (semanticRequested && !compilationDatabasePath.has_value()) {
         preflightDiagnostics.push_back(
             "Semantic analysis requested, but no compile_commands.json was found.");
+        if (compilationDatabaseProbe.explicitPathProvided && !options.compilationDatabasePath.empty()) {
+            preflightDiagnostics.push_back(
+                "Requested compilation database path was not found: " +
+                detail::normalizePath(options.compilationDatabasePath));
+        }
+        if (!compilationDatabaseProbe.searchedPaths.empty()) {
+            preflightDiagnostics.push_back(
+                "Compilation database search paths: " + joinPathList(compilationDatabaseProbe.searchedPaths));
+        }
         semanticStatusCode = "missing_compile_commands";
         semanticStatusMessage =
             "Semantic analysis is blocked because no compile_commands.json was found for the target project.";

@@ -1,0 +1,16 @@
+digraph SAVT {
+  rankdir=LR;
+  graph [fontname="Cascadia Mono"];
+  node [shape=box, fontname="Cascadia Mono"];
+  edge [fontname="Cascadia Mono"];
+  n1 [label="file\ncompile_commands.json"];
+  n2 [label="file\nmain.cpp"];
+  n3 [label="module\n(root)"];
+  n4 [label="function\nhelper"];
+  n5 [label="function\nmain"];
+  n3 -> n1 [label="contains"];
+  n3 -> n2 [label="contains"];
+  n2 -> n4 [label="contains"];
+  n2 -> n5 [label="contains"];
+  n5 -> n4 [label="calls"];
+}

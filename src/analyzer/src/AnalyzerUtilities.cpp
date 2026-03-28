@@ -612,37 +612,42 @@ SemanticBackendBuildInfo semanticBackendBuildInfo() {
     info.configuredLlvmRoot = SAVT_CONFIGURED_LLVM_ROOT;
 #endif
 
+#ifdef SAVT_CLANG_TOOLING_STATUS_CODE
+    info.statusCode = SAVT_CLANG_TOOLING_STATUS_CODE;
+#endif
+
+#ifdef SAVT_CLANG_TOOLING_STATUS_MESSAGE
+    info.statusMessage = SAVT_CLANG_TOOLING_STATUS_MESSAGE;
+#endif
+
     if (info.available) {
-        info.statusCode = "semantic_ready";
-        info.statusMessage = "Clang/LibTooling semantic backend is available in this build.";
+        if (info.statusCode.empty()) {
+            info.statusCode = "semantic_ready";
+        }
+        if (info.statusMessage.empty()) {
+            info.statusMessage = "Clang/LibTooling semantic backend is available in this build.";
+        }
         return info;
     }
 
-#ifdef SAVT_CLANG_TOOLING_MISSING
-    info.statusCode = "backend_unavailable";
-    if (!info.configuredLlvmRoot.empty()) {
-        info.statusMessage =
-            "SAVT_ENABLE_CLANG_TOOLING was requested, but LLVM/Clang headers or libraries were not found under " +
-            info.configuredLlvmRoot + ".";
-    } else {
-        info.statusMessage =
-            "SAVT_ENABLE_CLANG_TOOLING was requested, but LLVM/Clang headers or libraries were not found.";
+    if (info.statusCode.empty()) {
+        info.statusCode = "backend_unavailable";
     }
-    return info;
-#endif
-
-    info.statusCode = "backend_unavailable";
-    info.statusMessage =
-        "This build does not include the Clang/LibTooling semantic backend. Reconfigure with "
-        "SAVT_ENABLE_CLANG_TOOLING=ON to enable semantic analysis.";
+    if (info.statusMessage.empty()) {
+        info.statusMessage =
+            "This build does not include the Clang/LibTooling semantic backend. Reconfigure with "
+            "SAVT_ENABLE_CLANG_TOOLING=ON to enable semantic analysis.";
+    }
     return info;
 }
 
-std::optional<std::filesystem::path> locateCompilationDatabase(
+CompilationDatabaseProbe probeCompilationDatabase(
     const std::filesystem::path& rootPath,
     const AnalyzerOptions& options) {
+    CompilationDatabaseProbe probe;
+
     std::vector<std::filesystem::path> candidates;
-    const auto appendCandidate = [&candidates](const std::filesystem::path& candidate) {
+    const auto appendCandidate = [&candidates, &probe](const std::filesystem::path& candidate) {
         if (candidate.empty()) {
             return;
         }
@@ -652,7 +657,10 @@ std::optional<std::filesystem::path> locateCompilationDatabase(
         }
     };
 
-    appendCandidate(options.compilationDatabasePath);
+    if (!options.compilationDatabasePath.empty()) {
+        probe.explicitPathProvided = true;
+        appendCandidate(options.compilationDatabasePath);
+    }
     appendCandidate(rootPath / "compile_commands.json");
     appendCandidate(rootPath / ".qtc_clangd" / "compile_commands.json");
     appendCandidate(rootPath / "build" / "compile_commands.json");
@@ -683,12 +691,21 @@ std::optional<std::filesystem::path> locateCompilationDatabase(
             continue;
         }
 
+        probe.searchedPaths.push_back(normalizedCandidate);
+
         if (std::filesystem::exists(normalizedCandidate, errorCode) && std::filesystem::is_regular_file(normalizedCandidate, errorCode)) {
-            return normalizedCandidate;
+            probe.resolvedPath = normalizedCandidate;
+            return probe;
         }
     }
 
-    return std::nullopt;
+    return probe;
+}
+
+std::optional<std::filesystem::path> locateCompilationDatabase(
+    const std::filesystem::path& rootPath,
+    const AnalyzerOptions& options) {
+    return probeCompilationDatabase(rootPath, options).resolvedPath;
 }
 
 
@@ -716,4 +733,3 @@ bool isHeuristicAnalyzableFile(const std::filesystem::path& filePath) {
 }
 
 }  // namespace savt::analyzer::detail
-

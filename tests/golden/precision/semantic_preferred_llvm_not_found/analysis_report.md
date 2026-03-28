@@ -10,18 +10,18 @@
 | --- | --- |
 | 当前精度 | 语义失败后回退到语法分析 |
 | 主引擎 | tree-sitter |
-| 语义状态 | 阻断：当前构建未包含语义后端 |
-| 语义状态码 | `backend_unavailable` |
+| 语义状态 | 阻断：未找到 LLVM/Clang |
+| 语义状态码 | `llvm_not_found` |
 | 编译数据库 | <fixture_root>/compile_commands.json |
 | 已发现源码文件 | 2 |
 | 已成功解析文件 | 1 |
 
-**状态说明：** This build does not include the Clang/LibTooling semantic backend. Reconfigure with SAVT_ENABLE_CLANG_TOOLING=ON to enable semantic analysis.
+**状态说明：** SAVT_ENABLE_CLANG_TOOLING was requested, but no compatible LLVM/Clang installation was found. Set SAVT_LLVM_ROOT to a distribution that contains clang-c/Index.h and libclang.
 
-**处理建议：** 当前 SAVT 构建没有包含 Clang/LibTooling 语义后端，请重新配置并启用 SAVT_ENABLE_CLANG_TOOLING。
+**处理建议：** 请安装带 clang-c/Index.h 和 libclang 的 LLVM/Clang 发行包，并正确设置 SAVT_LLVM_ROOT。
 
 **诊断日志：**
-- This build does not include the Clang/LibTooling semantic backend. Reconfigure with SAVT_ENABLE_CLANG_TOOLING=ON to enable semantic analysis.
+- SAVT_ENABLE_CLANG_TOOLING was requested, but no compatible LLVM/Clang installation was found. Set SAVT_LLVM_ROOT to a distribution that contains clang-c/Index.h and libclang.
 - Analyzer precision mode: semantic_preferred
 
 ---

@@ -1202,7 +1202,7 @@ void populatePendingAnalysisResult(
   result.groupItems = sceneData.groupItems;
   result.sceneWidth = sceneData.sceneWidth;
   result.sceneHeight = sceneData.sceneHeight;
-  result.analysisReport = formatCapabilityReportMarkdown(capabilityGraph);
+  result.analysisReport = formatCapabilityReportMarkdown(report, capabilityGraph);
   result.systemContextReport = formatSystemContextReportMarkdown(capabilityGraph);
   result.systemContextData = ReportService::buildSystemContextData(
       report, overview, capabilityGraph, cleanedPath);
@@ -1345,7 +1345,7 @@ void runAnalysisTask(QPromise<void> &promise, const QString &cleanedPath,
     result.groupItems = sceneData.groupItems;
     result.sceneWidth = sceneData.sceneWidth;
     result.sceneHeight = sceneData.sceneHeight;
-    result.analysisReport = formatCapabilityReportMarkdown(capabilityGraph);
+    result.analysisReport = formatCapabilityReportMarkdown(report, capabilityGraph);
     result.systemContextReport =
         formatSystemContextReportMarkdown(capabilityGraph);
     result.systemContextData = ReportService::buildSystemContextData(

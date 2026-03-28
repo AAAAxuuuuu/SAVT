@@ -4,6 +4,25 @@
 
 ---
 
+## 分析引擎状态
+
+| 项目 | 值 |
+| --- | --- |
+| 当前精度 | 语法分析 |
+| 主引擎 | tree-sitter |
+| 语义状态 | 未请求 |
+| 语义状态码 | `not_requested` |
+| 编译数据库 | (none) |
+| 已发现源码文件 | 6 |
+| 已成功解析文件 | 5 |
+
+**状态说明：** Semantic analysis was not requested for this run.
+
+**诊断日志：**
+- Analyzer precision mode: syntax_only
+
+---
+
 ## 项目概览
 
 | 指标 | 数值 |

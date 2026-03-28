@@ -1,0 +1,36 @@
+[precision summary]
+primary engine: tree-sitter
+precision level: syntax_fallback
+semantic requested: true
+semantic enabled: false
+semantic status code: llvm_not_found
+semantic status message: SAVT_ENABLE_CLANG_TOOLING was requested, but no compatible LLVM/Clang installation was found. Set SAVT_LLVM_ROOT to a distribution that contains clang-c/Index.h and libclang.
+compilation database: <fixture_root>/compile_commands.json
+discovered files: 2
+parsed files: 1
+raw nodes: 5
+raw edges: 5
+edge support total: 5
+semantic nodes: 0 (0.0%)
+inferred nodes: 5 (100.0%)
+semantic edges: 0 (0.0%)
+inferred edges: 5 (100.0%)
+
+[edge kinds]
+contains: 4
+calls: 1
+includes: 0
+inherits: 0
+uses_type: 0
+overrides: 0
+depends_on: 0
+
+[derived views]
+overview nodes: 1
+overview edges: 0
+overview flows: 0
+capability nodes: 1
+capability edges: 0
+capability flows: 0
+visible capability nodes: 1
+visible capability edges: 0

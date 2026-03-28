@@ -206,7 +206,7 @@ SnapshotArtifacts buildArtifacts(const fs::path& runtimeRoot, const SnapshotCase
     artifacts.layoutText = normalizeSnapshotText(savt::layout::formatLayoutResult(layout, report), runtimeRoot);
     artifacts.capabilitySceneLayoutText = normalizeSnapshotText(savt::layout::formatCapabilitySceneLayoutResult(capabilitySceneLayout), runtimeRoot);
     artifacts.analysisReportMarkdown = normalizeSnapshotText(
-        savt::ui::formatCapabilityReportMarkdown(capability).toStdString(),
+        savt::ui::formatCapabilityReportMarkdown(report, capability).toStdString(),
         runtimeRoot);
     artifacts.systemContextMarkdown = normalizeSnapshotText(
         savt::ui::formatSystemContextReportMarkdown(capability).toStdString(),
@@ -294,6 +294,12 @@ std::vector<SnapshotCase> snapshotCases() {
         "semantic_required_system_headers_unresolved",
         savt::analyzer::AnalyzerPrecision::SemanticRequired,
         SnapshotCase::CompilationDatabaseMode::NoSystemHeadersSingleTranslationUnit
+    });
+#elif defined(SAVT_CLANG_TOOLING_REQUESTED)
+    cases.push_back({
+        "semantic_preferred_llvm_not_found",
+        savt::analyzer::AnalyzerPrecision::SemanticPreferred,
+        SnapshotCase::CompilationDatabaseMode::SingleTranslationUnit
     });
 #else
     cases.push_back({
