@@ -43,31 +43,33 @@
 本轮已改为：
 
 - 语义后端实现已经存在
-- 当前缺口主要在 semantic-capable 机器验收、样本覆盖和复杂语义场景
+- 当前缺口主要在样本覆盖、复杂语义场景以及后续证据链建设
 
 ## 验证结果
 
-本轮在当前 macOS 基线下完成以下验证：
+首轮在当前 macOS 基线下完成以下验证：
 
 - `cmake --build --preset macos-qt-debug --parallel --target savt_backend_tests` 通过
 - `ctest --preset macos-qt-debug --output-on-failure --tests-regex savt_backend_tests` 通过
 - `cmake --build --preset macos-qt-debug --parallel --target savt_snapshot_tests` 通过
 - `ctest --preset macos-qt-debug --output-on-failure --tests-regex savt_snapshot_tests` 仍只有既有失败 `python_tooling_data_project`
 
+补充验收时，在已启用 `SAVT_ENABLE_CLANG_TOOLING=ON`、`SAVT_LLVM_ROOT=/opt/homebrew/opt/llvm` 的 semantic-capable macOS 环境里完成以下验证：
+
+- `ctest --preset macos-qt6.9.2-debug --output-on-failure --tests-regex 'savt_backend_tests|savt_snapshot_tests|savt_ai_tests'` 通过
+- `cpp_semantic_cross_tu` 中模板类型 `Box` 的跨 TU identity 归并通过
+- `semantic_required_missing_compile_commands` 与 `semantic_required_system_headers_unresolved` 的报告快照已同步到当前语义状态输出
+
 ## 当前判断
 
-从代码实现角度看，第 2 阶段的主干能力已经基本收口：
+从当前代码和实机验证结果看，第 2 阶段已经完成当前验收：
 
 - 语义 identity 主路径成立
 - 跨 TU 合并主路径成立
 - 语义边去重与 supportCount 聚合成立
 - “按名字误合并语义节点”的关键漏洞已修正
 
-但严格按阶段验收口径，仍有一个收尾项不能在这台机器上完成：
-
-- 需要在真正具备 LLVM/Clang headers + `libclang` 的 semantic-capable 环境里，实跑 `cpp_semantic_cross_tu` 和相关 snapshot fixture，完成最终验收
-
 因此，当前更准确的表述是：
 
-- 第 2 阶段代码侧已基本收口
-- 第 2 阶段最终验收还差一轮 semantic-capable 机器验证
+- 第 2 阶段已完成当前验收
+- 后续工作重心应转向第 5 阶段 scene/layout 统一，以及第 6 阶段结果可追溯能力
