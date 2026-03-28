@@ -1,0 +1,35 @@
+[overview]
+overview nodes: 2
+overview edges: 1
+overview groups: 4
+overview stages: 2
+overview flows: 1
+- [entry_point_module] host role=procedure_centric stage=entry in=0 out=1
+  summary: entry procedure_centric module in stage entry with 3 file(s), 1 class(es), 0 struct(s), 0 enum(s), 1 function(s), 1 method(s). Reachable from an entry module. Tech mix: 3 C/C++. Example files: host/PluginHost.cpp, host/PluginHost.h, host/main.cpp. Top symbols: PluginHost, main, start.
+- [module] plugins role=type_centric stage=leaf in=1 out=0
+  summary: type_centric module in stage leaf with 2 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 1 method(s). Reachable from an entry module. Tech mix: 2 C/C++. Example files: plugins/metrics/MetricsPlugin.cpp, plugins/metrics/MetricsPlugin.h. Top symbols: MetricsPlugin, activate.
+
+[overview edges]
+- depends_on: host -> plugins (weight=2)
+
+[overview groups]
+- [folder_cluster] host nodes=1 expanded=yes
+  summary: Folder cluster 'host' containing 1 module(s).
+- [folder_cluster] plugins nodes=1 expanded=yes
+  summary: Folder cluster 'plugins' containing 1 module(s).
+- [role_cluster] procedure_centric nodes=1 expanded=no
+  summary: Role cluster 'procedure_centric' containing 1 module(s).
+- [role_cluster] type_centric nodes=1 expanded=no
+  summary: Role cluster 'type_centric' containing 1 module(s).
+
+[overview stages]
+- stage 0 (entry): 1 module(s)
+- stage 1 (leaf): 1 module(s)
+
+[overview flows]
+- host -> plugins (weight=3, stage_span=1)
+  summary: Starts at host, traverses 2 module(s) across 1 stage hop(s), and reaches plugins with cumulative dependency weight 3.
+  path: host -> plugins
+
+[overview diagnostics]
+- Derived 2 overview module(s) from 5 discovered file(s); average 2.5 file(s) per module.

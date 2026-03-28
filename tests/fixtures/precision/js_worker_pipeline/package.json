@@ -1,0 +1,4 @@
+{
+  "name": "search-worker",
+  "main": "src/worker.js"
+}

@@ -1,0 +1,33 @@
+[capability graph]
+capability nodes: 2
+capability edges: 1
+capability flows: 1
+capability groups: 3
+- [entry] Tools role=tooling modules=1 visible=yes priority=1378 stages=0
+  responsibility: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。
+  summary: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。 Covers 1 module(s) and 3 file(s), spans stage 0, and appears in 1 main flow(s). It is reachable from an entry capability. Main modules: tools. Example files: tools/export/ExportJob.cpp, tools/export/ExportJob.h, tools/main.cpp. Key symbols: ExportJob, main, run. Supporting roles inside this cluster: tooling. Direct collaborators: Domain. It is shown in the default view.
+- [infrastructure] Domain role=💾 数据存储 (Database) modules=1 visible=yes priority=470 stages=1
+  responsibility: 负责将数据持久化保存到本地数据库或文件中。
+  summary: 负责将数据持久化保存到本地数据库或文件中。 包含了 2 个源码文件。
+👉 核心类/函数: ReportStore, write
+
+[capability edges]
+- activates: Tools -> Domain (weight=2, visible=yes)
+  summary: Tools activates Domain as one of the first visible workflow steps (aggregated weight=2)
+
+[capability groups]
+- [lane] Entry Lane nodes=1 expanded=yes hidden=0
+  summary: Entry Lane containing 1 node(s).
+- [lane] Infrastructure Lane nodes=1 expanded=yes hidden=0
+  summary: Infrastructure Lane containing 1 node(s).
+- [role_cluster] 💾 数据存储 (Database) nodes=1 expanded=yes hidden=0
+  summary: Role cluster '💾 数据存储 (Database)' containing 1 node(s).
+
+[capability flows]
+- Tools -> Domain (weight=3, stage_span=1)
+  summary: Starts at Tools, crosses 2 capability step(s), spans 1 stage hop(s), and reaches Domain with aggregate weight 3.
+  path: Tools -> Domain
+
+[capability diagnostics]
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.

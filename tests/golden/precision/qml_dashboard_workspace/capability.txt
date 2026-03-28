@@ -1,0 +1,52 @@
+[capability graph]
+capability nodes: 5
+capability edges: 2
+capability flows: 2
+capability groups: 6
+- [entry] App role=procedure_centric modules=1 visible=yes priority=1482 stages=0
+  responsibility: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。
+  summary: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。 Covers 1 module(s) and 1 file(s), spans stage 0, and appears in 2 main flow(s). It is reachable from an entry capability. Main modules: app. Example files: app/main.cpp. Key symbols: main. Supporting roles inside this cluster: procedure_centric. Direct collaborators: Backend Controller. It is shown in the default view.
+- [capability] Backend Controller role=interaction modules=1 visible=yes priority=844 stages=1
+  responsibility: 承担项目中某项核心业务能力，参与主要的用户可见工作流。
+  summary: 承担项目中某项核心业务能力，参与主要的用户可见工作流。 Covers 1 module(s) and 2 file(s), spans stage 1, and appears in 2 main flow(s). It is reachable from an entry capability. Folder scope: Backend. Main modules: backend/controller. Example files: backend/controller/DashboardController.cpp, backend/controller/DashboardController.h. Key symbols: DashboardController, refresh. Supporting roles inside this cluster: interaction. Direct collaborators: App, Backend Service. It is shown in the default view.
+- [capability] Ui role=🎨 界面展示 (UI) modules=1 visible=yes priority=736 stages=0
+  responsibility: 负责渲染界面和处理用户的点击/滑动等操作。
+  summary: 负责渲染界面和处理用户的点击/滑动等操作。 包含了 2 个源码文件。
+- [infrastructure] Backend Service role=interaction modules=1 visible=yes priority=470 stages=2
+  responsibility: 提供底层支撑服务，保持核心能力流程的稳定性和可复用性。
+  summary: 提供底层支撑服务，保持核心能力流程的稳定性和可复用性。 Covers 1 module(s) and 2 file(s), spans stage 2, and appears in 1 main flow(s). It is reachable from an entry capability. Folder scope: Backend. Main modules: backend/service. Example files: backend/service/MetricService.cpp, backend/service/MetricService.h. Key symbols: MetricService, load. Supporting roles inside this cluster: interaction. Direct collaborators: Backend Controller. It is shown in the default view.
+- [infrastructure] Data role=data modules=1 visible=yes priority=278 stages=0
+  responsibility: 负责持久化存储配置、资源或项目运行数据，供其他模块读取和写入。
+  summary: 负责持久化存储配置、资源或项目运行数据，供其他模块读取和写入。 Covers 1 module(s) and 1 file(s), spans stage 0. Main modules: data. Example files: data/metrics.json. Key symbols: none. Supporting roles inside this cluster: data. It is shown in the default view.
+
+[capability edges]
+- activates: App -> Backend Controller (weight=2, visible=yes)
+  summary: App activates Backend Controller as one of the first visible workflow steps (aggregated weight=2)
+- uses_infrastructure: Backend Controller -> Backend Service (weight=2, visible=yes)
+  summary: Backend Controller relies on Backend Service for shared support during execution (aggregated weight=2)
+
+[capability groups]
+- [lane] Capability Lane nodes=2 expanded=yes hidden=0
+  summary: Capability Lane containing 2 node(s).
+- [lane] Entry Lane nodes=1 expanded=yes hidden=0
+  summary: Entry Lane containing 1 node(s).
+- [lane] Infrastructure Lane nodes=2 expanded=yes hidden=0
+  summary: Infrastructure Lane containing 2 node(s).
+- [role_cluster] Data nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'data' containing 1 node(s).
+- [role_cluster] Interaction nodes=2 expanded=yes hidden=0
+  summary: Role cluster 'interaction' containing 2 node(s).
+- [role_cluster] 🎨 界面展示 (UI) nodes=1 expanded=yes hidden=0
+  summary: Role cluster '🎨 界面展示 (UI)' containing 1 node(s).
+
+[capability flows]
+- App -> Backend Service (weight=5, stage_span=2)
+  summary: Starts at App, crosses 3 capability step(s), spans 2 stage hop(s), and reaches Backend Service with aggregate weight 5.
+  path: App -> Backend Controller -> Backend Service
+- App -> Backend Controller (weight=3, stage_span=1)
+  summary: Starts at App, crosses 2 capability step(s), spans 1 stage hop(s), and reaches Backend Controller with aggregate weight 3.
+  path: App -> Backend Controller
+
+[capability diagnostics]
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.

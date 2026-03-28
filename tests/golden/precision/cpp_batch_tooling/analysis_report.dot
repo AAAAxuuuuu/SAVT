@@ -1,0 +1,35 @@
+digraph SAVT {
+  rankdir=LR;
+  graph [fontname="Cascadia Mono"];
+  node [shape=box, fontname="Cascadia Mono"];
+  edge [fontname="Cascadia Mono"];
+  n1 [label="file\nReportStore.cpp"];
+  n2 [label="file\nReportStore.h"];
+  n3 [label="file\nExportJob.cpp"];
+  n4 [label="file\nExportJob.h"];
+  n5 [label="file\nmain.cpp"];
+  n6 [label="module\ndomain"];
+  n7 [label="module\ntools"];
+  n8 [label="method\nwrite"];
+  n9 [label="class\nReportStore"];
+  n10 [label="method\nrun"];
+  n11 [label="class\nExportJob"];
+  n12 [label="function\nmain"];
+  n6 -> n1 [label="contains"];
+  n6 -> n2 [label="contains"];
+  n7 -> n3 [label="contains"];
+  n7 -> n4 [label="contains"];
+  n7 -> n5 [label="contains"];
+  n1 -> n2 [label="includes"];
+  n1 -> n8 [label="contains"];
+  n2 -> n9 [label="contains"];
+  n3 -> n4 [label="includes"];
+  n3 -> n2 [label="includes"];
+  n3 -> n10 [label="contains"];
+  n4 -> n11 [label="contains"];
+  n5 -> n4 [label="includes"];
+  n5 -> n12 [label="contains"];
+  n10 -> n8 [label="calls"];
+  n12 -> n10 [label="calls"];
+  n7 -> n6 [label="depends_on (2)"];
+}

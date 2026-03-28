@@ -1,0 +1,46 @@
+[capability graph]
+capability nodes: 5
+capability edges: 0
+capability flows: 0
+capability groups: 5
+- [entry] Tools role=💾 数据存储 (Database) modules=1 visible=yes priority=1238 stages=0
+  responsibility: 负责将数据持久化保存到本地数据库或文件中。
+  summary: 负责将数据持久化保存到本地数据库或文件中。 包含了 1 个源码文件。
+👉 核心类/函数: main
+- [infrastructure] Analytics role=🎨 界面展示 (UI) modules=1 visible=yes priority=478 stages=0
+  responsibility: 负责渲染界面和处理用户的点击/滑动等操作。
+  summary: 负责渲染界面和处理用户的点击/滑动等操作。 包含了 1 个源码文件。
+👉 核心类/函数: build_summary
+- [infrastructure] Data role=💾 数据存储 (Database) modules=1 visible=yes priority=278 stages=0
+  responsibility: 负责将数据持久化保存到本地数据库或文件中。
+  summary: 负责将数据持久化保存到本地数据库或文件中。 包含了 1 个源码文件。
+- [infrastructure] Storage role=💾 数据存储 (Database) modules=1 visible=yes priority=278 stages=0
+  responsibility: 负责将数据持久化保存到本地数据库或文件中。
+  summary: 负责将数据持久化保存到本地数据库或文件中。 包含了 1 个源码文件。
+👉 核心类/函数: load_snapshot
+- [infrastructure] Support role=tooling modules=1 visible=yes priority=278 stages=0
+  responsibility: 构建或预处理阶段的辅助模块，在主运行时流程之外完成转换、验证或生成工作。
+  summary: 构建或预处理阶段的辅助模块，在主运行时流程之外完成转换、验证或生成工作。 Covers 1 module(s) and 1 file(s), spans stage 0. Main modules: support. Example files: support/formatting.py. Key symbols: normalize_title. Supporting roles inside this cluster: tooling. It is shown in the default view.
+
+[capability edges]
+- none
+
+[capability groups]
+- [lane] Entry Lane nodes=1 expanded=yes hidden=0
+  summary: Entry Lane containing 1 node(s).
+- [lane] Infrastructure Lane nodes=4 expanded=yes hidden=0
+  summary: Infrastructure Lane containing 4 node(s).
+- [role_cluster] Tooling nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'tooling' containing 1 node(s).
+- [role_cluster] 🎨 界面展示 (UI) nodes=1 expanded=yes hidden=0
+  summary: Role cluster '🎨 界面展示 (UI)' containing 1 node(s).
+- [role_cluster] 💾 数据存储 (Database) nodes=2 expanded=yes hidden=0
+  summary: Role cluster '💾 数据存储 (Database)' containing 2 node(s).
+
+[capability flows]
+- none
+
+[capability diagnostics]
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.
+- No multi-step capability flow was derived from the current module dependency graph.

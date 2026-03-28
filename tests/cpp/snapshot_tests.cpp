@@ -375,12 +375,93 @@ bool compareOrUpdateArtifacts(
     return success;
 }
 
+void requireArtifactSubstring(
+    const SnapshotCase& snapshotCase,
+    const std::string& artifactName,
+    const std::string& haystack,
+    const std::string& needle,
+    std::vector<std::string>& failures,
+    bool& success) {
+    if (haystack.find(needle) == std::string::npos) {
+        failures.push_back(
+            "Audited expectation failed for " + snapshotCase.name + "/" + artifactName +
+            ": missing substring `" + needle + "`");
+        success = false;
+    }
+}
+
+bool validateAuditedExpectations(
+    const SnapshotCase& snapshotCase,
+    const SnapshotArtifacts& artifacts,
+    std::vector<std::string>& failures) {
+    bool success = true;
+
+    if (snapshotCase.name == "cpp_batch_tooling") {
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[entry_point_module] tools role=tooling", failures, success);
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[module] domain role=core_model", failures, success);
+    } else if (snapshotCase.name == "cpp_layered_pipeline") {
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[module] interaction role=interaction", failures, success);
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "depends_on: interaction -> core/service", failures, success);
+    } else if (snapshotCase.name == "cpp_plugin_host") {
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[module] plugins role=type_centric", failures, success);
+        requireArtifactSubstring(snapshotCase, "precision_summary.txt", artifacts.precisionSummary, "overview nodes: 2", failures, success);
+    } else if (snapshotCase.name == "cpp_vendored_dependency_app") {
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[module] QXlsx-1.5.0 role=dependency", failures, success);
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "depends_on: mainSystem -> QXlsx-1.5.0", failures, success);
+    } else if (snapshotCase.name == "js_backend") {
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[entry_point_module] src/server role=interaction", failures, success);
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "depends_on: src/services -> src/stores", failures, success);
+    } else if (snapshotCase.name == "js_express_inventory") {
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[module] src/repositories role=storage", failures, success);
+        requireArtifactSubstring(snapshotCase, "precision_summary.txt", artifacts.precisionSummary, "discovered files: 6", failures, success);
+    } else if (snapshotCase.name == "python_cli_pipeline") {
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[entry_point_module] cli role=tooling", failures, success);
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[module] services role=analysis", failures, success);
+    } else if (snapshotCase.name == "python_tooling_data_project") {
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[entry_point_module] tools role=tooling", failures, success);
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[module] data role=data", failures, success);
+    } else if (snapshotCase.name == "qml_dashboard_workspace") {
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[module] backend/controller role=interaction", failures, success);
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[module] ui role=presentation", failures, success);
+    } else if (snapshotCase.name == "qml_mixed_project") {
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[module] backend role=interaction", failures, success);
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[module] ui role=presentation", failures, success);
+    } else if (snapshotCase.name == "spring_boot_java") {
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[module] src/main/service role=analysis", failures, success);
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[module] src/main/model role=core_model", failures, success);
+    } else if (snapshotCase.name == "spring_boot_inventory") {
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[module] src/main/controller role=interaction", failures, success);
+        requireArtifactSubstring(snapshotCase, "overview.txt", artifacts.overviewText, "[module] src/main/repository role=storage", failures, success);
+    } else if (snapshotCase.name == "semantic_required_missing_compile_commands") {
+        requireArtifactSubstring(snapshotCase, "precision_summary.txt", artifacts.precisionSummary, "precision level: blocked_semantic_required", failures, success);
+        requireArtifactSubstring(snapshotCase, "precision_summary.txt", artifacts.precisionSummary, "semantic status code: missing_compile_commands", failures, success);
+    } else if (snapshotCase.name == "semantic_required_system_headers_unresolved") {
+        requireArtifactSubstring(snapshotCase, "precision_summary.txt", artifacts.precisionSummary, "semantic status code: system_headers_unresolved", failures, success);
+        requireArtifactSubstring(snapshotCase, "precision_summary.txt", artifacts.precisionSummary, "primary engine: libclang-cindex", failures, success);
+    } else if (snapshotCase.name == "semantic_preferred_backend_unavailable") {
+        requireArtifactSubstring(snapshotCase, "precision_summary.txt", artifacts.precisionSummary, "precision level: syntax_fallback", failures, success);
+        requireArtifactSubstring(snapshotCase, "precision_summary.txt", artifacts.precisionSummary, "semantic status code: backend_unavailable", failures, success);
+    }
+
+    return success;
+}
+
 std::vector<SnapshotCase> allSnapshotCases() {
     return {
+        {"cpp_batch_tooling", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"cpp_header_only_lib", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"cpp_layered_pipeline", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"cpp_plugin_host", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"cpp_syntax_only", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"cpp_vendored_dependency_app", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"js_express_inventory", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"js_backend", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"js_worker_pipeline", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"python_cli_pipeline", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"python_reporting_workspace", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"spring_boot_java", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"spring_boot_inventory", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"qml_dashboard_workspace", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"qml_mixed_project", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"python_tooling_data_project", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"cpp_semantic_cross_tu", savt::analyzer::AnalyzerPrecision::SemanticRequired, SnapshotCase::CompilationDatabaseMode::CrossTranslationUnits},
@@ -393,10 +474,20 @@ std::vector<SnapshotCase> allSnapshotCases() {
 
 std::vector<SnapshotCase> snapshotCases() {
     std::vector<SnapshotCase> cases = {
+        {"cpp_batch_tooling", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"cpp_header_only_lib", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"cpp_layered_pipeline", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"cpp_plugin_host", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"cpp_syntax_only", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"cpp_vendored_dependency_app", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"js_express_inventory", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"js_backend", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"js_worker_pipeline", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"python_cli_pipeline", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"spring_boot_java", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"spring_boot_inventory", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"python_reporting_workspace", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"qml_dashboard_workspace", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"qml_mixed_project", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"python_tooling_data_project", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
     };
@@ -499,7 +590,9 @@ int main(int argc, char* argv[]) {
             const fs::path caseRuntimeDir = runtimeDir(snapshotCase);
             prepareFixtureRuntime(snapshotCase, caseRuntimeDir);
             const SnapshotArtifacts artifacts = buildArtifacts(caseRuntimeDir, snapshotCase);
-            const bool caseOk = compareOrUpdateArtifacts(snapshotCase, artifacts, updateGoldens, failures);
+            const bool caseOk =
+                compareOrUpdateArtifacts(snapshotCase, artifacts, updateGoldens, failures) &&
+                validateAuditedExpectations(snapshotCase, artifacts, failures);
             std::cout << (caseOk ? "[PASS] " : "[FAIL] ") << snapshotCase.name << "\n";
         }
 

@@ -1,0 +1,56 @@
+{
+  "rootPath": "<fixture_root>",
+  "engine": "tree-sitter",
+  "precisionLevel": "syntax",
+  "semanticStatusCode": "not_requested",
+  "semanticStatusMessage": "Semantic analysis was not requested for this run.",
+  "compilationDatabasePath": "",
+  "semanticAnalysisRequested": false,
+  "semanticAnalysisEnabled": false,
+  "summary": {
+    "discoveredFiles": 5,
+    "parsedFiles": 5,
+    "nodeCount": 12,
+    "edgeCount": 17,
+    "inferredNodeCount": 12,
+    "semanticNodeCount": 0,
+    "inferredEdgeCount": 17,
+    "semanticEdgeCount": 0
+  },
+  "nodes": [
+    {"id": 1, "kind": "file", "displayName": "PluginHost.cpp", "qualifiedName": "host/PluginHost.cpp", "identityKey": "file:host/PluginHost.cpp", "filePath": "host/PluginHost.cpp", "line": 0, "factSource": "inferred"},
+    {"id": 2, "kind": "file", "displayName": "PluginHost.h", "qualifiedName": "host/PluginHost.h", "identityKey": "file:host/PluginHost.h", "filePath": "host/PluginHost.h", "line": 0, "factSource": "inferred"},
+    {"id": 3, "kind": "file", "displayName": "main.cpp", "qualifiedName": "host/main.cpp", "identityKey": "file:host/main.cpp", "filePath": "host/main.cpp", "line": 0, "factSource": "inferred"},
+    {"id": 4, "kind": "file", "displayName": "MetricsPlugin.cpp", "qualifiedName": "plugins/metrics/MetricsPlugin.cpp", "identityKey": "file:plugins/metrics/MetricsPlugin.cpp", "filePath": "plugins/metrics/MetricsPlugin.cpp", "line": 0, "factSource": "inferred"},
+    {"id": 5, "kind": "file", "displayName": "MetricsPlugin.h", "qualifiedName": "plugins/metrics/MetricsPlugin.h", "identityKey": "file:plugins/metrics/MetricsPlugin.h", "filePath": "plugins/metrics/MetricsPlugin.h", "line": 0, "factSource": "inferred"},
+    {"id": 6, "kind": "module", "displayName": "host", "qualifiedName": "module:host", "identityKey": "module:host", "filePath": "host", "line": 0, "factSource": "inferred"},
+    {"id": 7, "kind": "module", "displayName": "plugins", "qualifiedName": "module:plugins", "identityKey": "module:plugins", "filePath": "plugins", "line": 0, "factSource": "inferred"},
+    {"id": 8, "kind": "method", "displayName": "start", "qualifiedName": "PluginHost::start", "identityKey": "", "filePath": "host/PluginHost.cpp", "line": 4, "factSource": "inferred"},
+    {"id": 9, "kind": "class", "displayName": "PluginHost", "qualifiedName": "PluginHost", "identityKey": "", "filePath": "host/PluginHost.h", "line": 2, "factSource": "inferred"},
+    {"id": 10, "kind": "function", "displayName": "main", "qualifiedName": "main", "identityKey": "", "filePath": "host/main.cpp", "line": 2, "factSource": "inferred"},
+    {"id": 11, "kind": "method", "displayName": "activate", "qualifiedName": "MetricsPlugin::activate", "identityKey": "", "filePath": "plugins/metrics/MetricsPlugin.cpp", "line": 2, "factSource": "inferred"},
+    {"id": 12, "kind": "class", "displayName": "MetricsPlugin", "qualifiedName": "MetricsPlugin", "identityKey": "", "filePath": "plugins/metrics/MetricsPlugin.h", "line": 2, "factSource": "inferred"}
+  ],
+  "edges": [
+    {"fromId": 6, "toId": 1, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 6, "toId": 2, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 6, "toId": 3, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 7, "toId": 4, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 7, "toId": 5, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 1, "toId": 2, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 1, "toId": 5, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 1, "toId": 8, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 2, "toId": 9, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 2, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 10, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 4, "toId": 5, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 4, "toId": 11, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 12, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 8, "toId": 11, "kind": "calls", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 10, "toId": 8, "kind": "calls", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 6, "toId": 7, "kind": "depends_on", "weight": 2, "supportCount": 2, "factSource": "inferred"}
+  ],
+  "diagnostics": [
+    "Analyzer precision mode: syntax_only"
+  ]
+}

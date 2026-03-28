@@ -1,0 +1,48 @@
+[capability graph]
+capability nodes: 5
+capability edges: 0
+capability flows: 0
+capability groups: 7
+- [entry] Cli role=tooling modules=1 visible=yes priority=1238 stages=0
+  responsibility: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。
+  summary: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。 Covers 1 module(s) and 1 file(s), spans stage 0. It is reachable from an entry capability. Main modules: cli. Example files: cli/main.py. Key symbols: main. Supporting roles inside this cluster: tooling. It is shown in the default view.
+- [capability] Services role=analysis modules=1 visible=yes priority=528 stages=0
+  responsibility: 负责核心的数据分析或业务逻辑处理，将输入转化为结构化的结果。
+  summary: 负责核心的数据分析或业务逻辑处理，将输入转化为结构化的结果。 Covers 1 module(s) and 1 file(s), spans stage 0. Main modules: services. Example files: services/job_service.py. Key symbols: run_jobs. Supporting roles inside this cluster: analysis. It is shown in the default view.
+- [infrastructure] Data role=data modules=1 visible=yes priority=278 stages=0
+  responsibility: 负责持久化存储配置、资源或项目运行数据，供其他模块读取和写入。
+  summary: 负责持久化存储配置、资源或项目运行数据，供其他模块读取和写入。 Covers 1 module(s) and 1 file(s), spans stage 0. Main modules: data. Example files: data/jobs.json. Key symbols: none. Supporting roles inside this cluster: data. It is shown in the default view.
+- [infrastructure] Storage role=💾 数据存储 (Database) modules=1 visible=yes priority=278 stages=0
+  responsibility: 负责将数据持久化保存到本地数据库或文件中。
+  summary: 负责将数据持久化保存到本地数据库或文件中。 包含了 1 个源码文件。
+👉 核心类/函数: load_jobs
+- [infrastructure] Support role=tooling modules=1 visible=yes priority=278 stages=0
+  responsibility: 构建或预处理阶段的辅助模块，在主运行时流程之外完成转换、验证或生成工作。
+  summary: 构建或预处理阶段的辅助模块，在主运行时流程之外完成转换、验证或生成工作。 Covers 1 module(s) and 1 file(s), spans stage 0. Main modules: support. Example files: support/parsing.py. Key symbols: parse_name. Supporting roles inside this cluster: tooling. It is shown in the default view.
+
+[capability edges]
+- none
+
+[capability groups]
+- [lane] Capability Lane nodes=1 expanded=yes hidden=0
+  summary: Capability Lane containing 1 node(s).
+- [lane] Entry Lane nodes=1 expanded=yes hidden=0
+  summary: Entry Lane containing 1 node(s).
+- [lane] Infrastructure Lane nodes=3 expanded=yes hidden=0
+  summary: Infrastructure Lane containing 3 node(s).
+- [role_cluster] Analysis nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'analysis' containing 1 node(s).
+- [role_cluster] Data nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'data' containing 1 node(s).
+- [role_cluster] Tooling nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'tooling' containing 1 node(s).
+- [role_cluster] 💾 数据存储 (Database) nodes=1 expanded=yes hidden=0
+  summary: Role cluster '💾 数据存储 (Database)' containing 1 node(s).
+
+[capability flows]
+- none
+
+[capability diagnostics]
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.
+- No multi-step capability flow was derived from the current module dependency graph.

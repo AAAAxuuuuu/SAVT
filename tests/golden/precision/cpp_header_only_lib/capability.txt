@@ -1,0 +1,44 @@
+[capability graph]
+capability nodes: 3
+capability edges: 2
+capability flows: 2
+capability groups: 4
+- [entry] App role=procedure_centric modules=1 visible=yes priority=1482 stages=0
+  responsibility: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。
+  summary: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。 Covers 1 module(s) and 1 file(s), spans stage 0, and appears in 2 main flow(s). It is reachable from an entry capability. Main modules: app. Example files: app/main.cpp. Key symbols: main. Supporting roles inside this cluster: procedure_centric. Direct collaborators: Ui. It is shown in the default view.
+- [capability] 图数据管理 — Ui role=🧱 核心数据结构 modules=1 visible=yes priority=1084 stages=1
+  responsibility: 负责加载、管理节点与边等图结构数据，是后续算法和业务分析的底层数据来源。
+  summary: 负责加载、管理节点与边等图结构数据，是后续算法和业务分析的底层数据来源。 包含了 2 个源码文件。
+👉 核心类/函数: GraphWindow, nodeCount
+- [infrastructure] 图数据管理 — Lib role=🧱 核心数据结构 modules=1 visible=yes priority=702 stages=2
+  responsibility: 负责加载、管理节点与边等图结构数据，是后续算法和业务分析的底层数据来源。
+  summary: 负责加载、管理节点与边等图结构数据，是后续算法和业务分析的底层数据来源。 包含了 1 个源码文件。
+👉 核心类/函数: GraphSpec, GraphBuilder, build
+
+[capability edges]
+- activates: App -> 图数据管理 — Ui (weight=2, visible=yes)
+  summary: App activates 图数据管理 — Ui as one of the first visible workflow steps (aggregated weight=2)
+- uses_infrastructure: 图数据管理 — Ui -> 图数据管理 — Lib (weight=2, visible=yes)
+  summary: 图数据管理 — Ui relies on 图数据管理 — Lib for shared support during execution (aggregated weight=2)
+
+[capability groups]
+- [lane] Capability Lane nodes=1 expanded=yes hidden=0
+  summary: Capability Lane containing 1 node(s).
+- [lane] Entry Lane nodes=1 expanded=yes hidden=0
+  summary: Entry Lane containing 1 node(s).
+- [lane] Infrastructure Lane nodes=1 expanded=yes hidden=0
+  summary: Infrastructure Lane containing 1 node(s).
+- [role_cluster] 🧱 核心数据结构 nodes=2 expanded=yes hidden=0
+  summary: Role cluster '🧱 核心数据结构' containing 2 node(s).
+
+[capability flows]
+- App -> Lib (weight=5, stage_span=2)
+  summary: Starts at App, crosses 3 capability step(s), spans 2 stage hop(s), and reaches Lib with aggregate weight 5.
+  path: App -> 图数据管理 — Ui -> 图数据管理 — Lib
+- App -> Ui (weight=3, stage_span=1)
+  summary: Starts at App, crosses 2 capability step(s), spans 1 stage hop(s), and reaches Ui with aggregate weight 3.
+  path: App -> 图数据管理 — Ui
+
+[capability diagnostics]
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.

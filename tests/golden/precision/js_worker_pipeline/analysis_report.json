@@ -1,0 +1,56 @@
+{
+  "rootPath": "<fixture_root>",
+  "engine": "tree-sitter",
+  "precisionLevel": "syntax",
+  "semanticStatusCode": "not_requested",
+  "semanticStatusMessage": "Semantic analysis was not requested for this run.",
+  "compilationDatabasePath": "",
+  "semanticAnalysisRequested": false,
+  "semanticAnalysisEnabled": false,
+  "summary": {
+    "discoveredFiles": 5,
+    "parsedFiles": 4,
+    "nodeCount": 14,
+    "edgeCount": 15,
+    "inferredNodeCount": 14,
+    "semanticNodeCount": 0,
+    "inferredEdgeCount": 15,
+    "semanticEdgeCount": 0
+  },
+  "nodes": [
+    {"id": 1, "kind": "file", "displayName": "package.json", "qualifiedName": "package.json", "identityKey": "file:package.json", "filePath": "package.json", "line": 0, "factSource": "inferred"},
+    {"id": 2, "kind": "file", "displayName": "rebuildIndexJob.js", "qualifiedName": "src/jobs/rebuildIndexJob.js", "identityKey": "file:src/jobs/rebuildIndexJob.js", "filePath": "src/jobs/rebuildIndexJob.js", "line": 0, "factSource": "inferred"},
+    {"id": 3, "kind": "file", "displayName": "indexService.js", "qualifiedName": "src/services/indexService.js", "identityKey": "file:src/services/indexService.js", "filePath": "src/services/indexService.js", "line": 0, "factSource": "inferred"},
+    {"id": 4, "kind": "file", "displayName": "searchStore.js", "qualifiedName": "src/stores/searchStore.js", "identityKey": "file:src/stores/searchStore.js", "filePath": "src/stores/searchStore.js", "line": 0, "factSource": "inferred"},
+    {"id": 5, "kind": "file", "displayName": "worker.js", "qualifiedName": "src/worker.js", "identityKey": "file:src/worker.js", "filePath": "src/worker.js", "line": 0, "factSource": "inferred"},
+    {"id": 6, "kind": "module", "displayName": "(root)", "qualifiedName": "module:(root)", "identityKey": "module:(root)", "filePath": "(root)", "line": 0, "factSource": "inferred"},
+    {"id": 7, "kind": "module", "displayName": "src/jobs", "qualifiedName": "module:src/jobs", "identityKey": "module:src/jobs", "filePath": "src/jobs", "line": 0, "factSource": "inferred"},
+    {"id": 8, "kind": "module", "displayName": "src/services", "qualifiedName": "module:src/services", "identityKey": "module:src/services", "filePath": "src/services", "line": 0, "factSource": "inferred"},
+    {"id": 9, "kind": "module", "displayName": "src/stores", "qualifiedName": "module:src/stores", "identityKey": "module:src/stores", "filePath": "src/stores", "line": 0, "factSource": "inferred"},
+    {"id": 10, "kind": "module", "displayName": "src/worker", "qualifiedName": "module:src/worker", "identityKey": "module:src/worker", "filePath": "src/worker", "line": 0, "factSource": "inferred"},
+    {"id": 11, "kind": "function", "displayName": "run", "qualifiedName": "run", "identityKey": "", "filePath": "src/jobs/rebuildIndexJob.js", "line": 2, "factSource": "inferred"},
+    {"id": 12, "kind": "function", "displayName": "refreshIndex", "qualifiedName": "refreshIndex", "identityKey": "", "filePath": "src/services/indexService.js", "line": 2, "factSource": "inferred"},
+    {"id": 13, "kind": "function", "displayName": "writeIndex", "qualifiedName": "writeIndex", "identityKey": "", "filePath": "src/stores/searchStore.js", "line": 0, "factSource": "inferred"},
+    {"id": 14, "kind": "function", "displayName": "bootstrapWorker", "qualifiedName": "bootstrapWorker", "identityKey": "", "filePath": "src/worker.js", "line": 2, "factSource": "inferred"}
+  ],
+  "edges": [
+    {"fromId": 6, "toId": 1, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 7, "toId": 2, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 8, "toId": 3, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 9, "toId": 4, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 10, "toId": 5, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 2, "toId": 3, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 2, "toId": 11, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 4, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 12, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 4, "toId": 13, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 2, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 14, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 7, "toId": 8, "kind": "depends_on", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 8, "toId": 9, "kind": "depends_on", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 10, "toId": 7, "kind": "depends_on", "weight": 1, "supportCount": 1, "factSource": "inferred"}
+  ],
+  "diagnostics": [
+    "Analyzer precision mode: syntax_only"
+  ]
+}

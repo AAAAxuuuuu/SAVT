@@ -1,0 +1,55 @@
+[overview]
+overview nodes: 5
+overview edges: 3
+overview groups: 5
+overview stages: 4
+overview flows: 3
+- [module] (root) role=data stage=entry in=0 out=0
+  summary: data module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 Data. Example files: package.json. Top symbols: none.
+- [module] src/jobs role=tooling stage=core in=1 out=1
+  summary: tooling module in stage core with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 Script. Example files: src/jobs/rebuildIndexJob.js. Top symbols: run.
+- [module] src/services role=analysis stage=downstream_2 in=1 out=1
+  summary: analysis module in stage downstream_2 with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 Script. Example files: src/services/indexService.js. Top symbols: refreshIndex.
+- [module] src/stores role=tooling stage=leaf in=1 out=0
+  summary: tooling module in stage leaf with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 Script. Example files: src/stores/searchStore.js. Top symbols: writeIndex.
+- [module] src/worker role=tooling stage=entry in=0 out=1
+  summary: tooling module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 Script. Example files: src/worker.js. Top symbols: bootstrapWorker.
+
+[overview edges]
+- depends_on: src/jobs -> src/services (weight=1)
+- depends_on: src/services -> src/stores (weight=1)
+- depends_on: src/worker -> src/jobs (weight=1)
+
+[overview groups]
+- [folder_cluster] (root) nodes=1 expanded=yes
+  summary: Folder cluster '(root)' containing 1 module(s).
+- [folder_cluster] src nodes=4 expanded=no
+  summary: Folder cluster 'src' containing 4 module(s).
+- [role_cluster] analysis nodes=1 expanded=no
+  summary: Role cluster 'analysis' containing 1 module(s).
+- [role_cluster] data nodes=1 expanded=no
+  summary: Role cluster 'data' containing 1 module(s).
+- [role_cluster] tooling nodes=3 expanded=no
+  summary: Role cluster 'tooling' containing 3 module(s).
+
+[overview stages]
+- stage 0 (entry): 2 module(s)
+- stage 1 (core): 1 module(s)
+- stage 2 (downstream_2): 1 module(s)
+- stage 3 (leaf): 1 module(s)
+
+[overview flows]
+- src/worker -> src/stores (weight=4, stage_span=3)
+  summary: Starts at src/worker, traverses 4 module(s) across 3 stage hop(s), and reaches src/stores with cumulative dependency weight 4.
+  path: src/worker -> src/jobs -> src/services -> src/stores
+- src/worker -> src/services (weight=3, stage_span=2)
+  summary: Starts at src/worker, traverses 3 module(s) across 2 stage hop(s), and reaches src/services with cumulative dependency weight 3.
+  path: src/worker -> src/jobs -> src/services
+- src/worker -> src/jobs (weight=2, stage_span=1)
+  summary: Starts at src/worker, traverses 2 module(s) across 1 stage hop(s), and reaches src/jobs with cumulative dependency weight 2.
+  path: src/worker -> src/jobs
+
+[overview diagnostics]
+- Derived 5 overview module(s) from 5 discovered file(s); average 1 file(s) per module.
+- No explicit entry module was detected; overview entry points are inferred from dependency roots only.
+- Cross-artifact inventory captured QML/Web/Python/Data-backed modules in addition to C/C++ modules.

@@ -1,0 +1,35 @@
+[overview]
+overview nodes: 2
+overview edges: 1
+overview groups: 4
+overview stages: 2
+overview flows: 1
+- [entry_point_module] tools role=tooling stage=entry in=0 out=1
+  summary: entry tooling module in stage entry with 3 file(s), 1 class(es), 0 struct(s), 0 enum(s), 1 function(s), 1 method(s). Reachable from an entry module. Tech mix: 3 C/C++. Example files: tools/export/ExportJob.cpp, tools/export/ExportJob.h, tools/main.cpp. Top symbols: ExportJob, main, run.
+- [module] domain role=core_model stage=leaf in=1 out=0
+  summary: core_model module in stage leaf with 2 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 1 method(s). Reachable from an entry module. Tech mix: 2 C/C++. Example files: domain/report/ReportStore.cpp, domain/report/ReportStore.h. Top symbols: ReportStore, write.
+
+[overview edges]
+- depends_on: tools -> domain (weight=2)
+
+[overview groups]
+- [folder_cluster] domain nodes=1 expanded=yes
+  summary: Folder cluster 'domain' containing 1 module(s).
+- [folder_cluster] tools nodes=1 expanded=yes
+  summary: Folder cluster 'tools' containing 1 module(s).
+- [role_cluster] core_model nodes=1 expanded=no
+  summary: Role cluster 'core_model' containing 1 module(s).
+- [role_cluster] tooling nodes=1 expanded=no
+  summary: Role cluster 'tooling' containing 1 module(s).
+
+[overview stages]
+- stage 0 (entry): 1 module(s)
+- stage 1 (leaf): 1 module(s)
+
+[overview flows]
+- tools -> domain (weight=3, stage_span=1)
+  summary: Starts at tools, traverses 2 module(s) across 1 stage hop(s), and reaches domain with cumulative dependency weight 3.
+  path: tools -> domain
+
+[overview diagnostics]
+- Derived 2 overview module(s) from 5 discovered file(s); average 2.5 file(s) per module.

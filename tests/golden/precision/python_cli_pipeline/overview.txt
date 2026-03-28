@@ -1,0 +1,50 @@
+[overview]
+overview nodes: 5
+overview edges: 0
+overview groups: 9
+overview stages: 1
+overview flows: 0
+- [entry_point_module] cli role=tooling stage=entry in=0 out=0
+  summary: entry tooling module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 Script. Example files: cli/main.py. Top symbols: main.
+- [module] data role=data stage=entry in=0 out=0
+  summary: data module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Tech mix: 1 Data. Example files: data/jobs.json. Top symbols: none.
+- [module] services role=analysis stage=entry in=0 out=0
+  summary: analysis module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Tech mix: 1 Script. Example files: services/job_service.py. Top symbols: run_jobs.
+- [module] storage role=storage stage=entry in=0 out=0
+  summary: storage module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Tech mix: 1 Script. Example files: storage/job_store.py. Top symbols: load_jobs.
+- [module] support role=tooling stage=entry in=0 out=0
+  summary: tooling module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Tech mix: 1 Script. Example files: support/parsing.py. Top symbols: parse_name.
+
+[overview edges]
+- none
+
+[overview groups]
+- [folder_cluster] cli nodes=1 expanded=yes
+  summary: Folder cluster 'cli' containing 1 module(s).
+- [folder_cluster] data nodes=1 expanded=yes
+  summary: Folder cluster 'data' containing 1 module(s).
+- [folder_cluster] services nodes=1 expanded=yes
+  summary: Folder cluster 'services' containing 1 module(s).
+- [folder_cluster] storage nodes=1 expanded=yes
+  summary: Folder cluster 'storage' containing 1 module(s).
+- [folder_cluster] support nodes=1 expanded=yes
+  summary: Folder cluster 'support' containing 1 module(s).
+- [role_cluster] analysis nodes=1 expanded=no
+  summary: Role cluster 'analysis' containing 1 module(s).
+- [role_cluster] data nodes=1 expanded=no
+  summary: Role cluster 'data' containing 1 module(s).
+- [role_cluster] storage nodes=1 expanded=no
+  summary: Role cluster 'storage' containing 1 module(s).
+- [role_cluster] tooling nodes=2 expanded=no
+  summary: Role cluster 'tooling' containing 2 module(s).
+
+[overview stages]
+- stage 0 (entry): 5 module(s)
+
+[overview flows]
+- none
+
+[overview diagnostics]
+- Derived 5 overview module(s) from 5 discovered file(s); average 1 file(s) per module.
+- Cross-artifact inventory captured QML/Web/Python/Data-backed modules in addition to C/C++ modules.
+- No multi-module main flow could be derived from the current dependency graph.

@@ -1,0 +1,12 @@
+[module layout]
+layers: 4
+canvas: 1280 x 280
+positioned modules: 5
+- src/worker layer=0 order=0 pos=(0, 0)
+- (root) layer=0 order=1 pos=(0, 140)
+- src/jobs layer=1 order=0 pos=(320, 0)
+- src/services layer=2 order=0 pos=(640, 0)
+- src/stores layer=3 order=0 pos=(960, 0)
+
+[layout diagnostics]
+- none

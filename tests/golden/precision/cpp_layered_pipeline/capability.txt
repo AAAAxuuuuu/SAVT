@@ -1,0 +1,57 @@
+[capability graph]
+capability nodes: 4
+capability edges: 3
+capability flows: 3
+capability groups: 6
+- [entry] App role=procedure_centric modules=1 visible=yes priority=1602 stages=0
+  responsibility: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。
+  summary: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。 Covers 1 module(s) and 1 file(s), spans stage 0, and appears in 3 main flow(s). It is reachable from an entry capability. Main modules: app. Example files: app/main.cpp. Key symbols: main. Supporting roles inside this cluster: procedure_centric. Direct collaborators: Interaction. It is shown in the default view.
+- [capability] Core Service role=🧠 核心算法 (Core Engine) modules=1 visible=yes priority=844 stages=2
+  responsibility: 项目的心脏，负责最核心的业务计算、数据分析或逻辑处理。
+  summary: 项目的心脏，负责最核心的业务计算、数据分析或逻辑处理。 包含了 2 个源码文件。
+👉 核心类/函数: ScheduleService, load
+- [capability] Interaction role=🌐 网络通信 (Network) modules=1 visible=yes priority=964 stages=1
+  responsibility: 负责与外部服务器、大模型或第三方接口进行数据交互。
+  summary: 负责与外部服务器、大模型或第三方接口进行数据交互。 包含了 2 个源码文件。
+👉 核心类/函数: ApiController, handle
+- [infrastructure] Core Storage role=💾 数据存储 (Database) modules=1 visible=yes priority=470 stages=3
+  responsibility: 负责将数据持久化保存到本地数据库或文件中。
+  summary: 负责将数据持久化保存到本地数据库或文件中。 包含了 2 个源码文件。
+👉 核心类/函数: ScheduleRepository, fetch
+
+[capability edges]
+- activates: App -> Interaction (weight=2, visible=yes)
+  summary: App activates Interaction as one of the first visible workflow steps (aggregated weight=2)
+- uses_infrastructure: Core Service -> Core Storage (weight=2, visible=yes)
+  summary: Core Service relies on Core Storage for shared support during execution (aggregated weight=2)
+- enables: Interaction -> Core Service (weight=2, visible=yes)
+  summary: Interaction hands work to Core Service to continue the main capability flow (aggregated weight=2)
+
+[capability groups]
+- [lane] Capability Lane nodes=2 expanded=yes hidden=0
+  summary: Capability Lane containing 2 node(s).
+- [lane] Entry Lane nodes=1 expanded=yes hidden=0
+  summary: Entry Lane containing 1 node(s).
+- [lane] Infrastructure Lane nodes=1 expanded=yes hidden=0
+  summary: Infrastructure Lane containing 1 node(s).
+- [role_cluster] 🌐 网络通信 (Network) nodes=1 expanded=yes hidden=0
+  summary: Role cluster '🌐 网络通信 (Network)' containing 1 node(s).
+- [role_cluster] 💾 数据存储 (Database) nodes=1 expanded=yes hidden=0
+  summary: Role cluster '💾 数据存储 (Database)' containing 1 node(s).
+- [role_cluster] 🧠 核心算法 (Core Engine) nodes=1 expanded=yes hidden=0
+  summary: Role cluster '🧠 核心算法 (Core Engine)' containing 1 node(s).
+
+[capability flows]
+- App -> Core Storage (weight=7, stage_span=3)
+  summary: Starts at App, crosses 4 capability step(s), spans 3 stage hop(s), and reaches Core Storage with aggregate weight 7.
+  path: App -> Interaction -> Core Service -> Core Storage
+- App -> Core Service (weight=5, stage_span=2)
+  summary: Starts at App, crosses 3 capability step(s), spans 2 stage hop(s), and reaches Core Service with aggregate weight 5.
+  path: App -> Interaction -> Core Service
+- App -> Interaction (weight=3, stage_span=1)
+  summary: Starts at App, crosses 2 capability step(s), spans 1 stage hop(s), and reaches Interaction with aggregate weight 3.
+  path: App -> Interaction
+
+[capability diagnostics]
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.

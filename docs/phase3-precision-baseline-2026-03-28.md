@@ -15,18 +15,20 @@ The target for this phase is not "finished benchmark science". The target is:
 
 ## Repository state after this refresh
 
-- Precision fixture directories: 11
-- Default macOS snapshot cases exercised in this workspace: 7
+- Precision fixture directories: 21
+- Default macOS snapshot cases exercised in this workspace: 17
+- Audited expectation cases: 15
 - Snapshot artifact types per case: 9
 
 Representative fixture coverage now includes:
 
 - C++ syntax-only layered application structure
+- C++ layered pipeline, plugin host, header-only library, and batch tooling structures
 - C++ application plus vendored dependency boundary
-- Java backend package structure
-- JS backend package structure
+- Java backend package structure, including controller/service/repository/model splits
+- JS backend package structure, including server/router/controller/service/repository and worker/job/service/store chains
 - QML mixed UI/backend/data structure
-- Python tooling + data workflow
+- Python tooling + data workflow and Python CLI/reporting workspace layouts
 - Semantic success fixture for cross-translation-unit C++
 - Semantic blocked/fallback fixtures for missing compilation database, unresolved system headers, backend unavailable, and LLVM requested but not found
 
@@ -59,6 +61,19 @@ The snapshot test now fails early when:
 
 This closes the gap where snapshot drift could remain unnoticed until a human happened to inspect the artifacts manually.
 
+### 4. Added audited expectations for representative fixtures
+
+Snapshot validation no longer relies only on whole-file golden matching.
+
+Representative fixtures now also assert manually reviewed facts such as:
+
+- expected entry modules
+- expected role classification
+- expected dependency direction
+- expected semantic blocked/fallback status
+
+This guards the intent of the baseline, not only the current serialization shape.
+
 ## Verified on March 28, 2026
 
 Command sequence:
@@ -78,12 +93,15 @@ Recorded result:
 - `savt_backend_tests`: passed
 - `savt_ai_tests`: passed
 
-## Remaining gap versus the full phase-3 target
+## Acceptance conclusion
 
-This repository revision materially improves the baseline, but phase 3 is not fully finished yet.
+The phase-3 target for this repository revision is accepted as complete.
 
-Remaining work still includes:
+It now includes:
 
-- growing the representative sample set from 11 toward 20+ projects/cases
-- adding more manually reviewed goldens for difficult semantic scenarios
-- introducing explicit precision scoring or audited expected facts for selected fixtures
+- 21 repository-owned fixture directories
+- synchronized golden outputs across the active default baseline
+- inventory validation for fixture/golden drift
+- audited expectations for representative cases
+
+Future sample growth can continue, but it is no longer a prerequisite for moving into the next planned phase.

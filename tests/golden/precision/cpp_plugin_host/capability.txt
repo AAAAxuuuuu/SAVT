@@ -1,0 +1,32 @@
+[capability graph]
+capability nodes: 2
+capability edges: 1
+capability flows: 1
+capability groups: 3
+- [entry] Host role=procedure_centric modules=1 visible=yes priority=1378 stages=0
+  responsibility: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。
+  summary: 作为项目的启动入口，负责初始化运行环境并将控制权交给核心模块。 Covers 1 module(s) and 3 file(s), spans stage 0, and appears in 1 main flow(s). It is reachable from an entry capability. Main modules: host. Example files: host/PluginHost.cpp, host/PluginHost.h, host/main.cpp. Key symbols: PluginHost, main, start. Supporting roles inside this cluster: procedure_centric. Direct collaborators: Plugins. It is shown in the default view.
+- [infrastructure] Plugins role=type_centric modules=1 visible=yes priority=470 stages=1
+  responsibility: 提供底层支撑服务，保持核心能力流程的稳定性和可复用性。
+  summary: 提供底层支撑服务，保持核心能力流程的稳定性和可复用性。 Covers 1 module(s) and 2 file(s), spans stage 1, and appears in 1 main flow(s). It is reachable from an entry capability. Main modules: plugins. Example files: plugins/metrics/MetricsPlugin.cpp, plugins/metrics/MetricsPlugin.h. Key symbols: MetricsPlugin, activate. Supporting roles inside this cluster: type_centric. Direct collaborators: Host. It is shown in the default view.
+
+[capability edges]
+- activates: Host -> Plugins (weight=2, visible=yes)
+  summary: Host activates Plugins as one of the first visible workflow steps (aggregated weight=2)
+
+[capability groups]
+- [lane] Entry Lane nodes=1 expanded=yes hidden=0
+  summary: Entry Lane containing 1 node(s).
+- [lane] Infrastructure Lane nodes=1 expanded=yes hidden=0
+  summary: Infrastructure Lane containing 1 node(s).
+- [role_cluster] Type Centric nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'type_centric' containing 1 node(s).
+
+[capability flows]
+- Host -> Plugins (weight=3, stage_span=1)
+  summary: Starts at Host, crosses 2 capability step(s), spans 1 stage hop(s), and reaches Plugins with aggregate weight 3.
+  path: Host -> Plugins
+
+[capability diagnostics]
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.

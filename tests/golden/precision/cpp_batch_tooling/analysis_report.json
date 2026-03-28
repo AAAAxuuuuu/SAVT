@@ -1,0 +1,56 @@
+{
+  "rootPath": "<fixture_root>",
+  "engine": "tree-sitter",
+  "precisionLevel": "syntax",
+  "semanticStatusCode": "not_requested",
+  "semanticStatusMessage": "Semantic analysis was not requested for this run.",
+  "compilationDatabasePath": "",
+  "semanticAnalysisRequested": false,
+  "semanticAnalysisEnabled": false,
+  "summary": {
+    "discoveredFiles": 5,
+    "parsedFiles": 5,
+    "nodeCount": 12,
+    "edgeCount": 17,
+    "inferredNodeCount": 12,
+    "semanticNodeCount": 0,
+    "inferredEdgeCount": 17,
+    "semanticEdgeCount": 0
+  },
+  "nodes": [
+    {"id": 1, "kind": "file", "displayName": "ReportStore.cpp", "qualifiedName": "domain/report/ReportStore.cpp", "identityKey": "file:domain/report/ReportStore.cpp", "filePath": "domain/report/ReportStore.cpp", "line": 0, "factSource": "inferred"},
+    {"id": 2, "kind": "file", "displayName": "ReportStore.h", "qualifiedName": "domain/report/ReportStore.h", "identityKey": "file:domain/report/ReportStore.h", "filePath": "domain/report/ReportStore.h", "line": 0, "factSource": "inferred"},
+    {"id": 3, "kind": "file", "displayName": "ExportJob.cpp", "qualifiedName": "tools/export/ExportJob.cpp", "identityKey": "file:tools/export/ExportJob.cpp", "filePath": "tools/export/ExportJob.cpp", "line": 0, "factSource": "inferred"},
+    {"id": 4, "kind": "file", "displayName": "ExportJob.h", "qualifiedName": "tools/export/ExportJob.h", "identityKey": "file:tools/export/ExportJob.h", "filePath": "tools/export/ExportJob.h", "line": 0, "factSource": "inferred"},
+    {"id": 5, "kind": "file", "displayName": "main.cpp", "qualifiedName": "tools/main.cpp", "identityKey": "file:tools/main.cpp", "filePath": "tools/main.cpp", "line": 0, "factSource": "inferred"},
+    {"id": 6, "kind": "module", "displayName": "domain", "qualifiedName": "module:domain", "identityKey": "module:domain", "filePath": "domain", "line": 0, "factSource": "inferred"},
+    {"id": 7, "kind": "module", "displayName": "tools", "qualifiedName": "module:tools", "identityKey": "module:tools", "filePath": "tools", "line": 0, "factSource": "inferred"},
+    {"id": 8, "kind": "method", "displayName": "write", "qualifiedName": "ReportStore::write", "identityKey": "", "filePath": "domain/report/ReportStore.cpp", "line": 2, "factSource": "inferred"},
+    {"id": 9, "kind": "class", "displayName": "ReportStore", "qualifiedName": "ReportStore", "identityKey": "", "filePath": "domain/report/ReportStore.h", "line": 2, "factSource": "inferred"},
+    {"id": 10, "kind": "method", "displayName": "run", "qualifiedName": "ExportJob::run", "identityKey": "", "filePath": "tools/export/ExportJob.cpp", "line": 4, "factSource": "inferred"},
+    {"id": 11, "kind": "class", "displayName": "ExportJob", "qualifiedName": "ExportJob", "identityKey": "", "filePath": "tools/export/ExportJob.h", "line": 2, "factSource": "inferred"},
+    {"id": 12, "kind": "function", "displayName": "main", "qualifiedName": "main", "identityKey": "", "filePath": "tools/main.cpp", "line": 2, "factSource": "inferred"}
+  ],
+  "edges": [
+    {"fromId": 6, "toId": 1, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 6, "toId": 2, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 7, "toId": 3, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 7, "toId": 4, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 7, "toId": 5, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 1, "toId": 2, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 1, "toId": 8, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 2, "toId": 9, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 4, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 2, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 10, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 4, "toId": 11, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 4, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 12, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 10, "toId": 8, "kind": "calls", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 12, "toId": 10, "kind": "calls", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 7, "toId": 6, "kind": "depends_on", "weight": 2, "supportCount": 2, "factSource": "inferred"}
+  ],
+  "diagnostics": [
+    "Analyzer precision mode: syntax_only"
+  ]
+}

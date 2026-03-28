@@ -1,0 +1,55 @@
+[overview]
+overview nodes: 4
+overview edges: 3
+overview groups: 7
+overview stages: 4
+overview flows: 3
+- [entry_point_module] app role=procedure_centric stage=entry in=0 out=1
+  summary: entry procedure_centric module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 C/C++. Example files: app/main.cpp. Top symbols: main.
+- [module] core/service role=analysis stage=downstream_2 in=1 out=1
+  summary: analysis module in stage downstream_2 with 2 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 1 method(s). Reachable from an entry module. Tech mix: 2 C/C++. Example files: core/service/ScheduleService.cpp, core/service/ScheduleService.h. Top symbols: ScheduleService, load.
+- [module] core/storage role=storage stage=leaf in=1 out=0
+  summary: storage module in stage leaf with 2 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 1 method(s). Reachable from an entry module. Tech mix: 2 C/C++. Example files: core/storage/ScheduleRepository.cpp, core/storage/ScheduleRepository.h. Top symbols: ScheduleRepository, fetch.
+- [module] interaction role=interaction stage=core in=1 out=1
+  summary: interaction module in stage core with 2 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 1 method(s). Reachable from an entry module. Tech mix: 2 C/C++. Example files: interaction/http/ApiController.cpp, interaction/http/ApiController.h. Top symbols: ApiController, handle.
+
+[overview edges]
+- depends_on: app -> interaction (weight=2)
+- depends_on: core/service -> core/storage (weight=2)
+- depends_on: interaction -> core/service (weight=2)
+
+[overview groups]
+- [folder_cluster] app nodes=1 expanded=yes
+  summary: Folder cluster 'app' containing 1 module(s).
+- [folder_cluster] core nodes=2 expanded=yes
+  summary: Folder cluster 'core' containing 2 module(s).
+- [folder_cluster] interaction nodes=1 expanded=yes
+  summary: Folder cluster 'interaction' containing 1 module(s).
+- [role_cluster] analysis nodes=1 expanded=no
+  summary: Role cluster 'analysis' containing 1 module(s).
+- [role_cluster] interaction nodes=1 expanded=no
+  summary: Role cluster 'interaction' containing 1 module(s).
+- [role_cluster] procedure_centric nodes=1 expanded=no
+  summary: Role cluster 'procedure_centric' containing 1 module(s).
+- [role_cluster] storage nodes=1 expanded=no
+  summary: Role cluster 'storage' containing 1 module(s).
+
+[overview stages]
+- stage 0 (entry): 1 module(s)
+- stage 1 (core): 1 module(s)
+- stage 2 (downstream_2): 1 module(s)
+- stage 3 (leaf): 1 module(s)
+
+[overview flows]
+- app -> core/storage (weight=7, stage_span=3)
+  summary: Starts at app, traverses 4 module(s) across 3 stage hop(s), and reaches core/storage with cumulative dependency weight 7.
+  path: app -> interaction -> core/service -> core/storage
+- app -> core/service (weight=5, stage_span=2)
+  summary: Starts at app, traverses 3 module(s) across 2 stage hop(s), and reaches core/service with cumulative dependency weight 5.
+  path: app -> interaction -> core/service
+- app -> interaction (weight=3, stage_span=1)
+  summary: Starts at app, traverses 2 module(s) across 1 stage hop(s), and reaches interaction with cumulative dependency weight 3.
+  path: app -> interaction
+
+[overview diagnostics]
+- Derived 4 overview module(s) from 7 discovered file(s); average 1.75 file(s) per module.

@@ -1,0 +1,20 @@
+[capability scene layout]
+canvas: 1040 x 610
+nodes: 5
+edges: 0
+groups: 5
+- node 1 lane=0 order=0 rect=(40, 28, 248, 116)
+- node 2 lane=2 order=0 rect=(752, 28, 248, 116)
+- node 3 lane=2 order=1 rect=(752, 174, 248, 116)
+- node 4 lane=2 order=2 rect=(752, 320, 248, 116)
+- node 5 lane=2 order=3 rect=(752, 466, 248, 116)
+- group#1 visibleNodes=1 bounds=(22, 10, 284, 152)
+- group#2 visibleNodes=1 bounds=(734, 10, 284, 152)
+- group#3 visibleNodes=4 bounds=(734, 10, 284, 590)
+- group#4 visibleNodes=2 bounds=(734, 156, 284, 298)
+- group#5 visibleNodes=1 bounds=(734, 448, 284, 152)
+
+[scene diagnostics]
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.
+- No multi-step capability flow was derived from the current module dependency graph.

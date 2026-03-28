@@ -1,0 +1,4 @@
+{
+  "name": "inventory-api",
+  "main": "src/server.js"
+}

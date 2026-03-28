@@ -1,0 +1,63 @@
+{
+  "rootPath": "<fixture_root>",
+  "engine": "tree-sitter",
+  "precisionLevel": "syntax",
+  "semanticStatusCode": "not_requested",
+  "semanticStatusMessage": "Semantic analysis was not requested for this run.",
+  "compilationDatabasePath": "",
+  "semanticAnalysisRequested": false,
+  "semanticAnalysisEnabled": false,
+  "summary": {
+    "discoveredFiles": 6,
+    "parsedFiles": 5,
+    "nodeCount": 17,
+    "edgeCount": 19,
+    "inferredNodeCount": 17,
+    "semanticNodeCount": 0,
+    "inferredEdgeCount": 19,
+    "semanticEdgeCount": 0
+  },
+  "nodes": [
+    {"id": 1, "kind": "file", "displayName": "pom.xml", "qualifiedName": "pom.xml", "identityKey": "file:pom.xml", "filePath": "pom.xml", "line": 0, "factSource": "inferred"},
+    {"id": 2, "kind": "file", "displayName": "InventoryApplication.java", "qualifiedName": "src/main/java/com/example/inventory/InventoryApplication.java", "identityKey": "file:src/main/java/com/example/inventory/InventoryApplication.java", "filePath": "src/main/java/com/example/inventory/InventoryApplication.java", "line": 0, "factSource": "inferred"},
+    {"id": 3, "kind": "file", "displayName": "InventoryController.java", "qualifiedName": "src/main/java/com/example/inventory/controller/InventoryController.java", "identityKey": "file:src/main/java/com/example/inventory/controller/InventoryController.java", "filePath": "src/main/java/com/example/inventory/controller/InventoryController.java", "line": 0, "factSource": "inferred"},
+    {"id": 4, "kind": "file", "displayName": "InventoryItem.java", "qualifiedName": "src/main/java/com/example/inventory/model/InventoryItem.java", "identityKey": "file:src/main/java/com/example/inventory/model/InventoryItem.java", "filePath": "src/main/java/com/example/inventory/model/InventoryItem.java", "line": 0, "factSource": "inferred"},
+    {"id": 5, "kind": "file", "displayName": "InventoryRepository.java", "qualifiedName": "src/main/java/com/example/inventory/repository/InventoryRepository.java", "identityKey": "file:src/main/java/com/example/inventory/repository/InventoryRepository.java", "filePath": "src/main/java/com/example/inventory/repository/InventoryRepository.java", "line": 0, "factSource": "inferred"},
+    {"id": 6, "kind": "file", "displayName": "InventoryService.java", "qualifiedName": "src/main/java/com/example/inventory/service/InventoryService.java", "identityKey": "file:src/main/java/com/example/inventory/service/InventoryService.java", "filePath": "src/main/java/com/example/inventory/service/InventoryService.java", "line": 0, "factSource": "inferred"},
+    {"id": 7, "kind": "module", "displayName": "(root)", "qualifiedName": "module:(root)", "identityKey": "module:(root)", "filePath": "(root)", "line": 0, "factSource": "inferred"},
+    {"id": 8, "kind": "module", "displayName": "src/main/bootstrap", "qualifiedName": "module:src/main/bootstrap", "identityKey": "module:src/main/bootstrap", "filePath": "src/main/bootstrap", "line": 0, "factSource": "inferred"},
+    {"id": 9, "kind": "module", "displayName": "src/main/controller", "qualifiedName": "module:src/main/controller", "identityKey": "module:src/main/controller", "filePath": "src/main/controller", "line": 0, "factSource": "inferred"},
+    {"id": 10, "kind": "module", "displayName": "src/main/model", "qualifiedName": "module:src/main/model", "identityKey": "module:src/main/model", "filePath": "src/main/model", "line": 0, "factSource": "inferred"},
+    {"id": 11, "kind": "module", "displayName": "src/main/repository", "qualifiedName": "module:src/main/repository", "identityKey": "module:src/main/repository", "filePath": "src/main/repository", "line": 0, "factSource": "inferred"},
+    {"id": 12, "kind": "module", "displayName": "src/main/service", "qualifiedName": "module:src/main/service", "identityKey": "module:src/main/service", "filePath": "src/main/service", "line": 0, "factSource": "inferred"},
+    {"id": 13, "kind": "class", "displayName": "InventoryApplication", "qualifiedName": "InventoryApplication", "identityKey": "", "filePath": "src/main/java/com/example/inventory/InventoryApplication.java", "line": 5, "factSource": "inferred"},
+    {"id": 14, "kind": "class", "displayName": "InventoryController", "qualifiedName": "InventoryController", "identityKey": "", "filePath": "src/main/java/com/example/inventory/controller/InventoryController.java", "line": 6, "factSource": "inferred"},
+    {"id": 15, "kind": "class", "displayName": "InventoryItem", "qualifiedName": "InventoryItem", "identityKey": "", "filePath": "src/main/java/com/example/inventory/model/InventoryItem.java", "line": 2, "factSource": "inferred"},
+    {"id": 16, "kind": "class", "displayName": "InventoryRepository", "qualifiedName": "InventoryRepository", "identityKey": "", "filePath": "src/main/java/com/example/inventory/repository/InventoryRepository.java", "line": 6, "factSource": "inferred"},
+    {"id": 17, "kind": "class", "displayName": "InventoryService", "qualifiedName": "InventoryService", "identityKey": "", "filePath": "src/main/java/com/example/inventory/service/InventoryService.java", "line": 7, "factSource": "inferred"}
+  ],
+  "edges": [
+    {"fromId": 7, "toId": 1, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 8, "toId": 2, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 9, "toId": 3, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 10, "toId": 4, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 11, "toId": 5, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 12, "toId": 6, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 2, "toId": 13, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 6, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 14, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 4, "toId": 15, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 4, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 16, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 6, "toId": 4, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 6, "toId": 5, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 6, "toId": 17, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 9, "toId": 12, "kind": "depends_on", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 11, "toId": 10, "kind": "depends_on", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 12, "toId": 10, "kind": "depends_on", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 12, "toId": 11, "kind": "depends_on", "weight": 1, "supportCount": 1, "factSource": "inferred"}
+  ],
+  "diagnostics": [
+    "Analyzer precision mode: syntax_only"
+  ]
+}

@@ -1,0 +1,24 @@
+[capability scene layout]
+canvas: 1089.6 x 633.2
+nodes: 5
+edges: 3
+groups: 6
+- node 3 lane=1 order=0 rect=(396, 28, 272.8, 127.6)
+- node 2 lane=2 order=0 rect=(776.8, 28, 272.8, 127.6)
+- node 5 lane=2 order=1 rect=(783, 185.6, 260.4, 121.8)
+- node 4 lane=2 order=2 rect=(783, 337.4, 260.4, 121.8)
+- node 1 lane=2 order=3 rect=(789.2, 489.2, 248, 116)
+- edge 1 2 -> 3 routeStart=(1049.6, 91.8) routeEnd=(396, 91.8)
+- edge 2 3 -> 4 routeStart=(668.8, 91.8) routeEnd=(783, 398.3)
+- edge 3 5 -> 2 routeStart=(1043.4, 246.5) routeEnd=(776.8, 91.8)
+- group#1 visibleNodes=1 bounds=(378, 10, 308.8, 163.6)
+- group#2 visibleNodes=1 bounds=(378, 10, 308.8, 163.6)
+- group#3 visibleNodes=1 bounds=(758.8, 10, 308.8, 163.6)
+- group#4 visibleNodes=4 bounds=(758.8, 10, 308.8, 613.2)
+- group#5 visibleNodes=2 bounds=(765, 167.6, 296.4, 309.6)
+- group#6 visibleNodes=1 bounds=(771.2, 471.2, 284, 152)
+
+[scene diagnostics]
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.
+- No explicit entry capability was detected; the graph relies on inferred roots only.

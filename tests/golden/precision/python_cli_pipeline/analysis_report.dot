@@ -1,0 +1,32 @@
+digraph SAVT {
+  rankdir=LR;
+  graph [fontname="Cascadia Mono"];
+  node [shape=box, fontname="Cascadia Mono"];
+  edge [fontname="Cascadia Mono"];
+  n1 [label="file\nmain.py"];
+  n2 [label="file\njobs.json"];
+  n3 [label="file\njob_service.py"];
+  n4 [label="file\njob_store.py"];
+  n5 [label="file\nparsing.py"];
+  n6 [label="module\ncli"];
+  n7 [label="module\ndata"];
+  n8 [label="module\nservices"];
+  n9 [label="module\nstorage"];
+  n10 [label="module\nsupport"];
+  n11 [label="function\nmain"];
+  n12 [label="function\nrun_jobs"];
+  n13 [label="function\nload_jobs"];
+  n14 [label="function\nparse_name"];
+  n6 -> n1 [label="contains"];
+  n7 -> n2 [label="contains"];
+  n8 -> n3 [label="contains"];
+  n9 -> n4 [label="contains"];
+  n10 -> n5 [label="contains"];
+  n1 -> n8 [label="includes"];
+  n1 -> n11 [label="contains"];
+  n3 -> n9 [label="includes"];
+  n3 -> n12 [label="contains"];
+  n4 -> n10 [label="includes"];
+  n4 -> n13 [label="contains"];
+  n5 -> n14 [label="contains"];
+}

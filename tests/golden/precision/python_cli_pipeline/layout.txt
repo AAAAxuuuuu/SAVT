@@ -1,0 +1,12 @@
+[module layout]
+layers: 1
+canvas: 320 x 700
+positioned modules: 5
+- cli layer=0 order=0 pos=(0, 0)
+- data layer=0 order=1 pos=(0, 140)
+- services layer=0 order=2 pos=(0, 280)
+- storage layer=0 order=3 pos=(0, 420)
+- support layer=0 order=4 pos=(0, 560)
+
+[layout diagnostics]
+- none

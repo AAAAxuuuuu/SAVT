@@ -1,0 +1,55 @@
+[overview]
+overview nodes: 5
+overview edges: 2
+overview groups: 8
+overview stages: 3
+overview flows: 2
+- [entry_point_module] app role=procedure_centric stage=entry in=0 out=1
+  summary: entry procedure_centric module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 C/C++. Example files: app/main.cpp. Top symbols: main.
+- [module] backend/controller role=interaction stage=core in=1 out=1
+  summary: interaction module in stage core with 2 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 1 method(s). Reachable from an entry module. Tech mix: 2 C/C++. Example files: backend/controller/DashboardController.cpp, backend/controller/DashboardController.h. Top symbols: DashboardController, refresh.
+- [module] backend/service role=interaction stage=leaf in=1 out=0
+  summary: interaction module in stage leaf with 2 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 1 method(s). Reachable from an entry module. Tech mix: 2 C/C++. Example files: backend/service/MetricService.cpp, backend/service/MetricService.h. Top symbols: MetricService, load.
+- [module] data role=data stage=entry in=0 out=0
+  summary: data module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Tech mix: 1 Data. Example files: data/metrics.json. Top symbols: none.
+- [module] ui role=presentation stage=entry in=0 out=0
+  summary: presentation module in stage entry with 2 file(s), 0 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Tech mix: 2 QML. Example files: ui/Dashboard.qml, ui/components/MetricCard.qml. Top symbols: none.
+
+[overview edges]
+- depends_on: app -> backend/controller (weight=2)
+- depends_on: backend/controller -> backend/service (weight=2)
+
+[overview groups]
+- [folder_cluster] app nodes=1 expanded=yes
+  summary: Folder cluster 'app' containing 1 module(s).
+- [folder_cluster] backend nodes=2 expanded=yes
+  summary: Folder cluster 'backend' containing 2 module(s).
+- [folder_cluster] data nodes=1 expanded=yes
+  summary: Folder cluster 'data' containing 1 module(s).
+- [folder_cluster] ui nodes=1 expanded=yes
+  summary: Folder cluster 'ui' containing 1 module(s).
+- [role_cluster] data nodes=1 expanded=no
+  summary: Role cluster 'data' containing 1 module(s).
+- [role_cluster] interaction nodes=2 expanded=no
+  summary: Role cluster 'interaction' containing 2 module(s).
+- [role_cluster] presentation nodes=1 expanded=no
+  summary: Role cluster 'presentation' containing 1 module(s).
+- [role_cluster] procedure_centric nodes=1 expanded=no
+  summary: Role cluster 'procedure_centric' containing 1 module(s).
+
+[overview stages]
+- stage 0 (entry): 3 module(s)
+- stage 1 (core): 1 module(s)
+- stage 2 (leaf): 1 module(s)
+
+[overview flows]
+- app -> backend/service (weight=5, stage_span=2)
+  summary: Starts at app, traverses 3 module(s) across 2 stage hop(s), and reaches backend/service with cumulative dependency weight 5.
+  path: app -> backend/controller -> backend/service
+- app -> backend/controller (weight=3, stage_span=1)
+  summary: Starts at app, traverses 2 module(s) across 1 stage hop(s), and reaches backend/controller with cumulative dependency weight 3.
+  path: app -> backend/controller
+
+[overview diagnostics]
+- Derived 5 overview module(s) from 8 discovered file(s); average 1.6 file(s) per module.
+- Cross-artifact inventory captured QML/Web/Python/Data-backed modules in addition to C/C++ modules.

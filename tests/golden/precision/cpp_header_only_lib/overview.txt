@@ -1,0 +1,44 @@
+[overview]
+overview nodes: 3
+overview edges: 2
+overview groups: 5
+overview stages: 3
+overview flows: 2
+- [entry_point_module] app role=procedure_centric stage=entry in=0 out=1
+  summary: entry procedure_centric module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 C/C++. Example files: app/main.cpp. Top symbols: main.
+- [module] lib role=presentation stage=leaf in=1 out=0
+  summary: presentation module in stage leaf with 1 file(s), 1 class(es), 1 struct(s), 0 enum(s), 0 function(s), 1 method(s). Reachable from an entry module. Tech mix: 1 C/C++. Example files: lib/graph/GraphBuilder.h. Top symbols: GraphSpec, GraphBuilder, build.
+- [module] ui role=presentation stage=core in=1 out=1
+  summary: presentation module in stage core with 2 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 1 method(s). Reachable from an entry module. Tech mix: 2 C/C++. Example files: ui/GraphWindow.cpp, ui/GraphWindow.h. Top symbols: GraphWindow, nodeCount.
+
+[overview edges]
+- depends_on: app -> ui (weight=2)
+- depends_on: ui -> lib (weight=2)
+
+[overview groups]
+- [folder_cluster] app nodes=1 expanded=yes
+  summary: Folder cluster 'app' containing 1 module(s).
+- [folder_cluster] lib nodes=1 expanded=yes
+  summary: Folder cluster 'lib' containing 1 module(s).
+- [folder_cluster] ui nodes=1 expanded=yes
+  summary: Folder cluster 'ui' containing 1 module(s).
+- [role_cluster] presentation nodes=2 expanded=no
+  summary: Role cluster 'presentation' containing 2 module(s).
+- [role_cluster] procedure_centric nodes=1 expanded=no
+  summary: Role cluster 'procedure_centric' containing 1 module(s).
+
+[overview stages]
+- stage 0 (entry): 1 module(s)
+- stage 1 (core): 1 module(s)
+- stage 2 (leaf): 1 module(s)
+
+[overview flows]
+- app -> lib (weight=5, stage_span=2)
+  summary: Starts at app, traverses 3 module(s) across 2 stage hop(s), and reaches lib with cumulative dependency weight 5.
+  path: app -> ui -> lib
+- app -> ui (weight=3, stage_span=1)
+  summary: Starts at app, traverses 2 module(s) across 1 stage hop(s), and reaches ui with cumulative dependency weight 3.
+  path: app -> ui
+
+[overview diagnostics]
+- Derived 3 overview module(s) from 4 discovered file(s); average 1.33333 file(s) per module.

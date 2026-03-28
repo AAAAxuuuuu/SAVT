@@ -1,0 +1,60 @@
+[overview]
+overview nodes: 6
+overview edges: 4
+overview groups: 7
+overview stages: 4
+overview flows: 3
+- [entry_point_module] src/main/bootstrap role=type_centric stage=entry in=0 out=0
+  summary: entry type_centric module in stage entry with 1 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Reachable from an entry module. Tech mix: none. Example files: src/main/java/com/example/inventory/InventoryApplication.java. Top symbols: InventoryApplication.
+- [module] (root) role=type_centric stage=entry in=0 out=0
+  summary: type_centric module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Tech mix: none. Example files: pom.xml. Top symbols: none.
+- [module] src/main/controller role=interaction stage=entry in=0 out=1
+  summary: interaction module in stage entry with 1 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Tech mix: none. Example files: src/main/java/com/example/inventory/controller/InventoryController.java. Top symbols: InventoryController.
+- [module] src/main/model role=core_model stage=leaf in=2 out=0
+  summary: core_model module in stage leaf with 1 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Tech mix: none. Example files: src/main/java/com/example/inventory/model/InventoryItem.java. Top symbols: InventoryItem.
+- [module] src/main/repository role=storage stage=downstream_2 in=1 out=1
+  summary: storage module in stage downstream_2 with 1 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Tech mix: none. Example files: src/main/java/com/example/inventory/repository/InventoryRepository.java. Top symbols: InventoryRepository.
+- [module] src/main/service role=analysis stage=core in=1 out=2
+  summary: analysis module in stage core with 1 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Tech mix: none. Example files: src/main/java/com/example/inventory/service/InventoryService.java. Top symbols: InventoryService.
+
+[overview edges]
+- depends_on: src/main/controller -> src/main/service (weight=1)
+- depends_on: src/main/repository -> src/main/model (weight=1)
+- depends_on: src/main/service -> src/main/model (weight=1)
+- depends_on: src/main/service -> src/main/repository (weight=1)
+
+[overview groups]
+- [folder_cluster] (root) nodes=1 expanded=yes
+  summary: Folder cluster '(root)' containing 1 module(s).
+- [folder_cluster] src nodes=5 expanded=yes
+  summary: Folder cluster 'src' containing 5 module(s).
+- [role_cluster] analysis nodes=1 expanded=no
+  summary: Role cluster 'analysis' containing 1 module(s).
+- [role_cluster] core_model nodes=1 expanded=no
+  summary: Role cluster 'core_model' containing 1 module(s).
+- [role_cluster] interaction nodes=1 expanded=no
+  summary: Role cluster 'interaction' containing 1 module(s).
+- [role_cluster] storage nodes=1 expanded=no
+  summary: Role cluster 'storage' containing 1 module(s).
+- [role_cluster] type_centric nodes=2 expanded=no
+  summary: Role cluster 'type_centric' containing 2 module(s).
+
+[overview stages]
+- stage 0 (entry): 3 module(s)
+- stage 1 (core): 1 module(s)
+- stage 2 (downstream_2): 1 module(s)
+- stage 3 (leaf): 1 module(s)
+
+[overview flows]
+- src/main/controller -> src/main/model (weight=3, stage_span=3)
+  summary: Starts at src/main/controller, traverses 4 module(s) across 3 stage hop(s), and reaches src/main/model with cumulative dependency weight 3.
+  path: src/main/controller -> src/main/service -> src/main/repository -> src/main/model
+- src/main/controller -> src/main/repository (weight=2, stage_span=2)
+  summary: Starts at src/main/controller, traverses 3 module(s) across 2 stage hop(s), and reaches src/main/repository with cumulative dependency weight 2.
+  path: src/main/controller -> src/main/service -> src/main/repository
+- src/main/controller -> src/main/service (weight=1, stage_span=1)
+  summary: Starts at src/main/controller, traverses 2 module(s) across 1 stage hop(s), and reaches src/main/service with cumulative dependency weight 1.
+  path: src/main/controller -> src/main/service
+
+[overview diagnostics]
+- Derived 6 overview module(s) from 6 discovered file(s); average 1 file(s) per module.

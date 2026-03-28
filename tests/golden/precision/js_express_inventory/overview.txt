@@ -1,0 +1,63 @@
+[overview]
+overview nodes: 6
+overview edges: 4
+overview groups: 6
+overview stages: 5
+overview flows: 4
+- [entry_point_module] src/server role=interaction stage=entry in=0 out=1
+  summary: entry interaction module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 Script. Example files: src/server.js. Top symbols: bootstrapServer.
+- [module] (root) role=data stage=entry in=0 out=0
+  summary: data module in stage entry with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 0 function(s), 0 method(s). Tech mix: 1 Data. Example files: package.json. Top symbols: none.
+- [module] src/controllers role=interaction stage=downstream_2 in=1 out=1
+  summary: interaction module in stage downstream_2 with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 Script. Example files: src/controllers/inventoryController.js. Top symbols: listInventory.
+- [module] src/repositories role=storage stage=leaf in=1 out=0
+  summary: storage module in stage leaf with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 Script. Example files: src/repositories/inventoryRepository.js. Top symbols: readInventory.
+- [module] src/routes role=interaction stage=core in=1 out=1
+  summary: interaction module in stage core with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 Script. Example files: src/routes/inventory.js. Top symbols: buildInventoryRoutes.
+- [module] src/services role=analysis stage=downstream_3 in=1 out=1
+  summary: analysis module in stage downstream_3 with 1 file(s), 0 class(es), 0 struct(s), 0 enum(s), 1 function(s), 0 method(s). Reachable from an entry module. Tech mix: 1 Script. Example files: src/services/inventoryService.js. Top symbols: loadInventory.
+
+[overview edges]
+- depends_on: src/controllers -> src/services (weight=1)
+- depends_on: src/routes -> src/controllers (weight=1)
+- depends_on: src/server -> src/routes (weight=1)
+- depends_on: src/services -> src/repositories (weight=1)
+
+[overview groups]
+- [folder_cluster] (root) nodes=1 expanded=yes
+  summary: Folder cluster '(root)' containing 1 module(s).
+- [folder_cluster] src nodes=5 expanded=yes
+  summary: Folder cluster 'src' containing 5 module(s).
+- [role_cluster] analysis nodes=1 expanded=no
+  summary: Role cluster 'analysis' containing 1 module(s).
+- [role_cluster] data nodes=1 expanded=no
+  summary: Role cluster 'data' containing 1 module(s).
+- [role_cluster] interaction nodes=3 expanded=no
+  summary: Role cluster 'interaction' containing 3 module(s).
+- [role_cluster] storage nodes=1 expanded=no
+  summary: Role cluster 'storage' containing 1 module(s).
+
+[overview stages]
+- stage 0 (entry): 2 module(s)
+- stage 1 (core): 1 module(s)
+- stage 2 (downstream_2): 1 module(s)
+- stage 3 (downstream_3): 1 module(s)
+- stage 4 (leaf): 1 module(s)
+
+[overview flows]
+- src/server -> src/repositories (weight=5, stage_span=4)
+  summary: Starts at src/server, traverses 5 module(s) across 4 stage hop(s), and reaches src/repositories with cumulative dependency weight 5.
+  path: src/server -> src/routes -> src/controllers -> src/services -> src/repositories
+- src/server -> src/services (weight=4, stage_span=3)
+  summary: Starts at src/server, traverses 4 module(s) across 3 stage hop(s), and reaches src/services with cumulative dependency weight 4.
+  path: src/server -> src/routes -> src/controllers -> src/services
+- src/server -> src/controllers (weight=3, stage_span=2)
+  summary: Starts at src/server, traverses 3 module(s) across 2 stage hop(s), and reaches src/controllers with cumulative dependency weight 3.
+  path: src/server -> src/routes -> src/controllers
+- src/server -> src/routes (weight=2, stage_span=1)
+  summary: Starts at src/server, traverses 2 module(s) across 1 stage hop(s), and reaches src/routes with cumulative dependency weight 2.
+  path: src/server -> src/routes
+
+[overview diagnostics]
+- Derived 6 overview module(s) from 6 discovered file(s); average 1 file(s) per module.
+- Cross-artifact inventory captured QML/Web/Python/Data-backed modules in addition to C/C++ modules.
