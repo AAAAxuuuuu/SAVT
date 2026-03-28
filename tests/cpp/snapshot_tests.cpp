@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -231,6 +232,109 @@ std::map<std::string, std::string> artifactFileMap(const SnapshotArtifacts& arti
     };
 }
 
+std::vector<std::string> expectedArtifactFileNames() {
+    return {
+        "analysis_report.json",
+        "analysis_report.dot",
+        "analysis_report.md",
+        "overview.txt",
+        "capability.txt",
+        "layout.txt",
+        "capability_scene_layout.txt",
+        "system_context.md",
+        "precision_summary.txt",
+    };
+}
+
+std::set<std::string> directoryNames(const fs::path& root) {
+    std::set<std::string> names;
+    if (!fs::exists(root)) {
+        return names;
+    }
+
+    for (const fs::directory_entry& entry : fs::directory_iterator(root)) {
+        if (entry.is_directory()) {
+            names.insert(entry.path().filename().string());
+        }
+    }
+    return names;
+}
+
+bool hasRegularFiles(const fs::path& root) {
+    if (!fs::exists(root)) {
+        return false;
+    }
+
+    for (const fs::directory_entry& entry : fs::recursive_directory_iterator(root)) {
+        if (entry.is_regular_file()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void validateSnapshotInventory(
+    const std::vector<SnapshotCase>& activeCases,
+    const std::vector<SnapshotCase>& knownCases,
+    const bool updateGoldens,
+    std::vector<std::string>& failures) {
+    std::set<std::string> caseNames;
+    for (const SnapshotCase& snapshotCase : knownCases) {
+        if (!caseNames.insert(snapshotCase.name).second) {
+            failures.push_back("Duplicate snapshot case registration: " + snapshotCase.name);
+        }
+    }
+    std::set<std::string> activeCaseNames;
+    for (const SnapshotCase& snapshotCase : activeCases) {
+        activeCaseNames.insert(snapshotCase.name);
+    }
+
+    const fs::path fixturesRoot = testsSourceDir() / "fixtures" / "precision";
+    const fs::path goldenRoot = testsSourceDir() / "golden" / "precision";
+    const std::set<std::string> fixtureNames = directoryNames(fixturesRoot);
+    const std::set<std::string> goldenNames = directoryNames(goldenRoot);
+
+    for (const std::string& fixtureName : fixtureNames) {
+        if (!caseNames.contains(fixtureName)) {
+            failures.push_back("Unregistered fixture directory: " + fixtureName);
+        }
+    }
+    for (const std::string& goldenName : goldenNames) {
+        if (!caseNames.contains(goldenName)) {
+            failures.push_back("Unregistered golden directory: " + goldenName);
+        }
+    }
+
+    for (const SnapshotCase& snapshotCase : knownCases) {
+        const fs::path sourceRoot = fixtureSourceDir(snapshotCase);
+        const fs::path caseGoldenRoot = goldenDir(snapshotCase);
+        if (!fs::exists(sourceRoot)) {
+            failures.push_back("Missing fixture source directory: " + normalizePath(sourceRoot));
+            continue;
+        }
+        if (!hasRegularFiles(sourceRoot)) {
+            failures.push_back("Fixture source directory has no files: " + normalizePath(sourceRoot));
+        }
+        if (!fs::exists(caseGoldenRoot)) {
+            if (updateGoldens && activeCaseNames.contains(snapshotCase.name)) {
+                continue;
+            }
+            failures.push_back("Missing golden directory: " + normalizePath(caseGoldenRoot));
+            continue;
+        }
+        for (const std::string& artifactFileName : expectedArtifactFileNames()) {
+            if (!fs::exists(caseGoldenRoot / artifactFileName)) {
+                if (updateGoldens && activeCaseNames.contains(snapshotCase.name)) {
+                    continue;
+                }
+                failures.push_back(
+                    "Missing golden artifact for " + snapshotCase.name + ": " +
+                    normalizePath(caseGoldenRoot / artifactFileName));
+            }
+        }
+    }
+}
+
 bool compareOrUpdateArtifacts(
     const SnapshotCase& snapshotCase,
     const SnapshotArtifacts& artifacts,
@@ -271,9 +375,26 @@ bool compareOrUpdateArtifacts(
     return success;
 }
 
+std::vector<SnapshotCase> allSnapshotCases() {
+    return {
+        {"cpp_syntax_only", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"cpp_vendored_dependency_app", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"js_backend", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"spring_boot_java", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"qml_mixed_project", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"python_tooling_data_project", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"cpp_semantic_cross_tu", savt::analyzer::AnalyzerPrecision::SemanticRequired, SnapshotCase::CompilationDatabaseMode::CrossTranslationUnits},
+        {"semantic_required_missing_compile_commands", savt::analyzer::AnalyzerPrecision::SemanticRequired, SnapshotCase::CompilationDatabaseMode::None},
+        {"semantic_required_system_headers_unresolved", savt::analyzer::AnalyzerPrecision::SemanticRequired, SnapshotCase::CompilationDatabaseMode::NoSystemHeadersSingleTranslationUnit},
+        {"semantic_preferred_llvm_not_found", savt::analyzer::AnalyzerPrecision::SemanticPreferred, SnapshotCase::CompilationDatabaseMode::SingleTranslationUnit},
+        {"semantic_preferred_backend_unavailable", savt::analyzer::AnalyzerPrecision::SemanticPreferred, SnapshotCase::CompilationDatabaseMode::SingleTranslationUnit},
+    };
+}
+
 std::vector<SnapshotCase> snapshotCases() {
     std::vector<SnapshotCase> cases = {
         {"cpp_syntax_only", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
+        {"cpp_vendored_dependency_app", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"js_backend", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"spring_boot_java", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
         {"qml_mixed_project", savt::analyzer::AnalyzerPrecision::SyntaxOnly, SnapshotCase::CompilationDatabaseMode::None},
@@ -370,8 +491,11 @@ int main(int argc, char* argv[]) {
         const bool updateGoldens = argc > 1 && std::string(argv[1]) == "--update";
         fs::create_directories(snapshotArtifactDir());
 
+        const std::vector<SnapshotCase> cases = snapshotCases();
+        const std::vector<SnapshotCase> knownCases = allSnapshotCases();
         std::vector<std::string> failures;
-        for (const SnapshotCase& snapshotCase : snapshotCases()) {
+        validateSnapshotInventory(cases, knownCases, updateGoldens, failures);
+        for (const SnapshotCase& snapshotCase : cases) {
             const fs::path caseRuntimeDir = runtimeDir(snapshotCase);
             prepareFixtureRuntime(snapshotCase, caseRuntimeDir);
             const SnapshotArtifacts artifacts = buildArtifacts(caseRuntimeDir, snapshotCase);

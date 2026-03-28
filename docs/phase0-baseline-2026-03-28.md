@@ -45,11 +45,12 @@ Recorded result:
 - `cmake --build --preset macos-qt-debug --parallel`: passed
 - `savt_backend_tests`: passed
 - `savt_ai_tests`: passed
-- `savt_snapshot_tests`: failed
+- `savt_snapshot_tests`: passed
 
-Known failing area:
+Baseline notes:
 
-- `python_tooling_data_project` snapshot output currently differs on macOS and writes artifacts under `build/macos-qt-debug/snapshot_artifacts/actual/`
+- The default macOS snapshot baseline now covers the restored `python_tooling_data_project` tooling entrypoint and the additional `cpp_vendored_dependency_app` fixture.
+- Snapshot inventory validation now checks that registered fixture directories and golden artifacts stay in sync.
 
 ## Windows status
 

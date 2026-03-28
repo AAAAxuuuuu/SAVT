@@ -1,0 +1,61 @@
+{
+  "rootPath": "<fixture_root>",
+  "engine": "tree-sitter",
+  "precisionLevel": "syntax",
+  "semanticStatusCode": "not_requested",
+  "semanticStatusMessage": "Semantic analysis was not requested for this run.",
+  "compilationDatabasePath": "",
+  "semanticAnalysisRequested": false,
+  "semanticAnalysisEnabled": false,
+  "summary": {
+    "discoveredFiles": 6,
+    "parsedFiles": 6,
+    "nodeCount": 13,
+    "edgeCount": 21,
+    "inferredNodeCount": 13,
+    "semanticNodeCount": 0,
+    "inferredEdgeCount": 21,
+    "semanticEdgeCount": 0
+  },
+  "nodes": [
+    {"id": 1, "kind": "file", "displayName": "main.cpp", "qualifiedName": "QXlsx-1.5.0/HelloWorld/main.cpp", "identityKey": "file:QXlsx-1.5.0/HelloWorld/main.cpp", "filePath": "QXlsx-1.5.0/HelloWorld/main.cpp", "line": 0, "factSource": "inferred"},
+    {"id": 2, "kind": "file", "displayName": "xlsxdocument.h", "qualifiedName": "QXlsx-1.5.0/QXlsx/header/xlsxdocument.h", "identityKey": "file:QXlsx-1.5.0/QXlsx/header/xlsxdocument.h", "filePath": "QXlsx-1.5.0/QXlsx/header/xlsxdocument.h", "line": 0, "factSource": "inferred"},
+    {"id": 3, "kind": "file", "displayName": "xlsxdocument.cpp", "qualifiedName": "QXlsx-1.5.0/QXlsx/source/xlsxdocument.cpp", "identityKey": "file:QXlsx-1.5.0/QXlsx/source/xlsxdocument.cpp", "filePath": "QXlsx-1.5.0/QXlsx/source/xlsxdocument.cpp", "line": 0, "factSource": "inferred"},
+    {"id": 4, "kind": "file", "displayName": "main.cpp", "qualifiedName": "mainSystem/main.cpp", "identityKey": "file:mainSystem/main.cpp", "filePath": "mainSystem/main.cpp", "line": 0, "factSource": "inferred"},
+    {"id": 5, "kind": "file", "displayName": "mainwindow.cpp", "qualifiedName": "mainSystem/mainwindow.cpp", "identityKey": "file:mainSystem/mainwindow.cpp", "filePath": "mainSystem/mainwindow.cpp", "line": 0, "factSource": "inferred"},
+    {"id": 6, "kind": "file", "displayName": "mainwindow.h", "qualifiedName": "mainSystem/mainwindow.h", "identityKey": "file:mainSystem/mainwindow.h", "filePath": "mainSystem/mainwindow.h", "line": 0, "factSource": "inferred"},
+    {"id": 7, "kind": "module", "displayName": "QXlsx-1.5.0", "qualifiedName": "module:QXlsx-1.5.0", "identityKey": "module:QXlsx-1.5.0", "filePath": "QXlsx-1.5.0", "line": 0, "factSource": "inferred"},
+    {"id": 8, "kind": "module", "displayName": "mainSystem", "qualifiedName": "module:mainSystem", "identityKey": "module:mainSystem", "filePath": "mainSystem", "line": 0, "factSource": "inferred"},
+    {"id": 9, "kind": "function", "displayName": "main", "qualifiedName": "main", "identityKey": "", "filePath": "QXlsx-1.5.0/HelloWorld/main.cpp", "line": 2, "factSource": "inferred"},
+    {"id": 10, "kind": "class", "displayName": "QXlsxDocument", "qualifiedName": "QXlsxDocument", "identityKey": "", "filePath": "QXlsx-1.5.0/QXlsx/header/xlsxdocument.h", "line": 2, "factSource": "inferred"},
+    {"id": 11, "kind": "method", "displayName": "save", "qualifiedName": "QXlsxDocument::save", "identityKey": "", "filePath": "QXlsx-1.5.0/QXlsx/source/xlsxdocument.cpp", "line": 2, "factSource": "inferred"},
+    {"id": 12, "kind": "method", "displayName": "show", "qualifiedName": "MainWindow::show", "identityKey": "", "filePath": "mainSystem/mainwindow.cpp", "line": 4, "factSource": "inferred"},
+    {"id": 13, "kind": "class", "displayName": "MainWindow", "qualifiedName": "MainWindow", "identityKey": "", "filePath": "mainSystem/mainwindow.h", "line": 2, "factSource": "inferred"}
+  ],
+  "edges": [
+    {"fromId": 7, "toId": 1, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 7, "toId": 2, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 7, "toId": 3, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 8, "toId": 4, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 8, "toId": 5, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 8, "toId": 6, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 1, "toId": 2, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 1, "toId": 9, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 2, "toId": 10, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 2, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 3, "toId": 11, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 4, "toId": 6, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 4, "toId": 9, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 6, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 2, "kind": "includes", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 5, "toId": 12, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 6, "toId": 13, "kind": "contains", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 9, "toId": 11, "kind": "calls", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 9, "toId": 12, "kind": "calls", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 12, "toId": 11, "kind": "calls", "weight": 1, "supportCount": 1, "factSource": "inferred"},
+    {"fromId": 8, "toId": 7, "kind": "depends_on", "weight": 3, "supportCount": 3, "factSource": "inferred"}
+  ],
+  "diagnostics": [
+    "Analyzer precision mode: syntax_only"
+  ]
+}

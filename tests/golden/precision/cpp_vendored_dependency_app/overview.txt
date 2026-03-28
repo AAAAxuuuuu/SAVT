@@ -1,0 +1,35 @@
+[overview]
+overview nodes: 2
+overview edges: 1
+overview groups: 4
+overview stages: 2
+overview flows: 1
+- [entry_point_module] mainSystem role=presentation stage=entry in=0 out=1
+  summary: entry presentation module in stage entry with 3 file(s), 1 class(es), 0 struct(s), 0 enum(s), 0 function(s), 1 method(s). Reachable from an entry module. Tech mix: 3 C/C++. Example files: mainSystem/main.cpp, mainSystem/mainwindow.cpp, mainSystem/mainwindow.h. Top symbols: MainWindow, show.
+- [module] QXlsx-1.5.0 role=dependency stage=leaf in=1 out=0
+  summary: dependency module in stage leaf with 3 file(s), 1 class(es), 0 struct(s), 0 enum(s), 1 function(s), 1 method(s). Reachable from an entry module. Tech mix: 3 C/C++. Example files: QXlsx-1.5.0/HelloWorld/main.cpp, QXlsx-1.5.0/QXlsx/header/xlsxdocument.h, QXlsx-1.5.0/QXlsx/source/xlsxdocument.cpp. Top symbols: QXlsxDocument, main, save.
+
+[overview edges]
+- depends_on: mainSystem -> QXlsx-1.5.0 (weight=3)
+
+[overview groups]
+- [folder_cluster] QXlsx-1.5.0 nodes=1 expanded=yes
+  summary: Folder cluster 'QXlsx-1.5.0' containing 1 module(s).
+- [folder_cluster] mainSystem nodes=1 expanded=yes
+  summary: Folder cluster 'mainSystem' containing 1 module(s).
+- [role_cluster] dependency nodes=1 expanded=no
+  summary: Role cluster 'dependency' containing 1 module(s).
+- [role_cluster] presentation nodes=1 expanded=no
+  summary: Role cluster 'presentation' containing 1 module(s).
+
+[overview stages]
+- stage 0 (entry): 1 module(s)
+- stage 1 (leaf): 1 module(s)
+
+[overview flows]
+- mainSystem -> QXlsx-1.5.0 (weight=4, stage_span=1)
+  summary: Starts at mainSystem, traverses 2 module(s) across 1 stage hop(s), and reaches QXlsx-1.5.0 with cumulative dependency weight 4.
+  path: mainSystem -> QXlsx-1.5.0
+
+[overview diagnostics]
+- Derived 2 overview module(s) from 6 discovered file(s); average 3 file(s) per module.

@@ -46,7 +46,7 @@ Recorded result:
 - build: passed
 - `savt_backend_tests`: passed
 - `savt_ai_tests`: passed
-- `savt_snapshot_tests`: still has the existing `python_tooling_data_project` mismatch
+- `savt_snapshot_tests`: passed
 
 ### macOS semantic probe build
 

@@ -1,0 +1,33 @@
+[capability graph]
+capability nodes: 2
+capability edges: 1
+capability flows: 1
+capability groups: 3
+- [entry] MainSystem role=🎨 界面展示 (UI) modules=1 visible=yes priority=1578 stages=0
+  responsibility: 负责渲染界面和处理用户的点击/滑动等操作。
+  summary: 负责渲染界面和处理用户的点击/滑动等操作。 包含了 3 个源码文件。
+👉 核心类/函数: MainWindow, show
+- [infrastructure] QXlsx 1 5 0 role=dependency modules=1 visible=yes priority=478 stages=1
+  responsibility: 第三方或外部依赖库，为主系统提供可复用的基础能力，不属于核心业务代码。
+  summary: 第三方或外部依赖库，为主系统提供可复用的基础能力，不属于核心业务代码。 Covers 1 module(s) and 3 file(s), spans stage 1, and appears in 1 main flow(s). It is reachable from an entry capability. Main modules: QXlsx-1.5.0. Example files: QXlsx-1.5.0/HelloWorld/main.cpp, QXlsx-1.5.0/QXlsx/header/xlsxdocument.h, QXlsx-1.5.0/QXlsx/source/xlsxdocument.cpp. Key symbols: QXlsxDocument, main, save. Supporting roles inside this cluster: dependency. Direct collaborators: MainSystem. It is shown in the default view.
+
+[capability edges]
+- activates: MainSystem -> QXlsx 1 5 0 (weight=3, visible=yes)
+  summary: MainSystem activates QXlsx 1 5 0 as one of the first visible workflow steps (aggregated weight=3)
+
+[capability groups]
+- [lane] Entry Lane nodes=1 expanded=yes hidden=0
+  summary: Entry Lane containing 1 node(s).
+- [lane] Infrastructure Lane nodes=1 expanded=yes hidden=0
+  summary: Infrastructure Lane containing 1 node(s).
+- [role_cluster] Dependency nodes=1 expanded=yes hidden=0
+  summary: Role cluster 'dependency' containing 1 node(s).
+
+[capability flows]
+- MainSystem -> QXlsx 1 5 0 (weight=4, stage_span=1)
+  summary: Starts at MainSystem, crosses 2 capability step(s), spans 1 stage hop(s), and reaches QXlsx 1 5 0 with aggregate weight 4.
+  path: MainSystem -> QXlsx 1 5 0
+
+[capability diagnostics]
+- Capability aggregation mode: module_scoped.
+- Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.
