@@ -1,8 +1,10 @@
-# MinGW Debug Baseline Validation
+# Archived MinGW Baseline Validation
 
 Date: March 24, 2026
 
-This document records the phase-0 baseline that later refactor batches should preserve.
+This document records an earlier Windows MinGW-only phase-0 snapshot.
+
+The current shared baseline moved to `docs/phase0-baseline-2026-03-28.md`.
 
 ## Scope
 
@@ -33,7 +35,7 @@ On March 24, 2026 this path completed successfully and the current baseline pass
 - `savt_ai_tests`
 - `savt_utf8_check`
 
-Expected summary: `100% tests passed, 0 tests failed out of 3`.
+Expected summary at that time: `100% tests passed, 0 tests failed out of 3`.
 
 ## Explicit non-goals for this batch
 
@@ -41,4 +43,4 @@ Expected summary: `100% tests passed, 0 tests failed out of 3`.
 - No `AnalysisController` refactor
 - No semantic backend feature work
 - No L3 page implementation
-- No changes to the hand-maintained `src/ui/src/moc_AnalysisController.cpp`
+- No changes to generated or local-only files

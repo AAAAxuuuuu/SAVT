@@ -1,35 +1,38 @@
 # Qt Creator Setup
 
-## Recommended kits
+## Goal
 
-- Industrial precision path: `Qt 6.9.3 MSVC2022 64-bit`
-- Legacy syntax-only shell path: `Qt 6.9.3 MinGW 64-bit`
+Use the shared CMake presets inside Qt Creator without reintroducing machine-specific paths into the repository.
 
-## Recommended build directories
+## Recommended workflow
 
-- MSVC Debug: `g:/SAVT/build/qtcreator-qt6.9.3-msvc2022_64-debug`
-- MSVC Release: `g:/SAVT/build/qtcreator-qt6.9.3-msvc2022_64-release`
-- MinGW Debug: `g:/SAVT/build/qtcreator-qt6.9.3-mingw-debug`
-- MinGW Release: `g:/SAVT/build/qtcreator-qt6.9.3-mingw-release`
+1. Install a Qt 6.9.x kit for your platform.
+2. Open the repository root in Qt Creator as a CMake project.
+3. Provide your local Qt path through either:
+   - the `SAVT_QT_ROOT` environment variable
+   - a local-only `CMakeUserPresets.json` copied from `CMakeUserPresets.template.json`
+4. Select one of the shared presets:
+   - macOS: `macos-qt-debug`
+   - Windows MSVC: `windows-msvc-qt-debug`
+   - Windows MinGW compatibility path: `windows-mingw-qt-debug`
 
-Use the MSVC kit for any work related to industrial-grade semantic analysis. The MinGW kit is only for the existing lightweight shell and compatibility work.
+## Notes by platform
 
-## Installed semantic toolchain
+### macOS
 
-- LLVM root: `g:/SAVT/tools/llvm/clang+llvm-21.1.7-x86_64-pc-windows-msvc`
-- LLVM version: `21.1.7`
-- MSVC environment script: [enter-semantic-env.bat](/g:/SAVT/scripts/dev/enter-semantic-env.bat)
-- MSVC configure script: [configure-msvc-qt-debug.bat](/g:/SAVT/scripts/dev/configure-msvc-qt-debug.bat)\n- MSVC VS-generator validation script: [configure-msvc-vs-debug.bat](/g:/SAVT/scripts/dev/configure-msvc-vs-debug.bat)
-- MSVC build script: [build-msvc-qt-debug.bat](/g:/SAVT/scripts/dev/build-msvc-qt-debug.bat)
+- Point `SAVT_QT_ROOT` at a path like `/Users/you/Qt/6.9.2/macos`.
+- Use the shared `macos-qt-debug` preset for normal development.
 
-## What to open
+### Windows
 
-Open the root [CMakeLists.txt](/g:/SAVT/CMakeLists.txt).
+- Prefer the MSVC kit and the `windows-msvc-qt-debug` preset.
+- Use the MinGW preset only when you explicitly need the compatibility path.
+- If you want semantic analysis on Windows, initialize the environment described in `docs/semantic-toolchain-setup.md` before configuring.
 
-Do not open files under `third_party/Sourcetrail` as if they were the main application entry point. They are reference code only.
+## Local files that should stay untracked
 
-## Practical rule
+- `CMakeLists.txt.user`
+- `CMakeUserPresets.json`
+- `config/*.local.json`
 
-- Edit and debug code in `apps/` and `src/`.
-- Read `third_party/` when you want ideas or implementation references.
-- For industrial precision work, open Qt Creator with the MSVC kit or start from [enter-semantic-env.bat](/g:/SAVT/scripts/dev/enter-semantic-env.bat).
+Qt Creator may regenerate `CMakeLists.txt.user` at any time. That file is local IDE state and must not be committed.

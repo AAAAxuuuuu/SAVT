@@ -1,28 +1,47 @@
 # Semantic Toolchain Setup
 
-## Installed components
+## Goal
 
-- Visual Studio 2022 Preview MSVC toolchain
-- Qt 6.9.3 `msvc2022_64`
-- LLVM/Clang 21.1.7 development archive
-- Ninja from `F:/Qt/Tools/Ninja`
+Semantic analysis is expected to run on the Windows MSVC toolchain path, not on the MinGW compatibility path.
 
-## Paths
+This document defines the portable setup contract for that workflow.
 
-- MSVC vcvars: `C:\Program Files\Microsoft Visual Studio\2022\Preview\VC\Auxiliary\Build\vcvars64.bat`
-- Qt MSVC root: `F:\QT\6.9.3\msvc2022_64`
-- LLVM root: `g:\SAVT\tools\llvm\clang+llvm-21.1.7-x86_64-pc-windows-msvc`
-- LLVM CMake package: `g:\SAVT\tools\llvm\clang+llvm-21.1.7-x86_64-pc-windows-msvc\lib\cmake\llvm\LLVMConfig.cmake`
-- libclang import library: `g:\SAVT\tools\llvm\clang+llvm-21.1.7-x86_64-pc-windows-msvc\lib\libclang.lib`
+## Required components
 
-## Recommended entry points
+- Visual Studio 2022 with C++ build tools
+- A Qt 6.9.x `msvc2022_64` kit
+- LLVM/Clang for Windows with CMake package files
+- Ninja on `PATH`, or a local directory exposed through `SAVT_NINJA_ROOT`
 
-1. Double-click [enter-semantic-env.bat](/g:/SAVT/scripts/dev/enter-semantic-env.bat) to open a shell with MSVC and LLVM on `PATH`.
-2. Run [configure-msvc-qt-debug.bat](/g:/SAVT/scripts/dev/configure-msvc-qt-debug.bat) to configure the MSVC Qt build directory.
-3. Run [build-msvc-qt-debug.bat](/g:/SAVT/scripts/dev/build-msvc-qt-debug.bat) to build that directory.\n4. If you want a terminal-only sanity check for the MSVC toolchain without Ninja, run [configure-msvc-vs-debug.bat](/g:/SAVT/scripts/dev/configure-msvc-vs-debug.bat).
+## Environment variables
+
+- `SAVT_QT_ROOT`
+  Example: `C:\Qt\6.9.3\msvc2022_64`
+- `SAVT_LLVM_ROOT`
+  Example: `D:\llvm\clang+llvm-21.1.7-x86_64-pc-windows-msvc`
+- Optional: `SAVT_VCVARS_PATH`
+  Use this when automatic `vcvars64.bat` detection is not enough.
+- Optional: `SAVT_NINJA_ROOT`
+  Use this when `ninja.exe` is not already on `PATH`.
+
+## Standard entry points
+
+1. Run `scripts\dev\enter-semantic-env.bat` to open a shell with MSVC, Qt, and LLVM on `PATH`.
+2. Run `scripts\dev\configure-msvc-qt-debug.bat` to configure the shared `windows-msvc-qt-debug` preset with `SAVT_ENABLE_CLANG_TOOLING=ON`.
+3. Run `scripts\dev\build-msvc-qt-debug.bat` to build that preset.
+4. Run `scripts\dev\verify-windows-msvc-debug.bat` to execute the phase-0 baseline checks.
+5. If you need a Visual Studio generator build instead of Ninja, run `scripts\dev\configure-msvc-vs-debug.bat`.
+
+## Expected failure modes
+
+The repository should fail clearly in these cases instead of silently downgrading:
+
+- LLVM/Clang is not installed or `SAVT_LLVM_ROOT` is wrong
+- Qt MSVC kit is missing or `SAVT_QT_ROOT` is wrong
+- MSVC environment cannot be initialized
+- the analyzed project does not provide a usable `compile_commands.json`
 
 ## Notes
 
-- Industrial-grade C++ semantic analysis should target the MSVC toolchain path, not the MinGW path.
-- The LLVM package is installed locally inside the repository so the project can reference headers, CMake packages, and libraries without relying on system `PATH`.
-- `compile_commands.json` should be generated from the MSVC/Ninja build once the semantic backend is fully integrated.
+- `compile_commands.json` is required for semantic-required analysis of the target project.
+- The phase-0 baseline standardizes the setup and failure reporting path first; it does not claim that every project analyzed by SAVT already has full industrial-grade semantic extraction.

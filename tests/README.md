@@ -1,6 +1,6 @@
 # Tests
 
-This directory contains the current automated backend and adapter checks used by the phase-0 baseline.
+This directory contains the automated backend and adapter checks used by the shared phase-0 baseline.
 
 Current test targets:
 
@@ -9,17 +9,25 @@ Current test targets:
 - `savt_ai_tests`
 - `savt_utf8_check`
 
-Recommended Windows entry point:
+Recommended baseline entry points:
 
-```powershell
-.\scripts\dev\verify-mingw-debug.bat
+```bash
+./scripts/dev/verify-macos-debug.sh
 ```
 
-That script runs the smallest repeatable validation path for this repository:
+```bat
+scripts\dev\verify-windows-msvc-debug.bat
+```
 
-1. configure `qt-mingw-debug` with `SAVT_BUILD_TESTS=ON`
+```bat
+scripts\dev\verify-mingw-debug.bat
+```
+
+These scripts run the smallest repeatable configure/build/test paths for this repository:
+
+1. configure one shared debug preset with `SAVT_BUILD_TESTS=ON`
 2. build `savt_backend_tests`, `savt_snapshot_tests`, and `savt_ai_tests`
-3. run `ctest` against `build/qtcreator-qt6.9.3-mingw-debug`
+3. run `ctest` against the matching build directory
 
 Use this baseline before and after incremental refactor batches so regressions are visible immediately.
 

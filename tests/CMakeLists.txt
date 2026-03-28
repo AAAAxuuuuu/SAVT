@@ -9,7 +9,6 @@ target_include_directories(savt_backend_tests
 
 target_link_libraries(savt_backend_tests
     PRIVATE
-        savt_core
         savt_analyzer
         savt_layout
 )
@@ -26,7 +25,6 @@ add_executable(savt_snapshot_tests
 
 target_link_libraries(savt_snapshot_tests
     PRIVATE
-        savt_core
         savt_analyzer
         savt_layout
         savt_ui_formatters
@@ -89,14 +87,23 @@ if(NOT SAVT_QT_CORE_DLL)
     get_target_property(SAVT_QT_CORE_DLL Qt6::Core IMPORTED_LOCATION_RELEASE)
 endif()
 if(NOT SAVT_QT_CORE_DLL)
-    get_target_property(SAVT_QT_CORE_DLL Qt6::Core IMPORTED_LOCATION)
+get_target_property(SAVT_QT_CORE_DLL Qt6::Core IMPORTED_LOCATION)
 endif()
 get_filename_component(SAVT_QT_RUNTIME_BIN_DIR "${SAVT_QT_CORE_DLL}" DIRECTORY)
-set(SAVT_TEST_PATH_SEGMENTS "${SAVT_QT_RUNTIME_BIN_DIR};${SAVT_TEST_RUNTIME_BIN_DIR}")
+set(SAVT_TEST_PATH_SEGMENTS
+    "${SAVT_QT_RUNTIME_BIN_DIR}"
+    "${SAVT_TEST_RUNTIME_BIN_DIR}"
+)
 if(SAVT_CLANG_TOOLING_AVAILABLE AND SAVT_LLVM_RUNTIME_BIN_DIR AND EXISTS "${SAVT_LLVM_RUNTIME_BIN_DIR}")
-    set(SAVT_TEST_PATH_SEGMENTS "${SAVT_LLVM_RUNTIME_BIN_DIR};${SAVT_TEST_PATH_SEGMENTS}")
+    list(PREPEND SAVT_TEST_PATH_SEGMENTS "${SAVT_LLVM_RUNTIME_BIN_DIR}")
 endif()
-set(SAVT_TEST_PATH_VALUE "${SAVT_TEST_PATH_SEGMENTS};$ENV{PATH}")
+if(WIN32)
+    set(SAVT_TEST_PATH_LIST_SEPARATOR ";")
+else()
+    set(SAVT_TEST_PATH_LIST_SEPARATOR ":")
+endif()
+list(JOIN SAVT_TEST_PATH_SEGMENTS "${SAVT_TEST_PATH_LIST_SEPARATOR}" SAVT_TEST_PATH_SEGMENTS_JOINED)
+set(SAVT_TEST_PATH_VALUE "${SAVT_TEST_PATH_SEGMENTS_JOINED}${SAVT_TEST_PATH_LIST_SEPARATOR}$ENV{PATH}")
 string(REPLACE ";" "\\;" SAVT_TEST_PATH_VALUE_ESCAPED "${SAVT_TEST_PATH_VALUE}")
 set(SAVT_TEST_PATH_ENV "PATH=${SAVT_TEST_PATH_VALUE_ESCAPED}")
 set_tests_properties(savt_backend_tests PROPERTIES

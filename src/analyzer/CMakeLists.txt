@@ -11,7 +11,7 @@ target_include_directories(savt_analyzer
         ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${CMAKE_SOURCE_DIR}/third_party/tree-sitter-cpp/bindings/c
+        ${SAVT_TREE_SITTER_CPP_BINDINGS_DIR}
 )
 
 target_link_libraries(savt_analyzer

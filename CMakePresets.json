@@ -2,93 +2,204 @@
   "version": 6,
   "cmakeMinimumRequired": {
     "major": 3,
-    "minor": 30,
+    "minor": 24,
     "patch": 0
   },
   "configurePresets": [
     {
-      "name": "qt-mingw-debug",
-      "displayName": "Qt Creator / Qt 6.9.3 MinGW Debug",
-      "generator": "MinGW Makefiles",
-      "binaryDir": "${sourceDir}/build/qtcreator-qt6.9.3-mingw-debug",
-      "environment": {
-        "PATH": "F:/Qt/Tools/mingw1310_64/bin;F:/Qt/6.9.3/mingw_64/bin;$penv{PATH}"
-      },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_C_COMPILER": "F:/Qt/Tools/mingw1310_64/bin/gcc.exe",
-        "CMAKE_CXX_COMPILER": "F:/Qt/Tools/mingw1310_64/bin/g++.exe",
-        "CMAKE_MAKE_PROGRAM": "F:/Qt/Tools/mingw1310_64/bin/mingw32-make.exe",
-        "CMAKE_PREFIX_PATH": "F:/Qt/6.9.3/mingw_64"
-      }
-    },
-    {
-      "name": "qt-mingw-release",
-      "displayName": "Qt Creator / Qt 6.9.3 MinGW Release",
-      "generator": "MinGW Makefiles",
-      "binaryDir": "${sourceDir}/build/qtcreator-qt6.9.3-mingw-release",
-      "environment": {
-        "PATH": "F:/Qt/Tools/mingw1310_64/bin;F:/Qt/6.9.3/mingw_64/bin;$penv{PATH}"
-      },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_C_COMPILER": "F:/Qt/Tools/mingw1310_64/bin/gcc.exe",
-        "CMAKE_CXX_COMPILER": "F:/Qt/Tools/mingw1310_64/bin/g++.exe",
-        "CMAKE_MAKE_PROGRAM": "F:/Qt/Tools/mingw1310_64/bin/mingw32-make.exe",
-        "CMAKE_PREFIX_PATH": "F:/Qt/6.9.3/mingw_64"
-      }
-    },
-    {
-      "name": "qt-msvc2022-debug",
-      "displayName": "Qt Creator / Qt 6.9.3 MSVC2022 Debug",
+      "name": "dev-base",
+      "hidden": true,
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/qtcreator-qt6.9.3-msvc2022_64-debug",
-      "environment": {
-        "PATH": "${sourceDir}/tools/llvm/clang+llvm-21.1.7-x86_64-pc-windows-msvc/bin;F:/Qt/Tools/Ninja;$penv{PATH}"
-      },
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_PREFIX_PATH": "F:/QT/6.9.3/msvc2022_64",
-        "CMAKE_MAKE_PROGRAM": "F:/Qt/Tools/Ninja/ninja.exe",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "SAVT_ENABLE_CLANG_TOOLING": "ON",
-        "SAVT_LLVM_ROOT": "${sourceDir}/tools/llvm/clang+llvm-21.1.7-x86_64-pc-windows-msvc"
+        "SAVT_BUILD_TESTS": "ON",
+        "SAVT_ENABLE_CLANG_TOOLING": "OFF"
       }
     },
     {
-      "name": "qt-msvc2022-release",
-      "displayName": "Qt Creator / Qt 6.9.3 MSVC2022 Release",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/qtcreator-qt6.9.3-msvc2022_64-release",
+      "name": "dev-debug-base",
+      "hidden": true,
+      "inherits": "dev-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "dev-release-base",
+      "hidden": true,
+      "inherits": "dev-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "macos-qt-debug",
+      "displayName": "macOS / Qt Debug",
+      "description": "Shared macOS debug preset. Set SAVT_QT_ROOT to your Qt macOS kit root before configuring.",
+      "inherits": "dev-debug-base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "binaryDir": "${sourceDir}/build/macos-qt-debug",
       "environment": {
-        "PATH": "${sourceDir}/tools/llvm/clang+llvm-21.1.7-x86_64-pc-windows-msvc/bin;F:/Qt/Tools/Ninja;$penv{PATH}"
+        "PATH": "$env{SAVT_QT_ROOT}/bin:$penv{PATH}",
+        "QML_IMPORT_PATH": "$env{SAVT_QT_ROOT}/qml",
+        "QML2_IMPORT_PATH": "$env{SAVT_QT_ROOT}/qml"
       },
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_PREFIX_PATH": "F:/QT/6.9.3/msvc2022_64",
-        "CMAKE_MAKE_PROGRAM": "F:/Qt/Tools/Ninja/ninja.exe",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "SAVT_ENABLE_CLANG_TOOLING": "ON",
-        "SAVT_LLVM_ROOT": "${sourceDir}/tools/llvm/clang+llvm-21.1.7-x86_64-pc-windows-msvc"
+        "CMAKE_PREFIX_PATH": "$env{SAVT_QT_ROOT}"
+      }
+    },
+    {
+      "name": "macos-qt-release",
+      "displayName": "macOS / Qt Release",
+      "description": "Shared macOS release preset. Set SAVT_QT_ROOT to your Qt macOS kit root before configuring.",
+      "inherits": "dev-release-base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "binaryDir": "${sourceDir}/build/macos-qt-release",
+      "environment": {
+        "PATH": "$env{SAVT_QT_ROOT}/bin:$penv{PATH}",
+        "QML_IMPORT_PATH": "$env{SAVT_QT_ROOT}/qml",
+        "QML2_IMPORT_PATH": "$env{SAVT_QT_ROOT}/qml"
+      },
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{SAVT_QT_ROOT}"
+      }
+    },
+    {
+      "name": "windows-msvc-qt-debug",
+      "displayName": "Windows / Qt MSVC Debug",
+      "description": "Recommended Windows debug preset. Set SAVT_QT_ROOT to your Qt MSVC kit root before configuring.",
+      "inherits": "dev-debug-base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "binaryDir": "${sourceDir}/build/windows-msvc-qt-debug",
+      "environment": {
+        "PATH": "$env{SAVT_QT_ROOT}/bin;$penv{PATH}"
+      },
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{SAVT_QT_ROOT}"
+      }
+    },
+    {
+      "name": "windows-msvc-qt-release",
+      "displayName": "Windows / Qt MSVC Release",
+      "description": "Recommended Windows release preset. Set SAVT_QT_ROOT to your Qt MSVC kit root before configuring.",
+      "inherits": "dev-release-base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "binaryDir": "${sourceDir}/build/windows-msvc-qt-release",
+      "environment": {
+        "PATH": "$env{SAVT_QT_ROOT}/bin;$penv{PATH}"
+      },
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "$env{SAVT_QT_ROOT}"
+      }
+    },
+    {
+      "name": "windows-mingw-qt-debug",
+      "displayName": "Windows / Qt MinGW Debug (Legacy)",
+      "description": "Legacy Windows debug preset. Set SAVT_QT_ROOT and SAVT_MINGW_ROOT before configuring.",
+      "inherits": "dev-debug-base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "generator": "MinGW Makefiles",
+      "binaryDir": "${sourceDir}/build/windows-mingw-qt-debug",
+      "environment": {
+        "PATH": "$env{SAVT_MINGW_ROOT}/bin;$env{SAVT_QT_ROOT}/bin;$penv{PATH}"
+      },
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "$env{SAVT_MINGW_ROOT}/bin/gcc.exe",
+        "CMAKE_CXX_COMPILER": "$env{SAVT_MINGW_ROOT}/bin/g++.exe",
+        "CMAKE_MAKE_PROGRAM": "$env{SAVT_MINGW_ROOT}/bin/mingw32-make.exe",
+        "CMAKE_PREFIX_PATH": "$env{SAVT_QT_ROOT}"
+      }
+    },
+    {
+      "name": "windows-mingw-qt-release",
+      "displayName": "Windows / Qt MinGW Release (Legacy)",
+      "description": "Legacy Windows release preset. Set SAVT_QT_ROOT and SAVT_MINGW_ROOT before configuring.",
+      "inherits": "dev-release-base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "generator": "MinGW Makefiles",
+      "binaryDir": "${sourceDir}/build/windows-mingw-qt-release",
+      "environment": {
+        "PATH": "$env{SAVT_MINGW_ROOT}/bin;$env{SAVT_QT_ROOT}/bin;$penv{PATH}"
+      },
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "$env{SAVT_MINGW_ROOT}/bin/gcc.exe",
+        "CMAKE_CXX_COMPILER": "$env{SAVT_MINGW_ROOT}/bin/g++.exe",
+        "CMAKE_MAKE_PROGRAM": "$env{SAVT_MINGW_ROOT}/bin/mingw32-make.exe",
+        "CMAKE_PREFIX_PATH": "$env{SAVT_QT_ROOT}"
       }
     }
   ],
   "buildPresets": [
     {
-      "name": "qt-mingw-debug",
-      "configurePreset": "qt-mingw-debug"
+      "name": "macos-qt-debug",
+      "configurePreset": "macos-qt-debug"
     },
     {
-      "name": "qt-mingw-release",
-      "configurePreset": "qt-mingw-release"
+      "name": "macos-qt-release",
+      "configurePreset": "macos-qt-release"
     },
     {
-      "name": "qt-msvc2022-debug",
-      "configurePreset": "qt-msvc2022-debug"
+      "name": "windows-msvc-qt-debug",
+      "configurePreset": "windows-msvc-qt-debug"
     },
     {
-      "name": "qt-msvc2022-release",
-      "configurePreset": "qt-msvc2022-release"
+      "name": "windows-msvc-qt-release",
+      "configurePreset": "windows-msvc-qt-release"
+    },
+    {
+      "name": "windows-mingw-qt-debug",
+      "configurePreset": "windows-mingw-qt-debug"
+    },
+    {
+      "name": "windows-mingw-qt-release",
+      "configurePreset": "windows-mingw-qt-release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "macos-qt-debug",
+      "configurePreset": "macos-qt-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-msvc-qt-debug",
+      "configurePreset": "windows-msvc-qt-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-mingw-qt-debug",
+      "configurePreset": "windows-mingw-qt-debug",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

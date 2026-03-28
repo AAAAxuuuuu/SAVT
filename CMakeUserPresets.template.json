@@ -1,0 +1,75 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "include": [
+    "CMakePresets.json"
+  ],
+  "configurePresets": [
+    {
+      "name": "local-macos-qt-debug",
+      "displayName": "Local macOS / Qt Debug",
+      "inherits": "macos-qt-debug",
+      "environment": {
+        "SAVT_QT_ROOT": "/Users/you/Qt/6.9.2/macos"
+      }
+    },
+    {
+      "name": "local-windows-msvc-qt-debug",
+      "displayName": "Local Windows / Qt MSVC Debug",
+      "inherits": "windows-msvc-qt-debug",
+      "environment": {
+        "SAVT_QT_ROOT": "C:/Qt/6.9.3/msvc2022_64"
+      }
+    },
+    {
+      "name": "local-windows-mingw-qt-debug",
+      "displayName": "Local Windows / Qt MinGW Debug",
+      "inherits": "windows-mingw-qt-debug",
+      "environment": {
+        "SAVT_QT_ROOT": "C:/Qt/6.9.3/mingw_64",
+        "SAVT_MINGW_ROOT": "C:/Qt/Tools/mingw1310_64"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "local-macos-qt-debug",
+      "configurePreset": "local-macos-qt-debug"
+    },
+    {
+      "name": "local-windows-msvc-qt-debug",
+      "configurePreset": "local-windows-msvc-qt-debug"
+    },
+    {
+      "name": "local-windows-mingw-qt-debug",
+      "configurePreset": "local-windows-mingw-qt-debug"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "local-macos-qt-debug",
+      "configurePreset": "local-macos-qt-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "local-windows-msvc-qt-debug",
+      "configurePreset": "local-windows-msvc-qt-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "local-windows-mingw-qt-debug",
+      "configurePreset": "local-windows-mingw-qt-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

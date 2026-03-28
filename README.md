@@ -41,34 +41,46 @@ SAVT now includes a bounded AI adapter for architecture explanations, supporting
 
 The current adapter is intentionally restricted: it is only allowed to help with SAVT architecture reading tasks, must stay inside the supplied evidence package, and must not behave like a general assistant.
 
+`config/deepseek-ai.local.json` is a local machine file and should stay out of version control.
+
 ## Build
 
-This workspace includes a ready-to-use `CMakePresets.json` for the local Qt MinGW toolchain discovered on this machine.
+This repository now keeps shared presets portable and moves machine-specific Qt paths into environment variables or `CMakeUserPresets.json`.
 
-Recommended Qt Creator build directories:
+Recommended shared presets:
 
-- Debug: `build/qtcreator-qt6.9.3-mingw-debug`
-- Release: `build/qtcreator-qt6.9.3-mingw-release`
+- macOS: `macos-qt-debug`
+- Windows MSVC: `windows-msvc-qt-debug`
+- Windows MinGW compatibility path: `windows-mingw-qt-debug`
 
-Minimal baseline verification:
+Required environment variables:
 
-```powershell
-.\scripts\dev\verify-mingw-debug.bat
+- `SAVT_QT_ROOT`
+- `SAVT_MINGW_ROOT` for the MinGW compatibility path only
+- `SAVT_LLVM_ROOT` only when enabling the semantic backend
+
+Useful entry points:
+
+```bash
+./scripts/dev/verify-macos-debug.sh
 ```
 
-This is the phase-0 reference path for repeatable local validation. It configures `qt-mingw-debug` with `SAVT_BUILD_TESTS=ON`, builds `savt_backend_tests`, `savt_snapshot_tests`, and `savt_ai_tests`, then runs `ctest` for the current 4-test baseline. The recorded result is documented in `docs/baseline-validation-2026-03-24.md`.
-
-Manual configure:
-
-```powershell
-& 'F:\Qt\Tools\CMake_64\bin\cmake.exe' --preset qt-mingw-debug
+```bat
+scripts\dev\verify-windows-msvc-debug.bat
 ```
 
-Manual build:
-
-```powershell
-& 'F:\Qt\Tools\CMake_64\bin\cmake.exe' --build --preset qt-mingw-debug
+```bat
+scripts\dev\verify-mingw-debug.bat
 ```
+
+The first configure can automatically fetch `tree-sitter` and `tree-sitter-cpp` if `third_party/` does not already contain them. Set `-DSAVT_FETCH_THIRD_PARTY=OFF` if you need a fully pre-populated offline build.
+
+See:
+
+- `docs/build-setup.md`
+- `docs/phase0-baseline-2026-03-28.md`
+- `docs/qtcreator-setup.md`
+- `docs/semantic-toolchain-setup.md`
 
 ## Encoding hygiene
 
@@ -85,7 +97,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev\check_utf8.ps1
 - On Windows CMake builds, you can also run:
 
 ```powershell
-& 'F:\Qt\Tools\CMake_64\bin\cmake.exe' --build --preset qt-mingw-debug --target savt_check_utf8
+cmake --build --preset windows-msvc-qt-debug --target savt_check_utf8
 ```
 
 The UTF-8 check validates file bytes directly instead of trusting terminal display, which helps catch cases where a console looks garbled even though the file itself is still correct.
@@ -93,7 +105,7 @@ The UTF-8 check validates file bytes directly instead of trusting terminal displ
 ## Boundary
 
 - Everything under `src/` and `apps/` is your codebase.
-- Everything under `third_party/` is vendored dependency or reference material and should be treated as external.
+- Everything under `third_party/` is third-party dependency material and should be treated as external when present locally.
 
 See also: docs/industrial-precision-roadmap.md
 

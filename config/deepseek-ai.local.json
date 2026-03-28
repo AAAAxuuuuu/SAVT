@@ -1,9 +1,0 @@
-{
-  "provider": "cherry-studio-proxy",
-  "enabled": true,
-  "baseUrl": "https://chat.cqjtu.edu.cn/ds/api",
-  "model": "deepseek-chat",
-  "apiKey": "sk-63a583b0af60fc5ca8417ecbdfb41c53",
-  "timeoutMs": 30000,
-  "endpointPath": ""
-}

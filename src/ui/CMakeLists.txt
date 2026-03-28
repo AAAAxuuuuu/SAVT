@@ -11,7 +11,6 @@ add_library(savt_ui STATIC
     src/AnalysisOrchestrator.cpp
     src/ReportService.cpp
     src/SceneMapper.cpp
-    src/moc_AnalysisController.cpp
 )
 
 target_include_directories(savt_ui
@@ -34,7 +33,7 @@ target_link_libraries(savt_ui
 )
 
 set_target_properties(savt_ui PROPERTIES
-    AUTOMOC OFF
+    AUTOMOC ON
     AUTOUIC OFF
     AUTORCC OFF
     FOLDER src
