@@ -19,14 +19,16 @@ For C++ architecture analysis, industrial-grade precision requires all of the fo
 - Module aggregation.
 - Layered layout.
 - Precision-mode enforcement and compilation database discovery.
+- A libclang-based semantic analyzer implementation behind `SAVT_ENABLE_CLANG_TOOLING`.
+- Semantic symbol identity keyed by semantic declarations / `USR` when available.
+- Cross-translation-unit symbol merge for declarations, definitions, inherits, overrides, calls, and uses-type edges.
 
 ## What is still missing for true industrial precision
 
 - LLVM/Clang toolchain installation on this machine.
-- CMake integration that enables `SAVT_ENABLE_CLANG_TOOLING`.
-- A real semantic analyzer implementation behind that flag.
-- Semantic symbol canonicalization and cross-TU graph merge.
-- High-fidelity call/override/inheritance/usage extraction from Clang AST and index data.
+- Semantic-capable validation on macOS and Windows machines that actually provide headers + `libclang`.
+- Broader semantic fixtures that cover overloads, templates, aliases, and larger real-world codebases.
+- More high-fidelity semantic extraction for difficult language features such as macro-heavy code and ambiguous overload sites.
 
 ## Practical consequence
 

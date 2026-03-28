@@ -74,7 +74,7 @@ private:
     std::size_t nextNodeId_ = 1;
     std::vector<FileRecord> files_;
     std::unordered_map<std::string, std::size_t> identityToNodeId_;
-    std::unordered_map<std::string, std::size_t> qualifiedToNodeId_;
+    std::unordered_map<std::string, std::vector<std::size_t>> qualifiedToNodeIds_;
     std::unordered_map<std::string, std::vector<std::size_t>> displayNameToNodeIds_;
     std::unordered_map<std::string, std::size_t> absolutePathToFileId_;
     std::unordered_map<std::string, std::size_t> relativePathToFileId_;

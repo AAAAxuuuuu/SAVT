@@ -31,6 +31,12 @@ savt::core::FactSource mergeFactSource(
                : savt::core::FactSource::Inferred;
 }
 
+void appendUniqueNodeId(std::vector<std::size_t>& nodeIds, const std::size_t nodeId) {
+    if (std::find(nodeIds.begin(), nodeIds.end(), nodeId) == nodeIds.end()) {
+        nodeIds.push_back(nodeId);
+    }
+}
+
 }  // namespace
 
 AnalysisGraphBuilder::AnalysisGraphBuilder(std::filesystem::path rootPath, const AnalyzerOptions& options)
@@ -80,9 +86,17 @@ std::size_t AnalysisGraphBuilder::addOrMergeNode(
     }
 
     if (!existingId.has_value() && !qualifiedName.empty()) {
-        const auto qualifiedIt = qualifiedToNodeId_.find(qualifiedName);
-        if (qualifiedIt != qualifiedToNodeId_.end()) {
-            existingId = qualifiedIt->second;
+        const auto qualifiedIt = qualifiedToNodeIds_.find(qualifiedName);
+        if (qualifiedIt != qualifiedToNodeIds_.end() && qualifiedIt->second.size() == 1) {
+            const std::size_t candidateId = qualifiedIt->second.front();
+            const savt::core::SymbolNode* candidateNode = nodeById(candidateId);
+            const bool compatibleIdentity =
+                candidateNode != nullptr &&
+                (identityKey.empty() || candidateNode->identityKey.empty() || candidateNode->identityKey == identityKey);
+            const bool compatibleKind = candidateNode != nullptr && candidateNode->kind == kind;
+            if (compatibleIdentity && compatibleKind) {
+                existingId = candidateId;
+            }
         }
     }
 
@@ -109,7 +123,7 @@ std::size_t AnalysisGraphBuilder::addOrMergeNode(
                 identityToNodeId_.emplace(existingNode->identityKey, existingNode->id);
             }
             if (!existingNode->qualifiedName.empty()) {
-                qualifiedToNodeId_.emplace(existingNode->qualifiedName, existingNode->id);
+                appendUniqueNodeId(qualifiedToNodeIds_[existingNode->qualifiedName], existingNode->id);
             }
 
             if (kind != savt::core::SymbolKind::Module && !filePath.empty()) {
@@ -138,7 +152,7 @@ std::size_t AnalysisGraphBuilder::addOrMergeNode(
         identityToNodeId_.emplace(stored.identityKey, stored.id);
     }
     if (!stored.qualifiedName.empty()) {
-        qualifiedToNodeId_.emplace(stored.qualifiedName, stored.id);
+        appendUniqueNodeId(qualifiedToNodeIds_[stored.qualifiedName], stored.id);
     }
     displayNameToNodeIds_[stored.displayName].push_back(stored.id);
 
@@ -288,11 +302,11 @@ const savt::core::SymbolNode* AnalysisGraphBuilder::nodeById(const std::size_t n
 }
 
 std::optional<std::size_t> AnalysisGraphBuilder::findSymbolByQualifiedName(const std::string& qualifiedName) const {
-    const auto iterator = qualifiedToNodeId_.find(qualifiedName);
-    if (iterator == qualifiedToNodeId_.end()) {
+    const auto iterator = qualifiedToNodeIds_.find(qualifiedName);
+    if (iterator == qualifiedToNodeIds_.end() || iterator->second.size() != 1) {
         return std::nullopt;
     }
-    return iterator->second;
+    return iterator->second.front();
 }
 
 std::vector<std::size_t> AnalysisGraphBuilder::findSymbolsByDisplayName(const std::string& displayName) const {

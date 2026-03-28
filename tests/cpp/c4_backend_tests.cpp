@@ -1,4 +1,5 @@
 #include "AnalyzerUtilities.h"
+#include "AnalysisGraphBuilder.h"
 
 #include "savt/analyzer/CppProjectAnalyzer.h"
 #include "savt/core/ArchitectureGraph.h"
@@ -465,6 +466,73 @@ void testAnalysisReportSerializesFactSources() {
            "json report should serialize edge support counts");
     expect(json.find("\"semanticNodeCount\": 1") != std::string::npos,
            "json report summary should expose semantic node counts");
+}
+
+void testAnalysisGraphBuilderPreservesDistinctSemanticOverloads() {
+    using savt::analyzer::AnalyzerOptions;
+    using savt::analyzer::detail::AnalysisGraphBuilder;
+    using savt::core::FactSource;
+    using savt::core::SymbolKind;
+
+    AnalysisGraphBuilder builder(std::filesystem::current_path(), AnalyzerOptions{});
+
+    const std::size_t syntaxDeclId = builder.addOrMergeNode(
+        SymbolKind::Function,
+        "helper",
+        "demo::helper",
+        "demo.cpp",
+        1);
+    const std::size_t syntaxDefId = builder.addOrMergeNode(
+        SymbolKind::Function,
+        "helper",
+        "demo::helper",
+        "demo.cpp",
+        12);
+    expect(syntaxDeclId == syntaxDefId,
+           "syntax-level duplicates should still merge by qualifiedName when the symbol is otherwise unambiguous");
+    expect(builder.findSymbolByQualifiedName("demo::helper").has_value() &&
+               *builder.findSymbolByQualifiedName("demo::helper") == syntaxDeclId,
+           "unique qualified names should remain directly resolvable");
+
+    const std::size_t intOverloadId = builder.addOrMergeNode(
+        SymbolKind::Function,
+        "compute",
+        "demo::compute",
+        "demo.cpp",
+        20,
+        "usr:demo::compute#int",
+        FactSource::Semantic);
+    const std::size_t doubleOverloadId = builder.addOrMergeNode(
+        SymbolKind::Function,
+        "compute",
+        "demo::compute",
+        "demo.cpp",
+        28,
+        "usr:demo::compute#double",
+        FactSource::Semantic);
+    expect(intOverloadId != doubleOverloadId,
+           "semantic overloads with different identities must not merge just because they share a qualifiedName");
+    expect(findNodesByQualifiedName(builder.report(), "demo::compute").size() == 2,
+           "distinct semantic overloads should remain as two logical nodes in the report");
+    expect(!builder.findSymbolByQualifiedName("demo::compute").has_value(),
+           "ambiguous qualified names should no longer resolve to an arbitrary node");
+
+    const std::size_t repeatIntOverloadId = builder.addOrMergeNode(
+        SymbolKind::Function,
+        "compute",
+        "demo::compute",
+        "demo.cpp",
+        33,
+        "usr:demo::compute#int",
+        FactSource::Semantic);
+    expect(repeatIntOverloadId == intOverloadId,
+           "semantic nodes should still merge by identity when the same overload is seen again");
+
+    const auto computeNodes = findNodesByQualifiedName(builder.report(), "demo::compute");
+    expect(std::all_of(computeNodes.begin(), computeNodes.end(), [](const savt::core::SymbolNode* node) {
+               return node != nullptr && node->factSource == savt::core::FactSource::Semantic;
+           }),
+           "preserved overload nodes should retain semantic fact labeling");
 }
 
 void testNodeBackendRelativeImportsAndRoleClassification() {
@@ -1004,6 +1072,7 @@ int main() {
     testDependencyAndPrimaryEntryClassification();
     testCrossArtifactOverviewAndCapabilityGraph();
     testAnalysisReportSerializesFactSources();
+    testAnalysisGraphBuilderPreservesDistinctSemanticOverloads();
     testNodeBackendRelativeImportsAndRoleClassification();
     testSpringBootJavaImportsAndRoleClassification();
     testSemanticRequiredBlocksWhenCompileCommandsAreMissing();
