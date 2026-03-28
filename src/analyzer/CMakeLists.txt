@@ -67,17 +67,40 @@ if(SAVT_ENABLE_CLANG_TOOLING)
         list(APPEND _savt_llvm_hints "$ENV{SAVT_LLVM_ROOT}")
     endif()
 
-    find_path(SAVT_LIBCLANG_INCLUDE_DIR
-        NAMES clang-c/Index.h
-        HINTS ${_savt_llvm_hints}
-        PATH_SUFFIXES include
-    )
+    if(NOT "${SAVT_LLVM_ROOT}" STREQUAL "")
+        if(EXISTS "${SAVT_LLVM_ROOT}/include/clang-c/Index.h")
+            set(SAVT_LIBCLANG_INCLUDE_DIR "${SAVT_LLVM_ROOT}/include")
+        endif()
 
-    find_library(SAVT_LIBCLANG_LIBRARY
-        NAMES libclang clang
-        HINTS ${_savt_llvm_hints}
-        PATH_SUFFIXES lib bin
-    )
+        set(_savt_libclang_candidates
+            "${SAVT_LLVM_ROOT}/lib/libclang.dylib"
+            "${SAVT_LLVM_ROOT}/lib/libclang.so"
+            "${SAVT_LLVM_ROOT}/lib/libclang.dll.a"
+            "${SAVT_LLVM_ROOT}/lib/libclang.lib"
+            "${SAVT_LLVM_ROOT}/bin/libclang.dll")
+        foreach(_savt_libclang_candidate IN LISTS _savt_libclang_candidates)
+            if(EXISTS "${_savt_libclang_candidate}")
+                set(SAVT_LIBCLANG_LIBRARY "${_savt_libclang_candidate}")
+                break()
+            endif()
+        endforeach()
+    endif()
+
+    if(NOT SAVT_LIBCLANG_INCLUDE_DIR)
+        find_path(SAVT_LIBCLANG_INCLUDE_DIR
+            NAMES clang-c/Index.h
+            HINTS ${_savt_llvm_hints}
+            PATH_SUFFIXES include
+        )
+    endif()
+
+    if(NOT SAVT_LIBCLANG_LIBRARY)
+        find_library(SAVT_LIBCLANG_LIBRARY
+            NAMES libclang clang
+            HINTS ${_savt_llvm_hints}
+            PATH_SUFFIXES lib bin
+        )
+    endif()
 
     if(SAVT_LIBCLANG_INCLUDE_DIR AND SAVT_LIBCLANG_LIBRARY)
         set(SAVT_CLANG_TOOLING_AVAILABLE ON)

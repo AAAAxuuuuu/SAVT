@@ -3,9 +3,11 @@
 #include "AnalysisGraphBuilder.h"
 #include "AnalyzerUtilities.h"
 
+#include <array>
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <cstdio>
 #include <map>
 #include <optional>
 #include <sstream>
@@ -657,6 +659,203 @@ bool diagnosticLooksLikeSystemHeaderFailure(const std::string& formattedDiagnost
     return isLikelySystemHeaderName(extractQuotedToken(formattedDiagnostic));
 }
 
+bool argumentMatchesOption(const std::string& argument, const std::string_view option) {
+    return argument == option ||
+           (argument.size() > option.size() && argument.starts_with(option) && argument[option.size()] == '=');
+}
+
+bool argumentsContainOption(
+    const std::vector<std::string>& arguments,
+    const std::string_view option) {
+    return std::any_of(arguments.begin(), arguments.end(), [&](const std::string& argument) {
+        return argumentMatchesOption(argument, option);
+    });
+}
+
+bool argumentsContainPathValue(
+    const std::vector<std::string>& arguments,
+    const std::string_view option,
+    const std::filesystem::path& expectedPath) {
+    const std::string normalizedExpected = normalizePath(expectedPath);
+    for (std::size_t index = 0; index < arguments.size(); ++index) {
+        const std::string& argument = arguments[index];
+        if (argument == option) {
+            if (index + 1 < arguments.size() &&
+                normalizePath(std::filesystem::path(arguments[index + 1])) == normalizedExpected) {
+                return true;
+            }
+            continue;
+        }
+
+        const std::string prefix(option);
+        if (argument.size() > prefix.size() && argument.starts_with(prefix) && argument[prefix.size()] == '=') {
+            if (normalizePath(std::filesystem::path(argument.substr(prefix.size() + 1))) == normalizedExpected) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool isCppLikeSourceFile(const std::filesystem::path& sourceFile) {
+    const std::string extension = lowerAsciiCopy(sourceFile.extension().string());
+    return extension == ".cc" || extension == ".cpp" || extension == ".cxx" || extension == ".mm" ||
+           extension == ".hpp" || extension == ".hh" || extension == ".hxx";
+}
+
+bool commandDisablesSystemHeaderSearch(const std::vector<std::string>& arguments);
+
+#if defined(__APPLE__)
+
+std::optional<std::string> captureCommandOutput(const char* command) {
+    std::array<char, 256> buffer{};
+    std::string output;
+
+    FILE* pipe = popen(command, "r");
+    if (pipe == nullptr) {
+        return std::nullopt;
+    }
+
+    while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe) != nullptr) {
+        output += buffer.data();
+    }
+
+    if (pclose(pipe) != 0) {
+        return std::nullopt;
+    }
+
+    while (!output.empty() && std::isspace(static_cast<unsigned char>(output.back())) != 0) {
+        output.pop_back();
+    }
+    while (!output.empty() && std::isspace(static_cast<unsigned char>(output.front())) != 0) {
+        output.erase(output.begin());
+    }
+
+    return output.empty() ? std::nullopt : std::optional<std::string>(std::move(output));
+}
+
+std::string shellQuoteForPosix(std::string_view value) {
+    std::string quoted;
+    quoted.reserve(value.size() + 2);
+    quoted.push_back('\'');
+    for (const char character : value) {
+        if (character == '\'') {
+            quoted += "'\\''";
+        } else {
+            quoted.push_back(character);
+        }
+    }
+    quoted.push_back('\'');
+    return quoted;
+}
+
+bool usesMacOsClangDriver(const std::vector<std::string>& arguments) {
+    if (arguments.empty()) {
+        return false;
+    }
+
+    const std::string compiler = lowerAsciiCopy(std::filesystem::path(toUnixPath(arguments.front())).filename().string());
+    return compiler == "clang" || compiler == "clang++" || compiler == "cc" || compiler == "c++";
+}
+
+std::optional<std::filesystem::path> macOsSdkRoot() {
+    static const std::optional<std::filesystem::path> cached = []() -> std::optional<std::filesystem::path> {
+        const auto output = captureCommandOutput("xcrun --show-sdk-path 2>/dev/null");
+        if (!output.has_value()) {
+            return std::nullopt;
+        }
+
+        std::error_code errorCode;
+        const std::filesystem::path sdkPath = std::filesystem::path(*output).lexically_normal();
+        if (!std::filesystem::exists(sdkPath, errorCode) || errorCode) {
+            return std::nullopt;
+        }
+
+        return sdkPath;
+    }();
+    return cached;
+}
+
+std::optional<std::filesystem::path> compilerResourceDir(const std::string& compilerExecutable) {
+    static std::unordered_map<std::string, std::optional<std::filesystem::path>> cache;
+
+    const std::string cacheKey = compilerExecutable.empty() ? std::string("clang") : toUnixPath(compilerExecutable);
+    if (const auto cached = cache.find(cacheKey); cached != cache.end()) {
+        return cached->second;
+    }
+
+    const std::string executable = compilerExecutable.empty() ? std::string("clang") : compilerExecutable;
+    const std::string command = shellQuoteForPosix(executable) + " -print-resource-dir 2>/dev/null";
+    const auto output = captureCommandOutput(command.c_str());
+    if (!output.has_value()) {
+        cache.emplace(cacheKey, std::nullopt);
+        return std::nullopt;
+    }
+
+    std::error_code errorCode;
+    const std::filesystem::path resourceDir = std::filesystem::path(*output).lexically_normal();
+    if (!std::filesystem::exists(resourceDir, errorCode) || errorCode) {
+        cache.emplace(cacheKey, std::nullopt);
+        return std::nullopt;
+    }
+
+    cache.emplace(cacheKey, resourceDir);
+    return resourceDir;
+}
+
+struct MacOsSdkAdjustment {
+    bool applied = false;
+    bool addedSysroot = false;
+    bool addedLibcxxHeaders = false;
+    bool addedResourceDir = false;
+};
+
+MacOsSdkAdjustment applyMacOsSdkFallbackArguments(
+    std::vector<std::string>& arguments,
+    const std::filesystem::path& sourceFile) {
+    MacOsSdkAdjustment adjustment;
+    if (commandDisablesSystemHeaderSearch(arguments) || !usesMacOsClangDriver(arguments)) {
+        return adjustment;
+    }
+
+    const auto sdkRoot = macOsSdkRoot();
+    if (!sdkRoot.has_value()) {
+        return adjustment;
+    }
+
+    if (!argumentsContainOption(arguments, "-isysroot") && !argumentsContainOption(arguments, "--sysroot")) {
+        arguments.push_back("-isysroot");
+        arguments.push_back(normalizePath(*sdkRoot));
+        adjustment.applied = true;
+        adjustment.addedSysroot = true;
+    }
+
+    const std::filesystem::path libcxxHeaders = *sdkRoot / "usr/include/c++/v1";
+    if (isCppLikeSourceFile(sourceFile) && !argumentsContainPathValue(arguments, "-isystem", libcxxHeaders)) {
+        std::error_code errorCode;
+        if (std::filesystem::exists(libcxxHeaders, errorCode) && !errorCode) {
+            arguments.push_back("-isystem");
+            arguments.push_back(normalizePath(libcxxHeaders));
+            adjustment.applied = true;
+            adjustment.addedLibcxxHeaders = true;
+        }
+    }
+
+    if (!argumentsContainOption(arguments, "-resource-dir")) {
+        const auto resourceDir = compilerResourceDir(arguments.empty() ? std::string() : arguments.front());
+        if (resourceDir.has_value()) {
+            arguments.push_back("-resource-dir");
+            arguments.push_back(normalizePath(*resourceDir));
+            adjustment.applied = true;
+            adjustment.addedResourceDir = true;
+        }
+    }
+
+    return adjustment;
+}
+
+#endif
+
 struct TranslationUnitDiagnosticSummary {
     bool hasSystemHeaderFailure = false;
     bool hasErrorOrFatal = false;
@@ -952,6 +1151,78 @@ void applyCompileCommandWorkingDirectory(
     arguments.insert(arguments.begin() + 1, "-working-directory=" + normalizePath(std::filesystem::path(commandDirectory)));
 }
 
+bool shouldDropCompileOnlyArgument(std::string_view argument) {
+    return argument == "-c" ||
+           argument == "-MD" ||
+           argument == "-MMD" ||
+           argument == "-MP" ||
+           argument == "-MV" ||
+           argument == "-Winvalid-command-line-argument";
+}
+
+bool argumentConsumesFollowingValue(std::string_view argument) {
+    return argument == "-o" ||
+           argument == "-MF" ||
+           argument == "-MT" ||
+           argument == "-MQ" ||
+           argument == "-MJ" ||
+           argument == "-fmodule-output" ||
+           argument == "--serialize-diagnostics";
+}
+
+bool argumentEmbedsConsumedValue(std::string_view argument) {
+    return (argument.size() > 2 && argument.starts_with("-o")) ||
+           (argument.size() > 3 && argument.starts_with("-MF")) ||
+           (argument.size() > 3 && argument.starts_with("-MT")) ||
+           (argument.size() > 3 && argument.starts_with("-MQ")) ||
+           (argument.size() > 3 && argument.starts_with("-MJ")) ||
+           argument.starts_with("-fmodule-output=") ||
+           argument.starts_with("--serialize-diagnostics=");
+}
+
+bool isLinkerArtifactArgument(const std::string& argument) {
+    if (argument.empty() || argument.front() == '-') {
+        return false;
+    }
+
+    const std::string extension = lowerAsciiCopy(std::filesystem::path(argument).extension().string());
+    return extension == ".o" || extension == ".obj" || extension == ".a" || extension == ".lib";
+}
+
+void sanitizeCompileCommandArgumentsForSemanticParse(std::vector<std::string>& arguments) {
+    if (arguments.empty()) {
+        return;
+    }
+
+    std::vector<std::string> sanitized;
+    sanitized.reserve(arguments.size());
+    sanitized.push_back(arguments.front());
+
+    for (std::size_t index = 1; index < arguments.size(); ++index) {
+        const std::string& argument = arguments[index];
+        if (shouldDropCompileOnlyArgument(argument)) {
+            continue;
+        }
+
+        if (argumentConsumesFollowingValue(argument)) {
+            ++index;
+            continue;
+        }
+
+        if (argumentEmbedsConsumedValue(argument)) {
+            continue;
+        }
+
+        if (isLinkerArtifactArgument(argument)) {
+            continue;
+        }
+
+        sanitized.push_back(argument);
+    }
+
+    arguments = std::move(sanitized);
+}
+
 bool commandDisablesSystemHeaderSearch(const std::vector<std::string>& arguments) {
     return std::find(arguments.begin(), arguments.end(), "-nostdinc") != arguments.end() ||
            std::find(arguments.begin(), arguments.end(), "-nostdinc++") != arguments.end();
@@ -1058,6 +1329,7 @@ SemanticBackendResult analyzeSemanticProject(
     std::size_t eligibleTranslationUnits = 0;
     std::size_t systemHeaderFailureCount = 0;
     std::size_t parseFailureCount = 0;
+    bool reportedMacOsSdkFallback = false;
     SemanticRegistry semanticRegistry{&builder};
     for (unsigned commandIndex = 0; commandIndex < commandCount; ++commandIndex) {
         const CXCompileCommand command = clang_CompileCommands_getCommand(compileCommands, commandIndex);
@@ -1080,6 +1352,26 @@ SemanticBackendResult analyzeSemanticProject(
             continue;
         }
         applyCompileCommandWorkingDirectory(command, argumentStorage);
+        sanitizeCompileCommandArgumentsForSemanticParse(argumentStorage);
+#if defined(__APPLE__)
+        const MacOsSdkAdjustment macOsSdkAdjustment = applyMacOsSdkFallbackArguments(argumentStorage, sourceFile);
+        if (macOsSdkAdjustment.applied && !reportedMacOsSdkFallback) {
+            std::ostringstream diagnostic;
+            diagnostic << "Applied macOS SDK fallback arguments for Apple Clang semantic analysis";
+            if (macOsSdkAdjustment.addedSysroot) {
+                diagnostic << " (-isysroot)";
+            }
+            if (macOsSdkAdjustment.addedLibcxxHeaders) {
+                diagnostic << " (-isystem libc++ headers)";
+            }
+            if (macOsSdkAdjustment.addedResourceDir) {
+                diagnostic << " (-resource-dir)";
+            }
+            diagnostic << ".";
+            builder.report().diagnostics.push_back(diagnostic.str());
+            reportedMacOsSdkFallback = true;
+        }
+#endif
 
         std::vector<const char*> argumentPointers;
         argumentPointers.reserve(argumentStorage.size());

@@ -850,6 +850,66 @@ int main() {
 }
 
 #ifdef SAVT_ENABLE_CLANG_TOOLING
+void testSemanticRequiredAppleClangCommandsResolveSystemHeaders() {
+#if defined(__APPLE__)
+    namespace fs = std::filesystem;
+
+    const fs::path tempRoot = makeTempDirectory("savt_semantic_macos_sdk_fallback");
+    std::error_code errorCode;
+    const fs::path sourceFile = tempRoot / "main.cpp";
+    writeTextFile(sourceFile, R"CPP(
+#include <vector>
+
+int main() {
+  std::vector<int> values{1, 2, 3};
+  return static_cast<int>(values.size());
+}
+)CPP");
+
+    writeTextFile(tempRoot / "compile_commands.json",
+                  std::string("[\n")
+                      + "  {\n"
+                      + "    \"directory\": \"" + jsonPath(tempRoot) + "\",\n"
+                      + "    \"file\": \"" + jsonPath(sourceFile) + "\",\n"
+                      + "    \"arguments\": [\n"
+                      + "      \"/usr/bin/clang++\",\n"
+                      + "      \"-std=c++20\",\n"
+                      + "      \"-c\",\n"
+                      + "      \"" + sourceFile.filename().string() + "\"\n"
+                      + "    ]\n"
+                      + "  }\n"
+                      + "]\n");
+
+    savt::analyzer::CppProjectAnalyzer analyzer;
+    savt::analyzer::AnalyzerOptions options;
+    options.precision = savt::analyzer::AnalyzerPrecision::SemanticRequired;
+    const auto report = analyzer.analyzeProject(tempRoot, options);
+
+    expect(report.precisionLevel == "semantic",
+           "macOS AppleClang compile commands without explicit sysroot should still parse semantically, got precision=" +
+               report.precisionLevel + ", status=" + report.semanticStatusCode);
+    expect(report.semanticStatusCode == "semantic_ready",
+           "macOS SDK fallback should avoid unresolved system headers, got status=" + report.semanticStatusCode +
+               ", message=" + report.semanticStatusMessage);
+    expect(report.parsedFiles >= 1,
+           "semantic analysis should parse at least one translation unit after applying the macOS SDK fallback");
+    expect(std::any_of(report.diagnostics.begin(), report.diagnostics.end(), [](const std::string& diagnostic) {
+               return diagnostic.find("Applied macOS SDK fallback arguments") != std::string::npos;
+           }),
+           "diagnostics should record when macOS SDK fallback arguments were applied");
+    expect(std::none_of(report.diagnostics.begin(), report.diagnostics.end(), [](const std::string& diagnostic) {
+               return diagnostic.find("argument unused during compilation: '-c'") != std::string::npos;
+           }),
+           "semantic parsing should strip compile-only flags such as -c before invoking libclang");
+    expect(std::none_of(report.diagnostics.begin(), report.diagnostics.end(), [](const std::string& diagnostic) {
+               return diagnostic.find("'linker' input unused") != std::string::npos;
+           }),
+           "semantic parsing should strip output-object linker inputs before invoking libclang");
+
+    fs::remove_all(tempRoot, errorCode);
+#endif
+}
+
 void testSemanticRequiredReportsSystemHeaderResolutionFailures() {
     namespace fs = std::filesystem;
 
@@ -1079,6 +1139,7 @@ int main() {
     testSemanticPreferredExplainsBackendUnavailability();
     testSyntaxOnlyAnalysisMarksFactsAsInferred();
 #ifdef SAVT_ENABLE_CLANG_TOOLING
+    testSemanticRequiredAppleClangCommandsResolveSystemHeaders();
     testSemanticRequiredReportsSystemHeaderResolutionFailures();
     testSemanticAnalysisMergesDeclarationsDefinitionsAndCrossTuEdges();
 #endif
