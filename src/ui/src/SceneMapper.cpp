@@ -41,6 +41,15 @@ QVariantMap toVariantRect(const double x, const double y, const double width, co
 
 }  // namespace
 
+QVariantMap SceneMapper::toVariantMap(const CapabilitySceneData& scene) {
+    QVariantMap sceneMap;
+    sceneMap.insert(QStringLiteral("nodes"), scene.nodeItems);
+    sceneMap.insert(QStringLiteral("edges"), scene.edgeItems);
+    sceneMap.insert(QStringLiteral("groups"), scene.groupItems);
+    sceneMap.insert(QStringLiteral("bounds"), toVariantRect(0.0, 0.0, scene.sceneWidth, scene.sceneHeight));
+    return sceneMap;
+}
+
 CapabilitySceneData SceneMapper::buildCapabilitySceneData(
     const core::CapabilityGraph& graph,
     const layout::CapabilitySceneLayoutResult& layout) {

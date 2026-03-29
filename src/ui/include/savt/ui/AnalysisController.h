@@ -7,6 +7,8 @@
 #include <QVariantList>
 #include <QVariantMap>
 
+#include "savt/ui/SceneMapper.h"
+
 #include <memory>
 
 class QNetworkAccessManager;
@@ -29,6 +31,7 @@ class AnalysisController : public QObject {
     Q_PROPERTY(QString astPreviewTitle READ astPreviewTitle NOTIFY astPreviewTitleChanged)
     Q_PROPERTY(QString astPreviewSummary READ astPreviewSummary NOTIFY astPreviewSummaryChanged)
     Q_PROPERTY(QString astPreviewText READ astPreviewText NOTIFY astPreviewTextChanged)
+    Q_PROPERTY(QVariantMap capabilityScene READ capabilityScene NOTIFY capabilitySceneChanged)
     Q_PROPERTY(QVariantList capabilityNodeItems READ capabilityNodeItems NOTIFY capabilityNodeItemsChanged)
     Q_PROPERTY(QVariantList capabilityEdgeItems READ capabilityEdgeItems NOTIFY capabilityEdgeItemsChanged)
     Q_PROPERTY(QVariantList capabilityGroupItems READ capabilityGroupItems NOTIFY capabilityGroupItemsChanged)
@@ -70,6 +73,7 @@ public:
     QString astPreviewTitle() const;
     QString astPreviewSummary() const;
     QString astPreviewText() const;
+    QVariantMap capabilityScene() const;
     QVariantList capabilityNodeItems() const;
     QVariantList capabilityEdgeItems() const;
     QVariantList capabilityGroupItems() const;
@@ -117,6 +121,7 @@ signals:
     void astPreviewTitleChanged();
     void astPreviewSummaryChanged();
     void astPreviewTextChanged();
+    void capabilitySceneChanged();
     void capabilityNodeItemsChanged();
     void capabilityEdgeItemsChanged();
     void capabilityGroupItemsChanged();
@@ -155,11 +160,7 @@ private:
     void setAstPreviewTitle(QString value);
     void setAstPreviewSummary(QString value);
     void setAstPreviewText(QString value);
-    void setCapabilityNodeItems(QVariantList value);
-    void setCapabilityEdgeItems(QVariantList value);
-    void setCapabilityGroupItems(QVariantList value);
-    void setCapabilitySceneWidth(double value);
-    void setCapabilitySceneHeight(double value);
+    void setCapabilityScene(CapabilitySceneData value);
     void setAnalyzing(bool value);
     void setStopRequested(bool value);
     void setAnalysisProgress(double value);
@@ -196,11 +197,7 @@ private:
     QString m_astPreviewTitle;
     QString m_astPreviewSummary;
     QString m_astPreviewText;
-    QVariantList m_capabilityNodeItems;
-    QVariantList m_capabilityEdgeItems;
-    QVariantList m_capabilityGroupItems;
-    double m_capabilitySceneWidth = 0.0;
-    double m_capabilitySceneHeight = 0.0;
+    CapabilitySceneData m_capabilityScene;
     bool m_analyzing = false;
     bool m_stopRequested = false;
     double m_analysisProgress = 0.0;

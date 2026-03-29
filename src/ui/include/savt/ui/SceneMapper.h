@@ -4,6 +4,7 @@
 #include "savt/layout/LayeredGraphLayout.h"
 
 #include <QVariantList>
+#include <QVariantMap>
 
 namespace savt::ui {
 
@@ -17,6 +18,7 @@ struct CapabilitySceneData {
 
 class SceneMapper {
 public:
+    static QVariantMap toVariantMap(const CapabilitySceneData& scene);
     static CapabilitySceneData buildCapabilitySceneData(
         const savt::core::CapabilityGraph& graph,
         const savt::layout::CapabilitySceneLayoutResult& layout);

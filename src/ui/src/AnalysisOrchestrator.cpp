@@ -51,11 +51,7 @@ void clearPendingPresentation(PendingAnalysisResult& result) {
     result.astPreviewTitle = preview.title;
     result.astPreviewSummary = preview.summary;
     result.astPreviewText = preview.text;
-    result.nodeItems.clear();
-    result.edgeItems.clear();
-    result.groupItems.clear();
-    result.sceneWidth = 0.0;
-    result.sceneHeight = 0.0;
+    result.capabilityScene = {};
     result.systemContextData.clear();
     result.systemContextCards.clear();
 }
@@ -114,11 +110,7 @@ void populatePendingPresentation(
 
     result.statusMessage =
         ReportService::buildStatusMessage(report, overview, capabilityGraph, layoutResult);
-    result.nodeItems = sceneData.nodeItems;
-    result.edgeItems = sceneData.edgeItems;
-    result.groupItems = sceneData.groupItems;
-    result.sceneWidth = sceneData.sceneWidth;
-    result.sceneHeight = sceneData.sceneHeight;
+    result.capabilityScene = sceneData;
     result.analysisReport = formatCapabilityReportMarkdown(report, capabilityGraph);
     result.systemContextReport = formatSystemContextReportMarkdown(capabilityGraph);
     result.systemContextData =

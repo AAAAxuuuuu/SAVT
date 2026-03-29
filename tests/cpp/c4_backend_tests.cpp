@@ -6,6 +6,7 @@
 #include "savt/core/ArchitectureOverview.h"
 #include "savt/core/CapabilityGraph.h"
 #include "savt/layout/LayeredGraphLayout.h"
+#include "savt/ui/SceneMapper.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -425,6 +426,76 @@ void testCrossArtifactOverviewAndCapabilityGraph() {
                return !group.hasBounds || (group.width > 0.0 && group.height > 0.0);
            }),
            "capability scene layout should assign positive bounds to every visible group");
+}
+
+void testCapabilitySceneMapperPublishesSingleScenePayload() {
+    savt::core::CapabilityGraph graph;
+
+    savt::core::CapabilityNode entryNode;
+    entryNode.id = 1;
+    entryNode.kind = savt::core::CapabilityNodeKind::Entry;
+    entryNode.name = "CLI";
+    entryNode.defaultPinned = true;
+    entryNode.visualPriority = 5;
+    entryNode.laneGroupId = 100;
+    graph.nodes.push_back(entryNode);
+
+    savt::core::CapabilityNode capabilityNode;
+    capabilityNode.id = 2;
+    capabilityNode.kind = savt::core::CapabilityNodeKind::Capability;
+    capabilityNode.name = "Analyzer";
+    capabilityNode.collaboratorCount = 4;
+    capabilityNode.laneGroupId = 101;
+    graph.nodes.push_back(capabilityNode);
+
+    savt::core::CapabilityEdge edge;
+    edge.id = 10;
+    edge.fromId = 1;
+    edge.toId = 2;
+    edge.kind = savt::core::CapabilityEdgeKind::Activates;
+    edge.summary = "CLI kicks off analysis";
+    graph.edges.push_back(edge);
+
+    savt::core::CapabilityGroup entryGroup;
+    entryGroup.id = 100;
+    entryGroup.kind = savt::core::CapabilityGroupKind::Lane;
+    entryGroup.name = "Entry lane";
+    entryGroup.nodeIds = {1};
+    graph.groups.push_back(entryGroup);
+
+    savt::core::CapabilityGroup capabilityGroup;
+    capabilityGroup.id = 101;
+    capabilityGroup.kind = savt::core::CapabilityGroupKind::Lane;
+    capabilityGroup.name = "Capability lane";
+    capabilityGroup.nodeIds = {2};
+    graph.groups.push_back(capabilityGroup);
+
+    savt::layout::LayeredGraphLayout layoutEngine;
+    const auto layout = layoutEngine.layoutCapabilityScene(graph);
+    const auto sceneData = savt::ui::SceneMapper::buildCapabilitySceneData(graph, layout);
+    const QVariantMap sceneMap = savt::ui::SceneMapper::toVariantMap(sceneData);
+
+    const QVariantMap bounds = sceneMap.value("bounds").toMap();
+    expect(sceneMap.value("nodes").toList().size() == 2,
+           "scene map should publish all capability nodes in a single payload");
+    expect(sceneMap.value("edges").toList().size() == 1,
+           "scene map should publish all capability edges in a single payload");
+    expect(sceneMap.value("groups").toList().size() == 2,
+           "scene map should publish all capability groups in a single payload");
+    expect(bounds.value("width").toDouble() == sceneData.sceneWidth,
+           "scene payload bounds should reuse scene width from the layout result");
+    expect(bounds.value("height").toDouble() == sceneData.sceneHeight,
+           "scene payload bounds should reuse scene height from the layout result");
+
+    const QVariantList nodeItems = sceneMap.value("nodes").toList();
+    const QVariantMap firstNode = nodeItems.front().toMap();
+    expect(firstNode.contains("layoutBounds"),
+           "scene payload nodes should expose layout bounds from the layout layer");
+
+    const QVariantList edgeItems = sceneMap.value("edges").toList();
+    const QVariantMap firstEdge = edgeItems.front().toMap();
+    expect(firstEdge.value("routePointCount").toULongLong() >= 2,
+           "scene payload edges should expose routed path points from the layout layer");
 }
 
 void testAnalysisReportSerializesFactSources() {
@@ -1131,6 +1202,7 @@ int main() {
     testAdaptiveModuleInference();
     testDependencyAndPrimaryEntryClassification();
     testCrossArtifactOverviewAndCapabilityGraph();
+    testCapabilitySceneMapperPublishesSingleScenePayload();
     testAnalysisReportSerializesFactSources();
     testAnalysisGraphBuilderPreservesDistinctSemanticOverloads();
     testNodeBackendRelativeImportsAndRoleClassification();

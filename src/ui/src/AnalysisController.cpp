@@ -95,24 +95,28 @@ QString AnalysisController::astPreviewSummary() const {
 
 QString AnalysisController::astPreviewText() const { return m_astPreviewText; }
 
+QVariantMap AnalysisController::capabilityScene() const {
+    return SceneMapper::toVariantMap(m_capabilityScene);
+}
+
 QVariantList AnalysisController::capabilityNodeItems() const {
-    return m_capabilityNodeItems;
+    return m_capabilityScene.nodeItems;
 }
 
 QVariantList AnalysisController::capabilityEdgeItems() const {
-    return m_capabilityEdgeItems;
+    return m_capabilityScene.edgeItems;
 }
 
 QVariantList AnalysisController::capabilityGroupItems() const {
-    return m_capabilityGroupItems;
+    return m_capabilityScene.groupItems;
 }
 
 double AnalysisController::capabilitySceneWidth() const {
-    return m_capabilitySceneWidth;
+    return m_capabilityScene.sceneWidth;
 }
 
 double AnalysisController::capabilitySceneHeight() const {
-    return m_capabilitySceneHeight;
+    return m_capabilityScene.sceneHeight;
 }
 
 bool AnalysisController::analyzing() const { return m_analyzing; }
@@ -229,7 +233,7 @@ void AnalysisController::analyzeProjectUrl(const QUrl& projectRootUrl) {
 void AnalysisController::copyCodeContextToClipboard(const qulonglong nodeId) {
     QVariantMap targetNode;
     bool found = false;
-    for (const QVariant& item : m_capabilityNodeItems) {
+    for (const QVariant& item : m_capabilityScene.nodeItems) {
         QVariantMap node = item.toMap();
         if (node.value(QStringLiteral("id")).toULongLong() == nodeId) {
             targetNode = node;
@@ -355,7 +359,7 @@ void AnalysisController::requestProjectAiExplanation(const QString& userTask) {
             m_projectRootPath, m_analysisReport, m_statusMessage, m_analysisPhase, userTask},
         m_systemContextData,
         m_systemContextCards,
-        m_capabilityNodeItems);
+        m_capabilityScene.nodeItems);
     applyAiAvailability(prepared.availability);
     if (!prepared.ready) {
         setAiStatusMessage(prepared.failureStatusMessage);
@@ -437,15 +441,11 @@ void AnalysisController::finishAnalysis() {
     setAstPreviewTitle(result->astPreviewTitle);
     setAstPreviewSummary(result->astPreviewSummary);
     setAstPreviewText(result->astPreviewText);
-    setCapabilityNodeItems(result->nodeItems);
-    setCapabilityEdgeItems(result->edgeItems);
+    setCapabilityScene(result->capabilityScene);
     if (m_systemContextReport != result->systemContextReport) {
         m_systemContextReport = result->systemContextReport;
         emit systemContextReportChanged();
     }
-    setCapabilityGroupItems(result->groupItems);
-    setCapabilitySceneWidth(result->sceneWidth);
-    setCapabilitySceneHeight(result->sceneHeight);
     setSystemContextData(result->systemContextData);
     setSystemContextCards(result->systemContextCards);
 }
@@ -458,11 +458,7 @@ void AnalysisController::clearVisualizationState() {
     setAstPreviewTitle(preview.title);
     setAstPreviewSummary(preview.summary);
     setAstPreviewText(preview.text);
-    setCapabilityNodeItems({});
-    setCapabilityEdgeItems({});
-    setCapabilityGroupItems({});
-    setCapabilitySceneWidth(0.0);
-    setCapabilitySceneHeight(0.0);
+    setCapabilityScene({});
     setSystemContextData({});
     setSystemContextCards({});
     if (!m_systemContextReport.isEmpty()) {
@@ -543,44 +539,34 @@ void AnalysisController::setAstPreviewText(QString value) {
     emit astPreviewTextChanged();
 }
 
-void AnalysisController::setCapabilityNodeItems(QVariantList value) {
-    if (m_capabilityNodeItems == value) {
+void AnalysisController::setCapabilityScene(CapabilitySceneData value) {
+    const bool nodeItemsChanged = (m_capabilityScene.nodeItems != value.nodeItems);
+    const bool edgeItemsChanged = (m_capabilityScene.edgeItems != value.edgeItems);
+    const bool groupItemsChanged = (m_capabilityScene.groupItems != value.groupItems);
+    const bool sceneWidthChanged = !qFuzzyCompare(m_capabilityScene.sceneWidth, value.sceneWidth);
+    const bool sceneHeightChanged = !qFuzzyCompare(m_capabilityScene.sceneHeight, value.sceneHeight);
+    if (!nodeItemsChanged && !edgeItemsChanged && !groupItemsChanged &&
+        !sceneWidthChanged && !sceneHeightChanged) {
         return;
     }
-    m_capabilityNodeItems = std::move(value);
-    emit capabilityNodeItemsChanged();
-}
 
-void AnalysisController::setCapabilityEdgeItems(QVariantList value) {
-    if (m_capabilityEdgeItems == value) {
-        return;
+    m_capabilityScene = std::move(value);
+    emit capabilitySceneChanged();
+    if (nodeItemsChanged) {
+        emit capabilityNodeItemsChanged();
     }
-    m_capabilityEdgeItems = std::move(value);
-    emit capabilityEdgeItemsChanged();
-}
-
-void AnalysisController::setCapabilityGroupItems(QVariantList value) {
-    if (m_capabilityGroupItems == value) {
-        return;
+    if (edgeItemsChanged) {
+        emit capabilityEdgeItemsChanged();
     }
-    m_capabilityGroupItems = std::move(value);
-    emit capabilityGroupItemsChanged();
-}
-
-void AnalysisController::setCapabilitySceneWidth(const double value) {
-    if (m_capabilitySceneWidth == value) {
-        return;
+    if (groupItemsChanged) {
+        emit capabilityGroupItemsChanged();
     }
-    m_capabilitySceneWidth = value;
-    emit capabilitySceneWidthChanged();
-}
-
-void AnalysisController::setCapabilitySceneHeight(const double value) {
-    if (m_capabilitySceneHeight == value) {
-        return;
+    if (sceneWidthChanged) {
+        emit capabilitySceneWidthChanged();
     }
-    m_capabilitySceneHeight = value;
-    emit capabilitySceneHeightChanged();
+    if (sceneHeightChanged) {
+        emit capabilitySceneHeightChanged();
+    }
 }
 
 void AnalysisController::setAnalyzing(const bool value) {

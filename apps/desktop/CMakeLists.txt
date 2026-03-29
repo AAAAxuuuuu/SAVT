@@ -7,9 +7,13 @@ qt_add_qml_module(savt_desktop
     VERSION 1.0
     QML_FILES
         qml/Main.qml
+        qml/components/AppButton.qml
+        qml/components/AppTheme.qml
         qml/components/TopControlBar.qml
         qml/components/L2GraphView.qml
         qml/components/RightInspector.qml
+        qml/components/SurfaceCard.qml
+        qml/components/TagChip.qml
 )
 
 target_link_libraries(savt_desktop

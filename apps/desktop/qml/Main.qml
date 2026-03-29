@@ -5,102 +5,254 @@ import "components"
 
 ApplicationWindow {
     id: window
-    width: 1540
-    height: 900
-    visible: true
-    title: "SAVT (Light Theme)"
-    color: "#f8fafc"
 
+    width: 1500
+    height: 920
+    visible: true
+    title: "SAVT"
+    color: theme.windowBase
+
+    property var theme: appTheme
     property var selectedCapabilityNode: null
     property var capabilityNavigationStack: []
     property int selectedC4LevelIndex: 1
     property string relationshipViewMode: "focused"
     property bool inspectorCollapsed: false
-    property int inspectorExpandedWidth: 420
+    property int inspectorExpandedWidth: 398
+
+    readonly property var capabilitySceneData: analysisController.capabilityScene || ({})
+    readonly property var capabilityNodes: capabilitySceneData.nodes || []
+    readonly property var capabilityEdges: capabilitySceneData.edges || []
+    readonly property var capabilityGroups: capabilitySceneData.groups || []
 
     property var c4Levels: [
-        {"title": "L1 \u7cfb\u7edf\u4e0a\u4e0b\u6587", "summary": "\u9879\u76ee\u8fd0\u884c\u73af\u5883\u3001\u5916\u90e8\u8f93\u5165\u8f93\u51fa"},
-        {"title": "L2 \u5bb9\u5668\u5c42", "summary": "\u9879\u76ee\u88ab\u62c6\u6210\u54ea\u4e9b\u4e3b\u8981\u90e8\u5206\uff0c\u4ee5\u53ca\u5b83\u4eec\u5982\u4f55\u914d\u5408"},
-        {"title": "L3 \u7ec4\u4ef6\u5c42", "summary": "\u70b9\u5f00\u67d0\u4e2a\u4e3b\u8981\u90e8\u5206\u540e\uff0c\u770b\u5b83\u5185\u90e8\u627f\u62c5\u7684\u804c\u8d23"},
-        {"title": "L4 \u5168\u666f\u62a5\u544a", "summary": "\u2728 \u79d2\u7ea7\u751f\u6210\u7684 C4 \u67b6\u6784 Markdown \u62a5\u544a"}
+        {"title": "L1 系统上下文", "eyebrow": "Landscape", "summary": "项目整体定位、外部输入输出和主要容器"},
+        {"title": "L2 容器层", "eyebrow": "Containers", "summary": "项目被拆成哪些主要部分，以及它们如何协作"},
+        {"title": "L3 组件层", "eyebrow": "Components", "summary": "当前仍以程序员入口 AST 预览作为深挖界面"},
+        {"title": "L4 全景报告", "eyebrow": "Report", "summary": "静态分析生成的 Markdown 全景报告"}
     ]
+
+    AppTheme {
+        id: appTheme
+    }
+
+    background: Rectangle {
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: theme.windowTop }
+            GradientStop { position: 1.0; color: theme.windowBase }
+        }
+
+        Rectangle {
+            width: 460
+            height: 460
+            radius: 230
+            x: -140
+            y: -180
+            color: "#dbe7f0"
+            opacity: 0.82
+        }
+
+        Rectangle {
+            width: 390
+            height: 390
+            radius: 195
+            x: parent.width - width * 0.75
+            y: -90
+            color: "#edf2f7"
+            opacity: 0.78
+        }
+
+        Rectangle {
+            width: 540
+            height: 540
+            radius: 270
+            x: parent.width - width * 0.55
+            y: parent.height - height * 0.55
+            color: "#d9e4ed"
+            opacity: 0.42
+        }
+    }
+
+    Connections {
+        target: analysisController
+
+        function onCapabilitySceneChanged() {
+            if (window.selectedCapabilityNode && !window.capabilityNodeById(window.selectedCapabilityNode.id))
+                window.selectedCapabilityNode = null
+        }
+    }
 
     Component {
         id: systemContextPageComponent
 
-        Frame {
-            background: Rectangle { radius: 10; color: "#ffffff" }
-            ScrollView {
-                anchors.fill: parent
-                anchors.margins: 20
-                contentWidth: availableWidth
+        ScrollView {
+            clip: true
+            contentWidth: availableWidth
 
-                ColumnLayout {
-                    width: parent.width
-                    spacing: 16
+            ColumnLayout {
+                width: parent.width
+                spacing: 16
 
-                    Frame {
-                        Layout.fillWidth: true
-                        background: Rectangle {
-                            radius: 16
-                            color: "#eff6ff"
-                            border.color: "#bfdbfe"
+                SurfaceCard {
+                    Layout.fillWidth: true
+                    minimumContentHeight: 152
+                    stacked: true
+                    fillColor: theme.surfacePrimary
+                    borderColor: theme.borderStrong
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 14
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: analysisController.systemContextData.title || "L1 系统上下文"
+                            color: theme.inkStrong
+                            font.family: theme.displayFontFamily
+                            font.pixelSize: 26
+                            font.weight: Font.DemiBold
+                            wrapMode: Text.WordWrap
                         }
 
+                        Label {
+                            Layout.fillWidth: true
+                            text: analysisController.systemContextData.headline || "先完成一次分析，这里会显示项目定位和整体脉络。"
+                            color: theme.inkNormal
+                            font.family: theme.textFontFamily
+                            font.pixelSize: 15
+                            font.weight: Font.DemiBold
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Label {
+                            Layout.fillWidth: true
+                            visible: (analysisController.systemContextData.purposeSummary || "").length > 0
+                            text: analysisController.systemContextData.purposeSummary || ""
+                            color: theme.inkMuted
+                            font.family: theme.textFontFamily
+                            font.pixelSize: 13
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            visible: (analysisController.systemContextData.containerNames || []).length > 0
+
+                            Repeater {
+                                model: analysisController.systemContextData.containerNames || []
+
+                                TagChip {
+                                    text: modelData
+                                    fillColor: "#ffffff"
+                                    borderColor: theme.borderSubtle
+                                    textColor: theme.inkNormal
+                                }
+                            }
+                        }
+                    }
+                }
+
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: width > 1100 ? 3 : (width > 720 ? 2 : 1)
+                    columnSpacing: 14
+                    rowSpacing: 14
+
+                    Repeater {
+                        model: analysisController.systemContextCards || []
+
+                        SurfaceCard {
+                            Layout.fillWidth: true
+                            fillColor: theme.surfaceSecondary
+                            borderColor: theme.borderSubtle
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                spacing: 8
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: modelData.name || ""
+                                    color: theme.inkStrong
+                                    font.family: theme.displayFontFamily
+                                    font.pixelSize: 17
+                                    font.weight: Font.DemiBold
+                                    wrapMode: Text.WordWrap
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: modelData.summary || ""
+                                    color: theme.inkMuted
+                                    font.family: theme.textFontFamily
+                                    font.pixelSize: 13
+                                    wrapMode: Text.WordWrap
+                                }
+                            }
+                        }
+                    }
+                }
+
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: width > 1050 ? 2 : 1
+                    columnSpacing: 16
+                    rowSpacing: 16
+
+                    SurfaceCard {
+                        Layout.fillWidth: true
+                        minimumContentHeight: 210
+                        fillColor: theme.surfacePrimary
+                        borderColor: theme.borderSubtle
+
                         ColumnLayout {
-                            width: parent.width
                             anchors.fill: parent
-                            anchors.margins: 16
                             spacing: 10
 
                             Label {
-                                text: analysisController.systemContextData.title || "L1 系统上下文"
-                                color: "#1d4ed8"
-                                font.pixelSize: 22
-                                font.bold: true
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
+                                text: "快速摘要"
+                                color: theme.inkStrong
+                                font.family: theme.displayFontFamily
+                                font.pixelSize: 20
+                                font.weight: Font.DemiBold
                             }
 
-                            Label {
-                                text: analysisController.systemContextData.headline || "先完成一次分析，这里会显示项目的整体定位。"
-                                color: "#0f172a"
-                                font.pixelSize: 16
-                                font.bold: true
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
-                            }
+                            Repeater {
+                                model: [
+                                    {"title": "适合先看", "body": analysisController.systemContextData.entrySummary || ""},
+                                    {"title": "输入 / 输出", "body": ((analysisController.systemContextData.inputSummary || "") + "\n" + (analysisController.systemContextData.outputSummary || "")).trim()},
+                                    {"title": "技术线索", "body": analysisController.systemContextData.technologySummary || ""},
+                                    {"title": "容器摘要", "body": analysisController.systemContextData.containerSummary || ""}
+                                ]
 
-                            Label {
-                                visible: (analysisController.systemContextData.purposeSummary || "").length > 0
-                                text: analysisController.systemContextData.purposeSummary || ""
-                                color: "#334155"
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
-                            }
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    visible: (modelData.body || "").length > 0
+                                    radius: 18
+                                    color: "#ffffff"
+                                    border.color: theme.borderSubtle
 
-                            Flow {
-                                Layout.fillWidth: true
-                                spacing: 8
-                                visible: (analysisController.systemContextData.containerNames || []).length > 0
-
-                                Repeater {
-                                    model: analysisController.systemContextData.containerNames || []
-
-                                    Rectangle {
-                                        radius: 999
-                                        color: "#dbeafe"
-                                        border.color: "#93c5fd"
-                                        width: chipText.implicitWidth + 20
-                                        height: chipText.implicitHeight + 10
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 6
 
                                         Label {
-                                            id: chipText
-                                            anchors.centerIn: parent
-                                            text: modelData
-                                            color: "#1e3a8a"
+                                            text: modelData.title
+                                            color: theme.inkNormal
+                                            font.family: theme.textFontFamily
                                             font.pixelSize: 12
-                                            font.bold: true
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Label {
+                                            Layout.fillWidth: true
+                                            text: modelData.body
+                                            color: theme.inkMuted
+                                            font.family: theme.textFontFamily
+                                            font.pixelSize: 13
+                                            wrapMode: Text.WordWrap
                                         }
                                     }
                                 }
@@ -108,162 +260,62 @@ ApplicationWindow {
                         }
                     }
 
-                    GridLayout {
+                    SurfaceCard {
                         Layout.fillWidth: true
-                        columns: width > 980 ? 3 : (width > 640 ? 2 : 1)
-                        rowSpacing: 12
-                        columnSpacing: 12
+                        minimumContentHeight: 260
+                        fillColor: theme.surfacePrimary
+                        borderColor: theme.borderSubtle
 
-                        Repeater {
-                            model: analysisController.systemContextCards || []
+                        ColumnLayout {
+                            anchors.fill: parent
+                            spacing: 10
 
-                            Frame {
+                            RowLayout {
                                 Layout.fillWidth: true
-                                Layout.minimumHeight: 128
-                                background: Rectangle {
-                                    radius: 14
-                                    color: "#ffffff"
-                                    border.color: "#dbe4f0"
+
+                                Label {
+                                    text: "详细 Markdown 报告"
+                                    color: theme.inkStrong
+                                    font.family: theme.displayFontFamily
+                                    font.pixelSize: 20
+                                    font.weight: Font.DemiBold
                                 }
 
-                                ColumnLayout {
-                                    width: parent.width
+                                Item { Layout.fillWidth: true }
+
+                                AppButton {
+                                    theme: window.theme
+                                    compact: true
+                                    tone: "ghost"
+                                    text: "复制"
+                                    onClicked: analysisController.copyTextToClipboard(analysisController.systemContextReport)
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                implicitHeight: 340
+                                radius: 22
+                                color: "#ffffff"
+                                border.color: theme.borderSubtle
+
+                                ScrollView {
                                     anchors.fill: parent
                                     anchors.margins: 14
-                                    spacing: 8
+                                    clip: true
 
-                                    Label {
-                                        text: modelData.name || ""
-                                        color: "#0f172a"
-                                        font.pixelSize: 15
-                                        font.bold: true
-                                        wrapMode: Text.WordWrap
-                                        Layout.fillWidth: true
-                                    }
-
-                                    Label {
-                                        text: modelData.summary || ""
-                                        color: "#475569"
-                                        wrapMode: Text.WordWrap
-                                        Layout.fillWidth: true
+                                    TextArea {
+                                        text: analysisController.systemContextReport
+                                        readOnly: true
+                                        wrapMode: TextEdit.Wrap
+                                        textFormat: TextEdit.MarkdownText
+                                        color: theme.inkStrong
+                                        font.family: theme.textFontFamily
+                                        font.pixelSize: 14
+                                        background: null
                                     }
                                 }
-                            }
-                        }
-                    }
-
-                    Frame {
-                        Layout.fillWidth: true
-                        background: Rectangle {
-                            radius: 14
-                            color: "#ffffff"
-                            border.color: "#e2e8f0"
-                        }
-
-                        ColumnLayout {
-                            width: parent.width
-                            anchors.fill: parent
-                            anchors.margins: 16
-                            spacing: 10
-
-                            Label {
-                                text: "快速摘要"
-                                color: "#0f172a"
-                                font.pixelSize: 18
-                                font.bold: true
-                            }
-
-                            Label {
-                                text: "适合先看："
-                                color: "#1e293b"
-                                font.bold: true
-                                visible: (analysisController.systemContextData.entrySummary || "").length > 0
-                            }
-
-                            Label {
-                                text: analysisController.systemContextData.entrySummary || ""
-                                color: "#475569"
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
-                                visible: text.length > 0
-                            }
-
-                            Label {
-                                text: "输入 / 输出："
-                                color: "#1e293b"
-                                font.bold: true
-                                visible: (analysisController.systemContextData.inputSummary || "").length > 0
-                                         || (analysisController.systemContextData.outputSummary || "").length > 0
-                            }
-
-                            Label {
-                                text: ((analysisController.systemContextData.inputSummary || "")
-                                       + "\n"
-                                       + (analysisController.systemContextData.outputSummary || "")).trim()
-                                color: "#475569"
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
-                                visible: text.length > 0
-                            }
-
-                            Label {
-                                text: "技术线索："
-                                color: "#1e293b"
-                                font.bold: true
-                                visible: (analysisController.systemContextData.technologySummary || "").length > 0
-                            }
-
-                            Label {
-                                text: analysisController.systemContextData.technologySummary || ""
-                                color: "#475569"
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
-                                visible: text.length > 0
-                            }
-
-                            Label {
-                                text: "容器摘要："
-                                color: "#1e293b"
-                                font.bold: true
-                                visible: (analysisController.systemContextData.containerSummary || "").length > 0
-                            }
-
-                            Label {
-                                text: analysisController.systemContextData.containerSummary || ""
-                                color: "#475569"
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
-                                visible: text.length > 0
-                            }
-                        }
-                    }
-
-                    Frame {
-                        Layout.fillWidth: true
-                        background: Rectangle { radius: 14; color: "#ffffff"; border.color: "#e2e8f0" }
-
-                        ColumnLayout {
-                            width: parent.width
-                            anchors.fill: parent
-                            anchors.margins: 16
-                            spacing: 10
-
-                            Label {
-                                text: "详细 Markdown 报告"
-                                color: "#0f172a"
-                                font.pixelSize: 18
-                                font.bold: true
-                            }
-
-                            TextArea {
-                                Layout.fillWidth: true
-                                text: analysisController.systemContextReport
-                                readOnly: true
-                                wrapMode: TextEdit.Wrap
-                                textFormat: TextEdit.MarkdownText
-                                color: "#0f172a"
-                                font.pixelSize: 15
-                                background: null
                             }
                         }
                     }
@@ -275,101 +327,126 @@ ApplicationWindow {
     Component {
         id: astPreviewPageComponent
 
-        Frame {
-            background: Rectangle { radius: 10; color: "#ffffff" }
+        ColumnLayout {
+            spacing: 16
 
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 18
-                spacing: 12
+            SurfaceCard {
+                Layout.fillWidth: true
+                fillColor: theme.surfaceSecondary
+                borderColor: theme.borderSubtle
 
-                Frame {
-                    Layout.fillWidth: true
-                    background: Rectangle {
-                        radius: 14
-                        color: "#f8fafc"
-                        border.color: "#dbe4f0"
+                ColumnLayout {
+                    anchors.fill: parent
+                    spacing: 12
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 4
+
+                            Label {
+                                text: "AST 预览"
+                                color: theme.inkStrong
+                                font.family: theme.displayFontFamily
+                                font.pixelSize: 22
+                                font.weight: Font.DemiBold
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: analysisController.astPreviewSummary
+                                wrapMode: Text.WordWrap
+                                color: theme.inkMuted
+                                font.family: theme.textFontFamily
+                                font.pixelSize: 13
+                            }
+                        }
+
+                        TagChip {
+                            text: "文件 " + ((analysisController.astFileItems || []).length)
+                            fillColor: "#ffffff"
+                            borderColor: theme.borderSubtle
+                            textColor: theme.inkNormal
+                        }
                     }
 
-                    ColumnLayout {
-                        width: parent.width
-                        anchors.fill: parent
-                        anchors.margins: 14
-                        spacing: 10
+                    ComboBox {
+                        id: astFileSelector
+                        Layout.fillWidth: true
+                        model: analysisController.astFileItems
+                        textRole: "label"
+                        enabled: (analysisController.astFileItems || []).length > 0
+                        font.family: theme.textFontFamily
+                        font.pixelSize: 14
 
-                        Label {
-                            text: "AST 预览"
-                            color: "#0f172a"
-                            font.pixelSize: 20
-                            font.bold: true
+                        background: Rectangle {
+                            radius: 18
+                            color: "#ffffff"
+                            border.color: astFileSelector.activeFocus ? theme.borderStrong : theme.borderSubtle
                         }
 
-                        Label {
-                            text: analysisController.astPreviewSummary
-                            color: "#475569"
-                            wrapMode: Text.WordWrap
-                            Layout.fillWidth: true
+                        contentItem: Text {
+                            leftPadding: 14
+                            rightPadding: 36
+                            verticalAlignment: Text.AlignVCenter
+                            text: astFileSelector.displayText
+                            color: theme.inkStrong
+                            font: astFileSelector.font
+                            elide: Text.ElideRight
                         }
 
-                        ComboBox {
-                            id: astFileSelector
-                            Layout.fillWidth: true
-                            model: analysisController.astFileItems
-                            textRole: "label"
-                            enabled: (analysisController.astFileItems || []).length > 0
-
-                            function syncSelection() {
-                                var items = analysisController.astFileItems || []
-                                var selectedPath = analysisController.selectedAstFilePath
-                                var matched = -1
-                                for (var i = 0; i < items.length; ++i) {
-                                    if (items[i].path === selectedPath) {
-                                        matched = i
-                                        break
-                                    }
+                        function syncSelection() {
+                            var items = analysisController.astFileItems || []
+                            var selectedPath = analysisController.selectedAstFilePath
+                            var matched = -1
+                            for (var i = 0; i < items.length; ++i) {
+                                if (items[i].path === selectedPath) {
+                                    matched = i
+                                    break
                                 }
-                                currentIndex = matched
                             }
+                            currentIndex = matched
+                        }
 
-                            Component.onCompleted: syncSelection()
-                            onActivated: {
-                                var items = analysisController.astFileItems || []
-                                if (index >= 0 && index < items.length)
-                                    analysisController.selectedAstFilePath = items[index].path
-                            }
+                        Component.onCompleted: syncSelection()
 
-                            Connections {
-                                target: analysisController
-                                function onSelectedAstFilePathChanged() { astFileSelector.syncSelection() }
-                                function onAstFileItemsChanged() { astFileSelector.syncSelection() }
-                            }
+                        onActivated: {
+                            var items = analysisController.astFileItems || []
+                            if (index >= 0 && index < items.length)
+                                analysisController.selectedAstFilePath = items[index].path
+                        }
+
+                        Connections {
+                            target: analysisController
+                            function onSelectedAstFilePathChanged() { astFileSelector.syncSelection() }
+                            function onAstFileItemsChanged() { astFileSelector.syncSelection() }
                         }
                     }
                 }
+            }
 
-                Frame {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    background: Rectangle {
-                        radius: 14
-                        color: "#0b1220"
-                        border.color: "#1e293b"
-                    }
+            SurfaceCard {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                fillColor: "#0f1c2b"
+                borderColor: "#24374b"
+                stacked: true
 
-                    ScrollView {
-                        anchors.fill: parent
-                        anchors.margins: 12
-                        clip: true
+                ScrollView {
+                    anchors.fill: parent
+                    clip: true
 
-                        TextArea {
-                            text: analysisController.astPreviewText
-                            readOnly: true
-                            wrapMode: TextEdit.NoWrap
-                            color: "#dbeafe"
-                            font.pixelSize: 13
-                            font.family: "Consolas"
-                            background: null
-                        }
+                    TextArea {
+                        text: analysisController.astPreviewText
+                        readOnly: true
+                        wrapMode: TextEdit.NoWrap
+                        color: "#dce8f4"
+                        font.family: theme.monoFontFamily
+                        font.pixelSize: 13
+                        selectionColor: "#2d5d87"
+                        background: null
                     }
                 }
             }
@@ -379,41 +456,84 @@ ApplicationWindow {
     Component {
         id: analysisReportPageComponent
 
-        Frame {
-            background: Rectangle { radius: 10; color: "#ffffff" }
-            ScrollView {
-                anchors.fill: parent
-                anchors.margins: 20
-                TextArea {
-                    text: analysisController.analysisReport
-                    readOnly: true
-                    wrapMode: TextEdit.Wrap
-                    textFormat: TextEdit.MarkdownText
-                    color: "#0f172a"
-                    font.pixelSize: 15
-                    background: null
+        ColumnLayout {
+            spacing: 16
+
+            SurfaceCard {
+                Layout.fillWidth: true
+                minimumContentHeight: 104
+                fillColor: theme.surfaceSecondary
+                borderColor: theme.borderSubtle
+
+                RowLayout {
+                    anchors.fill: parent
+                    spacing: 12
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+
+                        Label {
+                            text: "L4 全景报告"
+                            color: theme.inkStrong
+                            font.family: theme.displayFontFamily
+                            font.pixelSize: 22
+                            font.weight: Font.DemiBold
+                        }
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: "保留 Markdown 入口，但用更清晰的阅读框体承载，便于后续继续扩展导出和分享能力。"
+                            wrapMode: Text.WordWrap
+                            color: theme.inkMuted
+                            font.family: theme.textFontFamily
+                            font.pixelSize: 13
+                        }
+                    }
+
+                    AppButton {
+                        theme: window.theme
+                        tone: "ghost"
+                        text: "复制报告"
+                        onClicked: analysisController.copyTextToClipboard(analysisController.analysisReport)
+                    }
+                }
+            }
+
+            SurfaceCard {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                fillColor: theme.surfacePrimary
+                borderColor: theme.borderStrong
+                stacked: true
+
+                ScrollView {
+                    anchors.fill: parent
+                    clip: true
+
+                    TextArea {
+                        text: analysisController.analysisReport
+                        readOnly: true
+                        wrapMode: TextEdit.Wrap
+                        textFormat: TextEdit.MarkdownText
+                        color: theme.inkStrong
+                        font.family: theme.textFontFamily
+                        font.pixelSize: 14
+                        background: null
+                    }
                 }
             }
         }
     }
 
     function displayNodeKind(kind) {
-        return kind === "entry" ? "\u53d1\u8d77\u5165\u53e3" : (kind === "infrastructure" ? "\u540e\u53f0\u652f\u6491" : kind)
-    }
-
-    function nodeFill(kind, selected) {
-        return selected ? "#3b82f6" : (kind === "entry" ? "#14b8a6" : (kind === "infrastructure" ? "#f59e0b" : "#eff6ff"))
-    }
-
-    function edgeColor(kind) {
-        return kind === "activates" ? "#60a5fa" : (kind === "uses_infrastructure" ? "#fcd34d" : "#cbd5e1")
+        return kind === "entry" ? "发起入口" : (kind === "infrastructure" ? "后台支撑" : "核心能力")
     }
 
     function capabilityNodeById(nodeId) {
-        var nodes = analysisController.capabilityNodeItems || []
-        for (var i = 0; i < nodes.length; ++i) {
-            if (nodes[i].id === nodeId)
-                return nodes[i]
+        for (var i = 0; i < capabilityNodes.length; ++i) {
+            if (capabilityNodes[i].id === nodeId)
+                return capabilityNodes[i]
         }
         return null
     }
@@ -433,19 +553,19 @@ ApplicationWindow {
     }
 
     function nodeTooltipSummary(node) {
-        return node ? node.name : ""
+        if (!node)
+            return ""
+        return (node.summary || "").length > 0 ? node.summary : node.name
     }
 
     function nodeDisplayRect(node) {
-        if (!node)
+        if (!node || !node.layoutBounds)
             return {"x": 0, "y": 0, "width": 0, "height": 0}
-        if (node.layoutBounds)
-            return node.layoutBounds
-        return {"x": node.x, "y": node.y, "width": node.width, "height": node.height}
+        return node.layoutBounds
     }
 
     function selectedNodeDisplayName() {
-        return selectedCapabilityNode ? selectedCapabilityNode.name : "\u8fd8\u6ca1\u6709\u9009\u4e2d\u4efb\u4f55\u90e8\u5206"
+        return selectedCapabilityNode ? selectedCapabilityNode.name : "尚未选择模块"
     }
 
     function selectedNodeResponsibility() {
@@ -461,21 +581,18 @@ ApplicationWindow {
         return values.slice(0, 4).join("、")
     }
 
-    function focusedLayoutData() {
-        return {
-            "useFocusedLayout": false,
-            "width": Math.max(analysisController.capabilitySceneWidth, 980),
-            "height": Math.max(analysisController.capabilitySceneHeight, 420),
-            "positions": {}
-        }
+    function capabilitySceneBounds() {
+        return capabilitySceneData.bounds ? capabilitySceneData.bounds : {"x": 0, "y": 0, "width": 0, "height": 0}
     }
 
     function currentCapabilitySceneWidth() {
-        return focusedLayoutData().width
+        var bounds = capabilitySceneBounds()
+        return Math.max(bounds.width || 0, 1040)
     }
 
     function currentCapabilitySceneHeight() {
-        return focusedLayoutData().height
+        var bounds = capabilitySceneBounds()
+        return Math.max(bounds.height || 0, 520)
     }
 
     function capabilityNodeOpacity(node) {
@@ -483,43 +600,20 @@ ApplicationWindow {
             return 1.0
         if (selectedCapabilityNode.id === node.id)
             return 1.0
-
-        var edges = analysisController.capabilityEdgeItems || []
-        for (var i = 0; i < edges.length; ++i) {
-            if ((edges[i].fromId === selectedCapabilityNode.id && edges[i].toId === node.id)
-                    || (edges[i].toId === selectedCapabilityNode.id && edges[i].fromId === node.id)) {
+        for (var i = 0; i < capabilityEdges.length; ++i) {
+            var edge = capabilityEdges[i]
+            if ((edge.fromId === selectedCapabilityNode.id && edge.toId === node.id)
+                    || (edge.toId === selectedCapabilityNode.id && edge.fromId === node.id)) {
                 return 1.0
             }
         }
-        return 0.35
+        return 0.34
     }
 
     function edgeRoutePoints(edge) {
         if (edge && edge.routePoints && edge.routePoints.length >= 2)
             return edge.routePoints
-        var fromRect = nodeDisplayRect(capabilityNodeById(edge.fromId))
-        var toRect = nodeDisplayRect(capabilityNodeById(edge.toId))
-        if (!fromRect || !toRect)
-            return []
-        var leftToRight = fromRect.x <= toRect.x
-        return [
-            {"x": leftToRight ? fromRect.x + fromRect.width : fromRect.x,
-             "y": fromRect.y + fromRect.height / 2},
-            {"x": leftToRight ? toRect.x : toRect.x + toRect.width,
-             "y": toRect.y + toRect.height / 2}
-        ]
-    }
-
-    function edgeEndpoints(edge) {
-        var points = edgeRoutePoints(edge)
-        if (!points || points.length < 2)
-            return {"x1": 0, "y1": 0, "x2": 0, "y2": 0}
-        return {
-            "x1": points[0].x,
-            "y1": points[0].y,
-            "x2": points[points.length - 1].x,
-            "y2": points[points.length - 1].y
-        }
+        return []
     }
 
     function edgeTouchesSelection(edge) {
@@ -527,70 +621,47 @@ ApplicationWindow {
     }
 
     function visibleCapabilityEdges() {
-        var edges = analysisController.capabilityEdgeItems || []
         if (relationshipViewMode === "all")
-            return edges.slice(0, Math.min(edges.length, 150))
+            return capabilityEdges.slice(0, Math.min(capabilityEdges.length, 180))
         if (!selectedCapabilityNode)
             return []
         var filtered = []
-        for (var i = 0; i < edges.length; ++i) {
-            if (edgeTouchesSelection(edges[i]))
-                filtered.push(edges[i])
+        for (var i = 0; i < capabilityEdges.length; ++i) {
+            if (edgeTouchesSelection(capabilityEdges[i]))
+                filtered.push(capabilityEdges[i])
         }
         return filtered
     }
 
-    function drawCapabilityEdge(ctx, edge, highlighted) {
+    function drawCapabilityEdge(ctx, edge) {
         var points = edgeRoutePoints(edge)
         if (!points || points.length < 2)
             return
 
-        var endpoints = edgeEndpoints(edge)
         var emphasized = edgeTouchesSelection(edge)
         var hasSelection = selectedCapabilityNode && selectedCapabilityNode.id !== undefined
-        var alpha = hasSelection ? (emphasized ? 0.92 : 0.04) : 0.5
-        var lineWidth = emphasized ? 3.0 : 1.2
-
         ctx.beginPath()
         ctx.lineJoin = "round"
         ctx.lineCap = "round"
-        ctx.strokeStyle = edgeColor(edge.kind)
-        ctx.lineWidth = lineWidth
-        ctx.globalAlpha = alpha
+        ctx.strokeStyle = theme.edgeColor(edge.kind)
+        ctx.lineWidth = emphasized ? 3.0 : 1.4
+        ctx.globalAlpha = hasSelection ? (emphasized ? 0.92 : 0.12) : 0.52
         ctx.moveTo(points[0].x, points[0].y)
 
-        if (points.length > 2) {
-            for (var i = 1; i < points.length; ++i)
-                ctx.lineTo(points[i].x, points[i].y)
-        } else {
-            var dx = Math.abs(endpoints.x2 - endpoints.x1)
-            var dy = Math.abs(endpoints.y2 - endpoints.y1)
-            var cpX = Math.max(60, dx * 0.5)
+        for (var i = 1; i < points.length; ++i)
+            ctx.lineTo(points[i].x, points[i].y)
 
-            if (dx < 100) {
-                var sweepDir = (endpoints.x1 < 500) ? -1 : 1
-                var sweepAmt = Math.max(80, dy * 0.4)
-                ctx.bezierCurveTo(
-                    endpoints.x1 + sweepDir * sweepAmt, endpoints.y1,
-                    endpoints.x2 + sweepDir * sweepAmt, endpoints.y2,
-                    endpoints.x2, endpoints.y2)
-            } else {
-                ctx.bezierCurveTo(
-                    endpoints.x1 + cpX, endpoints.y1,
-                    endpoints.x2 - cpX, endpoints.y2,
-                    endpoints.x2, endpoints.y2)
-            }
-        }
         ctx.stroke()
     }
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 18
-        spacing: 14
+        anchors.margins: 20
+        spacing: 18
 
         TopControlBar {
             Layout.fillWidth: true
+            theme: window.theme
         }
 
         SplitView {
@@ -598,42 +669,123 @@ ApplicationWindow {
             Layout.fillHeight: true
             orientation: Qt.Horizontal
 
-            Frame {
+            SurfaceCard {
                 SplitView.fillWidth: true
                 SplitView.fillHeight: true
-                background: Rectangle { radius: 10; color: "#ffffff"; border.color: "#e2e8f0" }
+                stacked: true
+                fillColor: theme.surfacePrimary
+                borderColor: theme.borderStrong
 
                 ColumnLayout {
                     anchors.fill: parent
-                    anchors.margins: 12
+                    spacing: 18
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 16
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Label {
+                                text: "Analysis Workspace"
+                                color: theme.inkStrong
+                                font.family: theme.displayFontFamily
+                                font.pixelSize: 26
+                                font.weight: Font.DemiBold
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: c4Levels[selectedC4LevelIndex].summary
+                                color: theme.inkMuted
+                                wrapMode: Text.WordWrap
+                                font.family: theme.textFontFamily
+                                font.pixelSize: 13
+                            }
+                        }
+
+                        TagChip {
+                            text: selectedCapabilityNode ? ("已选中 " + selectedCapabilityNode.name) : c4Levels[selectedC4LevelIndex].eyebrow
+                            fillColor: "#ffffff"
+                            borderColor: theme.borderSubtle
+                            textColor: theme.inkNormal
+                        }
+                    }
 
                     Flow {
                         Layout.fillWidth: true
-                        spacing: 8
+                        spacing: 10
 
                         Repeater {
                             model: window.c4Levels
-                            delegate: Rectangle {
-                                width: 160
-                                height: 52
-                                radius: 10
-                                color: window.selectedC4LevelIndex === index ? "#eff6ff" : "#ffffff"
-                                border.color: window.selectedC4LevelIndex === index ? "#3b82f6" : "#e2e8f0"
 
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: modelData.title
-                                    color: window.selectedC4LevelIndex === index ? "#1d4ed8" : "#475569"
-                                    font.bold: true
+                            delegate: Rectangle {
+                                width: 176
+                                height: 82
+                                radius: 20
+                                color: theme.levelFill(index, window.selectedC4LevelIndex === index)
+                                border.color: theme.levelBorder(index, window.selectedC4LevelIndex === index)
+                                border.width: 1
+                                clip: true
+
+                                Rectangle {
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
+                                    height: 6
+                                    color: window.selectedC4LevelIndex === index ? theme.accentStrong : "#d7e0e8"
+                                }
+
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 14
+                                    anchors.topMargin: 16
+                                    spacing: 3
+
+                                    Label {
+                                        text: modelData.eyebrow
+                                        color: theme.levelInk(window.selectedC4LevelIndex === index)
+                                        font.family: theme.textFontFamily
+                                        font.pixelSize: 11
+                                        font.weight: Font.DemiBold
+                                    }
+
+                                    Label {
+                                        text: modelData.title
+                                        color: theme.inkStrong
+                                        font.family: theme.displayFontFamily
+                                        font.pixelSize: 17
+                                        font.weight: Font.DemiBold
+                                    }
+
+                                    Label {
+                                        Layout.fillWidth: true
+                                        text: modelData.summary
+                                        wrapMode: Text.WordWrap
+                                        maximumLineCount: 2
+                                        elide: Text.ElideRight
+                                        color: theme.inkMuted
+                                        font.family: theme.textFontFamily
+                                        font.pixelSize: 11
+                                    }
                                 }
 
                                 MouseArea {
                                     anchors.fill: parent
+                                    hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: window.selectedC4LevelIndex = index
                                 }
                             }
                         }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 1
+                        color: theme.borderSubtle
                     }
 
                     StackLayout {
@@ -644,6 +796,7 @@ ApplicationWindow {
                         Item {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
+
                             Loader {
                                 anchors.fill: parent
                                 active: window.selectedC4LevelIndex === 0
@@ -655,11 +808,13 @@ ApplicationWindow {
                         L2GraphView {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
+                            theme: window.theme
                         }
 
                         Item {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
+
                             Loader {
                                 anchors.fill: parent
                                 active: window.selectedC4LevelIndex === 2
@@ -671,6 +826,7 @@ ApplicationWindow {
                         Item {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
+
                             Loader {
                                 anchors.fill: parent
                                 active: window.selectedC4LevelIndex === 3
@@ -683,12 +839,11 @@ ApplicationWindow {
             }
 
             RightInspector {
-                SplitView.preferredWidth: window.inspectorCollapsed ? 64 : window.inspectorExpandedWidth
-                SplitView.minimumWidth: window.inspectorCollapsed ? 64 : 320
+                theme: window.theme
+                SplitView.preferredWidth: window.inspectorCollapsed ? 86 : window.inspectorExpandedWidth
+                SplitView.minimumWidth: window.inspectorCollapsed ? 86 : 340
                 SplitView.fillHeight: true
             }
         }
     }
 }
-
-

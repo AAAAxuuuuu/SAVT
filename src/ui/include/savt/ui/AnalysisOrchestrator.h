@@ -4,6 +4,7 @@
 #include "savt/core/ArchitectureOverview.h"
 #include "savt/core/CapabilityGraph.h"
 #include "savt/layout/LayeredGraphLayout.h"
+#include "savt/ui/SceneMapper.h"
 
 #include <QPromise>
 #include <QString>
@@ -23,11 +24,7 @@ struct PendingAnalysisResult {
     QString astPreviewTitle;
     QString astPreviewSummary;
     QString astPreviewText;
-    QVariantList nodeItems;
-    QVariantList edgeItems;
-    QVariantList groupItems;
-    double sceneWidth = 0.0;
-    double sceneHeight = 0.0;
+    CapabilitySceneData capabilityScene;
     QVariantMap systemContextData;
     QVariantList systemContextCards;
     bool canceled = false;

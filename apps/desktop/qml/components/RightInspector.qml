@@ -2,103 +2,312 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-Frame {
+Item {
     id: root
-    background: Rectangle {
-        radius: 10
-        color: "#ffffff"
-        border.color: "#e2e8f0"
-    }
 
-    ColumnLayout {
+    required property QtObject theme
+
+    SurfaceCard {
         anchors.fill: parent
-        anchors.margins: window.inspectorCollapsed ? 8 : 12
-        spacing: 10
+        minimumContentHeight: 520
+        fillColor: root.theme.surfacePrimary
+        borderColor: root.theme.borderStrong
+        stacked: !window.inspectorCollapsed
 
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 8
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 12
 
-            Label {
-                visible: !window.inspectorCollapsed
-                text: "\u8bfb\u56fe\u8bf4\u660e\u4e0e\u8f85\u52a9"
-                color: "#0f172a"
-                font.pixelSize: 20
-                font.bold: true
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+                    visible: !window.inspectorCollapsed
+
+                    Label {
+                        text: "Inspector"
+                        color: root.theme.inkStrong
+                        font.family: root.theme.displayFontFamily
+                        font.pixelSize: 22
+                        font.weight: Font.DemiBold
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: "围绕当前选中模块，集中查看职责、证据线索和 AI 说明。"
+                        wrapMode: Text.WordWrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                        color: root.theme.inkMuted
+                        font.family: root.theme.textFontFamily
+                        font.pixelSize: 12
+                    }
+                }
+
+                AppButton {
+                    theme: root.theme
+                    compact: true
+                    tone: "ghost"
+                    text: window.inspectorCollapsed ? "展开" : "收起"
+                    onClicked: window.inspectorCollapsed = !window.inspectorCollapsed
+                }
             }
 
-            Item { Layout.fillWidth: true }
+            Item {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
 
-            Button {
-                text: window.inspectorCollapsed ? "\u5c55\u5f00" : "\u6536\u8d77"
-                onClicked: window.inspectorCollapsed = !window.inspectorCollapsed
+                Loader {
+                    anchors.fill: parent
+                    active: window.inspectorCollapsed
+                    sourceComponent: collapsedComponent
+                }
+
+                Loader {
+                    anchors.fill: parent
+                    active: !window.inspectorCollapsed
+                    sourceComponent: expandedComponent
+                }
             }
         }
+    }
+
+    Component {
+        id: collapsedComponent
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 12
+
+            TagChip {
+                text: window.selectedCapabilityNode ? "已选中模块" : "未选中"
+                fillColor: "#eef4f9"
+                borderColor: "#c8d6e4"
+                textColor: "#28435c"
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                radius: 24
+                color: root.theme.surfaceSecondary
+                border.color: root.theme.borderSubtle
+
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 12
+
+                    Label {
+                        text: "AI"
+                        color: root.theme.inkStrong
+                        font.family: root.theme.displayFontFamily
+                        font.pixelSize: 22
+                        font.weight: Font.DemiBold
+                    }
+
+                    Label {
+                        width: parent.parent ? parent.parent.width - 28 : 60
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                        text: "收起模式只保留状态。\n展开后查看模块细节。"
+                        color: root.theme.inkMuted
+                        font.family: root.theme.textFontFamily
+                        font.pixelSize: 12
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: expandedComponent
 
         ScrollView {
-            visible: !window.inspectorCollapsed
-            Layout.fillWidth: true
-            Layout.fillHeight: true
             clip: true
             contentWidth: availableWidth
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
             ColumnLayout {
                 width: parent.width
                 spacing: 12
 
-                Frame {
+                SurfaceCard {
                     Layout.fillWidth: true
-                    background: Rectangle { radius: 10; color: "#f8fafc"; border.color: "#e2e8f0" }
+                    minimumContentHeight: 110
+                    fillColor: root.theme.surfaceSecondary
+                    borderColor: root.theme.borderSubtle
 
                     ColumnLayout {
-                        width: parent.width
-                        anchors { top: parent.top; left: parent.left; right: parent.right; margins: 12 }
-                        spacing: 8
+                        anchors.fill: parent
+                        spacing: 12
 
-                        Label {
-                            text: "\u5f53\u524d\u9009\u4e2d\u7684\u90e8\u5206"
-                            color: "#0f172a"
-                            font.pixelSize: 17
-                            font.bold: true
-                        }
-                        Label {
-                            text: window.selectedNodeDisplayName()
-                            color: "#2563eb"
-                            font.pixelSize: 20
-                            font.bold: true
-                            wrapMode: Text.WordWrap
+                        RowLayout {
                             Layout.fillWidth: true
-                        }
-                        Label {
-                            text: "\u5b83\u4e3b\u8981\u8d1f\u8d23\uff1a" + window.selectedNodeResponsibility()
-                            color: "#475569"
-                            wrapMode: Text.WordWrap
-                            Layout.fillWidth: true
-                        }
-                    }
-                }
 
-                Frame {
-                    Layout.fillWidth: true
-                    background: Rectangle { radius: 10; color: "#f8fafc"; border.color: "#e2e8f0" }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 6
 
-                    ColumnLayout {
-                        width: parent.width
-                        anchors { top: parent.top; left: parent.left; right: parent.right; margins: 12 }
-                        spacing: 10
+                                Label {
+                                    text: window.selectedCapabilityNode ? window.selectedCapabilityNode.name : "尚未选择模块"
+                                    color: root.theme.inkStrong
+                                    wrapMode: Text.WordWrap
+                                    font.family: root.theme.displayFontFamily
+                                    font.pixelSize: 22
+                                    font.weight: Font.DemiBold
+                                    Layout.fillWidth: true
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: window.selectedCapabilityNode ? window.selectedCapabilityNode.responsibility : "先在 L2 视图里点一个模块，再从这里看它的职责和上下文。"
+                                    wrapMode: Text.WordWrap
+                                    maximumLineCount: 3
+                                    elide: Text.ElideRight
+                                    color: root.theme.inkMuted
+                                    font.family: root.theme.textFontFamily
+                                    font.pixelSize: 12
+                                }
+                            }
+                        }
 
                         Flow {
                             Layout.fillWidth: true
                             spacing: 8
 
-                            Label {
-                                text: "AI \u8f85\u52a9\u89e3\u8bfb"
-                                color: "#0f172a"
-                                font.pixelSize: 17
-                                font.bold: true
+                            TagChip {
+                                visible: !!window.selectedCapabilityNode
+                                text: window.selectedCapabilityNode ? window.displayNodeKind(window.selectedCapabilityNode.kind) : ""
+                                fillColor: "#ffffff"
+                                borderColor: root.theme.borderSubtle
+                                textColor: root.theme.inkNormal
                             }
-                            Button {
-                                text: analysisController.aiBusy ? "\u89e3\u8bfb\u4e2d..." : "\u751f\u6210\u8de8\u8bed\u8a00 AI \u89e3\u8bfb"
+
+                            TagChip {
+                                visible: !!window.selectedCapabilityNode && (window.selectedCapabilityNode.role || "").length > 0
+                                text: window.selectedCapabilityNode ? window.selectedCapabilityNode.role : ""
+                                fillColor: "#ffffff"
+                                borderColor: root.theme.borderSubtle
+                                textColor: root.theme.inkNormal
+                            }
+
+                            TagChip {
+                                visible: !!window.selectedCapabilityNode
+                                text: window.selectedCapabilityNode ? ("文件 " + (window.selectedCapabilityNode.fileCount || 0)) : ""
+                                fillColor: "#ffffff"
+                                borderColor: root.theme.borderSubtle
+                                textColor: root.theme.inkNormal
+                            }
+                        }
+                    }
+                }
+
+                SurfaceCard {
+                    Layout.fillWidth: true
+                    minimumContentHeight: 118
+                    fillColor: root.theme.surfacePrimary
+                    borderColor: root.theme.borderSubtle
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 12
+
+                        Label {
+                            text: "证据线索"
+                            color: root.theme.inkStrong
+                            font.family: root.theme.displayFontFamily
+                            font.pixelSize: 17
+                            font.weight: Font.DemiBold
+                        }
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: window.selectedNodeEvidenceSummary().length > 0
+                                  ? window.selectedNodeEvidenceSummary()
+                                  : "当前还没有提取到可展示的证据摘要。"
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 3
+                            elide: Text.ElideRight
+                            color: root.theme.inkNormal
+                            font.family: root.theme.textFontFamily
+                            font.pixelSize: 12
+                        }
+
+                        Repeater {
+                            model: window.selectedCapabilityNode && window.selectedCapabilityNode.topSymbols
+                                   ? window.selectedCapabilityNode.topSymbols.slice(0, 6)
+                                   : []
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                implicitHeight: evidenceLabel.implicitHeight + 18
+                                radius: 16
+                                color: "#ffffff"
+                                border.color: root.theme.borderSubtle
+
+                                Label {
+                                    id: evidenceLabel
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.margins: 12
+                                    text: modelData
+                                    wrapMode: Text.WordWrap
+                                    color: root.theme.inkNormal
+                                    font.family: root.theme.monoFontFamily
+                                    font.pixelSize: 12
+                                }
+                            }
+                        }
+                    }
+                }
+
+                SurfaceCard {
+                    Layout.fillWidth: true
+                    minimumContentHeight: 126
+                    fillColor: "#eef4f8"
+                    borderColor: root.theme.borderSubtle
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 12
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 10
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 4
+
+                                Label {
+                                    text: "AI 辅读图"
+                                    color: root.theme.inkStrong
+                                    font.family: root.theme.displayFontFamily
+                                    font.pixelSize: 17
+                                    font.weight: Font.DemiBold
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: analysisController.aiStatusMessage
+                                    wrapMode: Text.WordWrap
+                                    maximumLineCount: 3
+                                    elide: Text.ElideRight
+                                    color: root.theme.inkMuted
+                                    font.family: root.theme.textFontFamily
+                                    font.pixelSize: 12
+                                }
+                            }
+
+                            AppButton {
+                                theme: root.theme
+                                tone: "accent"
+                                compact: true
+                                text: analysisController.aiBusy ? "解读中..." : "生成解释"
                                 enabled: window.selectedCapabilityNode !== null && !analysisController.aiBusy
                                 onClicked: analysisController.requestAiExplanation(window.selectedCapabilityNode)
                             }
@@ -107,27 +316,21 @@ Frame {
                         RowLayout {
                             Layout.fillWidth: true
                             visible: analysisController.aiBusy
-                            spacing: 12
+                            spacing: 10
 
                             BusyIndicator {
                                 running: analysisController.aiBusy
                                 Layout.preferredWidth: 24
                                 Layout.preferredHeight: 24
                             }
-                            Label {
-                                text: "\u2728 AI \u6b63\u5728\u9605\u8bfb\u8de8\u8bed\u8a00\u6e90\u7801\u4e0a\u4e0b\u6587\uff0c\u52aa\u529b\u601d\u8003\u4e2d..."
-                                color: "#2563eb"
-                                font.pixelSize: 13
-                                font.italic: true
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
 
-                                SequentialAnimation on opacity {
-                                    loops: Animation.Infinite
-                                    running: analysisController.aiBusy
-                                    NumberAnimation { to: 0.4; duration: 800; easing.type: Easing.InOutQuad }
-                                    NumberAnimation { to: 1.0; duration: 800; easing.type: Easing.InOutQuad }
-                                }
+                            Label {
+                                Layout.fillWidth: true
+                                text: "正在结合结构结果和右侧上下文生成说明。"
+                                wrapMode: Text.WordWrap
+                                color: root.theme.accentStrong
+                                font.family: root.theme.textFontFamily
+                                font.pixelSize: 12
                             }
                         }
 
@@ -136,175 +339,127 @@ Frame {
                             spacing: 10
                             visible: analysisController.aiHasResult && !analysisController.aiBusy
 
-                            ColumnLayout {
+                            Label {
                                 Layout.fillWidth: true
-                                spacing: 4
                                 visible: analysisController.aiSummary.length > 0
-
-                                Label {
-                                    text: "\uD83D\uDCCC \u6982\u8ff0"
-                                    color: "#374151"
-                                    font.pixelSize: 13
-                                    font.bold: true
-                                }
-                                Label {
-                                    text: analysisController.aiSummary
-                                    color: "#0f172a"
-                                    wrapMode: Text.WordWrap
-                                    Layout.fillWidth: true
-                                    font.pixelSize: 13
-                                    lineHeight: 1.5
-                                }
+                                text: analysisController.aiSummary
+                                wrapMode: Text.WordWrap
+                                maximumLineCount: 3
+                                elide: Text.ElideRight
+                                color: root.theme.inkStrong
+                                font.family: root.theme.textFontFamily
+                                font.pixelSize: 12
                             }
 
                             Rectangle {
-                                Layout.fillWidth: true; height: 1; color: "#e2e8f0"
-                                visible: analysisController.aiSummary.length > 0
-                                         && analysisController.aiResponsibility.length > 0
-                            }
-
-                            ColumnLayout {
                                 Layout.fillWidth: true
-                                spacing: 4
                                 visible: analysisController.aiResponsibility.length > 0
-
-                                Label {
-                                    text: "\u2699\uFE0F \u8be6\u7ec6\u804c\u8d23"
-                                    color: "#374151"
-                                    font.pixelSize: 13
-                                    font.bold: true
-                                }
-                                Label {
-                                    text: analysisController.aiResponsibility
-                                    color: "#1e293b"
-                                    wrapMode: Text.WordWrap
-                                    Layout.fillWidth: true
-                                    font.pixelSize: 13
-                                    lineHeight: 1.5
-                                }
-                            }
-
-                            Rectangle {
-                                Layout.fillWidth: true; height: 1; color: "#e2e8f0"
-                                visible: analysisController.aiResponsibility.length > 0
-                                         && analysisController.aiCollaborators.length > 0
-                            }
-
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 6
-                                visible: analysisController.aiCollaborators.length > 0
-
-                                Label {
-                                    text: "\uD83E\uDD1D \u534f\u4f5c\u8005"
-                                    color: "#374151"
-                                    font.pixelSize: 13
-                                    font.bold: true
-                                }
-
-                                Flow {
-                                    Layout.fillWidth: true
-                                    spacing: 6
-
-                                    Repeater {
-                                        model: analysisController.aiCollaborators
-
-                                        Rectangle {
-                                            radius: 4
-                                            color: "#eff6ff"
-                                            border.color: "#bfdbfe"
-                                            width: chipLabel.implicitWidth + 16
-                                            height: chipLabel.implicitHeight + 8
-
-                                            Label {
-                                                id: chipLabel
-                                                anchors.centerIn: parent
-                                                text: modelData
-                                                color: "#1d4ed8"
-                                                font.pixelSize: 12
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                Layout.fillWidth: true; height: 1; color: "#e2e8f0"
-                                visible: analysisController.aiCollaborators.length > 0
-                                         && analysisController.aiUncertainty.length > 0
-                            }
-
-                            Frame {
-                                Layout.fillWidth: true
-                                visible: analysisController.aiUncertainty.length > 0
-                                padding: 8
-                                background: Rectangle {
-                                    radius: 6
-                                    color: "#fffbeb"
-                                    border.color: "#fcd34d"
-                                }
+                                radius: 18
+                                color: "#ffffff"
+                                border.color: root.theme.borderSubtle
 
                                 ColumnLayout {
-                                    width: parent.width
-                                    anchors { top: parent.top; left: parent.left; right: parent.right; margins: 2 }
-                                    spacing: 4
+                                    anchors.fill: parent
+                                    anchors.margins: 14
+                                    spacing: 8
 
                                     Label {
-                                        text: "\u26A0\uFE0F \u7f6e\u4fe1\u5ea6\u8bf4\u660e"
-                                        color: "#92400e"
+                                        text: "详细职责"
+                                        color: root.theme.inkNormal
+                                        font.family: root.theme.textFontFamily
                                         font.pixelSize: 12
-                                        font.bold: true
+                                        font.weight: Font.DemiBold
                                     }
+
                                     Label {
-                                        text: analysisController.aiUncertainty
-                                        color: "#78350f"
-                                        wrapMode: Text.WordWrap
                                         Layout.fillWidth: true
+                                        text: analysisController.aiResponsibility
+                                        wrapMode: Text.WordWrap
+                                        maximumLineCount: 3
+                                        elide: Text.ElideRight
+                                        color: root.theme.inkNormal
+                                        font.family: root.theme.textFontFamily
                                         font.pixelSize: 12
-                                        lineHeight: 1.4
                                     }
+                                }
+                            }
+
+                            Flow {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                visible: analysisController.aiCollaborators.length > 0
+
+                                Repeater {
+                                    model: analysisController.aiCollaborators
+
+                                    TagChip {
+                                        text: modelData
+                                        fillColor: "#ffffff"
+                                        borderColor: root.theme.borderSubtle
+                                        textColor: root.theme.inkNormal
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                visible: analysisController.aiUncertainty.length > 0
+                                radius: 18
+                                color: "#fbf3e2"
+                                border.color: "#ddc28e"
+
+                                Label {
+                                    anchors.fill: parent
+                                    anchors.margins: 14
+                                    text: analysisController.aiUncertainty
+                                    wrapMode: Text.WordWrap
+                                    color: "#7a5823"
+                                    font.family: root.theme.textFontFamily
+                                    font.pixelSize: 12
                                 }
                             }
                         }
                     }
                 }
 
-                Frame {
+                SurfaceCard {
                     Layout.fillWidth: true
-                    background: Rectangle {
-                        radius: 10
-                        color: "#eff6ff"
-                        border.color: "#60a5fa"
-                        border.width: 2
-                    }
+                    minimumContentHeight: 108
+                    fillColor: "#f0f4f9"
+                    borderColor: root.theme.borderSubtle
 
                     ColumnLayout {
-                        width: parent.width
-                        anchors { top: parent.top; left: parent.left; right: parent.right; margins: 14 }
-                        spacing: 10
+                        anchors.fill: parent
+                        spacing: 12
 
                         Label {
-                            text: "\u2728 \u51c6\u5907\u8ba9 AI \u4fee\u6539\u6b64\u6a21\u5757\uff1f"
-                            color: "#1e3a8a"
-                            font.pixelSize: 16
-                            font.bold: true
+                            text: "AI 修改入口"
+                            color: root.theme.inkStrong
+                            font.family: root.theme.displayFontFamily
+                            font.pixelSize: 17
+                            font.weight: Font.DemiBold
                         }
+
                         Label {
-                            text: "\u70b9\u51fb\u4e0b\u65b9\u6309\u9454\uff0c\u76f4\u63a5\u590d\u5236\u8be5\u6a21\u5757\u6240\u6709\u76f8\u5173\u6587\u4ef6\u8def\u5f84\u548c\u6838\u5fc3\u51fd\u6570\uff0c\u7c98\u8d34\u7ed9 Cursor \u5373\u53ef\u3002"
-                            color: "#3b82f6"
+                            Layout.fillWidth: true
+                            text: "直接复制当前模块的关键文件、核心符号和协作线索，给外部编码代理作为上下文。"
                             wrapMode: Text.WordWrap
-                            Layout.fillWidth: true
+                            maximumLineCount: 3
+                            elide: Text.ElideRight
+                            color: root.theme.inkMuted
+                            font.family: root.theme.textFontFamily
+                            font.pixelSize: 12
                         }
-                        Button {
+
+                        AppButton {
+                            theme: root.theme
                             Layout.fillWidth: true
-                            text: "\uD83D\uDCCB \u4e00\u952e\u63d0\u53d6\u6838\u5fc3\u6e90\u7801\u4e0a\u4e0b\u6587"
-                            font.bold: true
-                            highlighted: true
+                            tone: "accent"
+                            text: "复制当前模块上下文"
                             enabled: window.selectedCapabilityNode !== null
                             onClicked: {
-                                if (window.selectedCapabilityNode) {
+                                if (window.selectedCapabilityNode)
                                     analysisController.copyCodeContextToClipboard(window.selectedCapabilityNode.id)
-                                }
                             }
                         }
                     }
