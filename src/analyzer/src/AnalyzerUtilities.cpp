@@ -83,6 +83,30 @@ bool isNumericOnlySegment(const std::string_view segment) {
     });
 }
 
+bool pathContainsSegment(const std::string& normalizedLowerPath, const std::string_view segment) {
+    const std::string token = "/" + std::string(segment) + "/";
+    return normalizedLowerPath.find(token) != std::string::npos ||
+           normalizedLowerPath.starts_with(std::string(segment) + "/") ||
+           normalizedLowerPath.ends_with("/" + std::string(segment));
+}
+
+bool isLikelyToolchainDirectory(const std::string& nameLower) {
+    return nameLower == "llvm" ||
+           nameLower == "clang" ||
+           nameLower == "downloads" ||
+           nameLower == "sdk" ||
+           nameLower == "sdks" ||
+           nameLower == "toolchain" ||
+           nameLower == "toolchains" ||
+           nameLower == ".qtc_clangd" ||
+           nameLower.starts_with("clang+llvm-") ||
+           nameLower.starts_with("llvm-") ||
+           nameLower.starts_with("mingw") ||
+           nameLower.starts_with("msvc") ||
+           nameLower == "qt" ||
+           nameLower.starts_with("qt-");
+}
+
 std::string componentStemForFile(const std::filesystem::path& relativePath) {
     const std::string fileName = normalizedFileName(relativePath);
     if (isBootstrapFileName(fileName) || fileName.empty()) {
@@ -309,6 +333,8 @@ bool shouldSkipDirectory(const std::filesystem::path& directoryPath, const Analy
     };
 
     const std::string nameLower = lowerCopy(name);
+    const std::string normalizedLowerPath =
+        lowerCopy(directoryPath.lexically_normal().generic_string());
     if (buildDirs.contains(name) || buildDirs.contains(nameLower)) {
         return true;
     }
@@ -318,6 +344,19 @@ bool shouldSkipDirectory(const std::filesystem::path& directoryPath, const Analy
         nameLower.starts_with("qtcreator-") ||
         nameLower.starts_with("msvc") ||
         nameLower.starts_with(".qt")) {
+        return true;
+    }
+
+    if (nameLower == ".qtc_clangd" || nameLower == ".cache" || nameLower == "cache") {
+        return true;
+    }
+
+    const bool underToolsLikeRoot =
+        pathContainsSegment(normalizedLowerPath, "tools") ||
+        pathContainsSegment(normalizedLowerPath, "tool") ||
+        pathContainsSegment(normalizedLowerPath, "toolchains") ||
+        pathContainsSegment(normalizedLowerPath, "downloads");
+    if (underToolsLikeRoot && isLikelyToolchainDirectory(nameLower)) {
         return true;
     }
 

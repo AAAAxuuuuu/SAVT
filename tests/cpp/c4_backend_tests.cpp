@@ -585,6 +585,8 @@ void testAnalysisGraphBuilderPreservesDistinctSemanticOverloads() {
            "semantic overloads with different identities must not merge just because they share a qualifiedName");
     expect(findNodesByQualifiedName(builder.report(), "demo::compute").size() == 2,
            "distinct semantic overloads should remain as two logical nodes in the report");
+    expect(builder.findSymbolsByQualifiedName("demo::compute").size() == 2,
+           "builder qualified-name lookups should retain all overload candidates for downstream resolvers");
     expect(!builder.findSymbolByQualifiedName("demo::compute").has_value(),
            "ambiguous qualified names should no longer resolve to an arbitrary node");
 
@@ -920,6 +922,168 @@ int main() {
     fs::remove_all(tempRoot, errorCode);
 }
 
+void testCollectSourceFilesSkipsToolchainDirectoriesUnderTools() {
+    namespace fs = std::filesystem;
+
+    const fs::path tempRoot = makeTempDirectory("savt_skip_toolchain_dirs");
+    writeTextFile(tempRoot / "src" / "main.cpp", "int main() { return 0; }\n");
+    writeTextFile(tempRoot / "tools" / "llvm" / "include" / "clang" / "AST.h",
+                  "class ToolchainOnlyHeader {};\n");
+    writeTextFile(tempRoot / "tools" / "downloads" / "manifest.json", "{ \"name\": \"llvm\" }\n");
+    writeTextFile(tempRoot / ".qtc_clangd" / "index" / "cache.h", "class CacheOnlyHeader {};\n");
+
+    const auto files =
+        savt::analyzer::detail::collectSourceFiles(tempRoot, savt::analyzer::AnalyzerOptions{});
+
+    std::vector<std::string> relativePaths;
+    relativePaths.reserve(files.size());
+    for (const fs::path& filePath : files) {
+        relativePaths.push_back(savt::analyzer::detail::relativizePath(tempRoot, filePath));
+    }
+
+    expect(containsText(relativePaths, "src/main.cpp"),
+           "real project sources should still be collected");
+    expect(!containsText(relativePaths, "tools/llvm/include/clang/AST.h"),
+           "toolchain headers under tools/llvm should be skipped");
+    expect(!containsText(relativePaths, "tools/downloads/manifest.json"),
+           "downloaded tool payloads under tools/downloads should be skipped");
+    expect(!containsText(relativePaths, ".qtc_clangd/index/cache.h"),
+           "Qt Creator clangd cache directories should be skipped");
+
+    std::error_code errorCode;
+    fs::remove_all(tempRoot, errorCode);
+}
+
+void testLargeMixedOverviewAvoidsModuleScopedCapabilityExplosion() {
+    savt::core::AnalysisReport report;
+    savt::core::ArchitectureOverview overview;
+
+    for (std::size_t index = 0; index < 36; ++index) {
+        savt::core::OverviewNode node;
+        node.id = index + 1;
+        node.kind = savt::core::OverviewNodeKind::Module;
+        node.name = "workspace/module_" + std::to_string(index + 1);
+        node.folderKey = "workspace";
+        node.summary = "synthetic large mixed workspace module";
+        node.fileCount = 1;
+        node.sourceFileCount = 1;
+        node.role = (index % 3 == 0) ? "presentation" : ((index % 3 == 1) ? "analysis" : "storage");
+        if (index < 3) {
+            node.qmlFileCount = 1;
+        }
+        overview.nodes.push_back(std::move(node));
+    }
+
+    const auto graph = savt::core::buildCapabilityGraph(report, overview);
+    expect(!containsText(graph.diagnostics, "Capability aggregation mode: module_scoped."),
+           "large mixed-language workspaces should no longer force module-scoped capability graphs");
+    expect(graph.nodes.size() < overview.nodes.size(),
+           "large mixed-language workspaces should aggregate capability nodes to keep the scene bounded");
+}
+
+void testSyntaxAnalysisPreservesDistinctOverloads() {
+    namespace fs = std::filesystem;
+
+    const fs::path tempRoot = makeTempDirectory("savt_syntax_overloads");
+    std::error_code errorCode;
+    writeTextFile(tempRoot / "main.cpp", R"CPP(
+int helper(int value) {
+  return value + 1;
+}
+
+double helper(double value) {
+  return value + 0.5;
+}
+
+int main() {
+  return helper(1);
+}
+)CPP");
+
+    savt::analyzer::CppProjectAnalyzer analyzer;
+    savt::analyzer::AnalyzerOptions options;
+    options.precision = savt::analyzer::AnalyzerPrecision::SyntaxOnly;
+    const auto report = analyzer.analyzeProject(tempRoot, options);
+
+    const auto helperNodes = findNodesByQualifiedName(report, "helper");
+    const auto* mainFn = findSingleNodeByQualifiedName(report, "main");
+    expect(helperNodes.size() == 2,
+           "syntax analysis should preserve both helper overloads instead of merging them by qualifiedName");
+    expect(mainFn != nullptr,
+           "syntax overload fixture should still materialize the caller function");
+    expect(std::all_of(helperNodes.begin(), helperNodes.end(), [](const savt::core::SymbolNode* node) {
+               return node != nullptr && !node->identityKey.empty();
+           }),
+           "syntax overloads should materialize a synthetic identity key for disambiguation");
+    expect(std::none_of(helperNodes.begin(), helperNodes.end(), [&](const savt::core::SymbolNode* node) {
+               return node != nullptr &&
+                      hasSymbolEdge(report, mainFn->id, node->id, savt::core::EdgeKind::Calls);
+           }),
+           "ambiguous syntax overloads should not emit a Calls edge, got " +
+               describeEdgesOfKind(report, savt::core::EdgeKind::Calls));
+    expect(std::any_of(report.diagnostics.begin(), report.diagnostics.end(), [](const std::string& diagnostic) {
+               return diagnostic.find("ambiguous call target: helper") != std::string::npos;
+           }),
+           "ambiguous syntax overloads should emit an explicit ambiguity diagnostic, got " +
+               firstDiagnosticOrNone(report));
+
+    fs::remove_all(tempRoot, errorCode);
+}
+
+void testSyntaxAnalysisPrefersSameModuleCallTarget() {
+    namespace fs = std::filesystem;
+
+    const fs::path tempRoot = makeTempDirectory("savt_syntax_same_module_call");
+    std::error_code errorCode;
+    writeTextFile(tempRoot / "app" / "main.cpp", R"CPP(
+int main() {
+  return helper();
+}
+)CPP");
+    writeTextFile(tempRoot / "app" / "helper.cpp", R"CPP(
+int helper() {
+  return 1;
+}
+)CPP");
+    writeTextFile(tempRoot / "shared" / "helper.cpp", R"CPP(
+int helper() {
+  return 2;
+}
+)CPP");
+
+    savt::analyzer::CppProjectAnalyzer analyzer;
+    savt::analyzer::AnalyzerOptions options;
+    options.precision = savt::analyzer::AnalyzerPrecision::SyntaxOnly;
+    const auto report = analyzer.analyzeProject(tempRoot, options);
+
+    const auto helperNodes = findNodesByQualifiedName(report, "helper");
+    const auto* mainFn = findSingleNodeByQualifiedName(report, "main");
+    expect(helperNodes.size() == 2,
+           "same-module fixture should preserve both helper candidates, got " +
+               std::to_string(helperNodes.size()));
+    expect(mainFn != nullptr,
+           "same-module fixture should materialize the main caller");
+
+    const auto preferredHelper = std::find_if(helperNodes.begin(), helperNodes.end(), [](const savt::core::SymbolNode* node) {
+        return node != nullptr && node->filePath == "app/helper.cpp";
+    });
+    const auto fallbackHelper = std::find_if(helperNodes.begin(), helperNodes.end(), [](const savt::core::SymbolNode* node) {
+        return node != nullptr && node->filePath == "shared/helper.cpp";
+    });
+    expect(preferredHelper != helperNodes.end() && fallbackHelper != helperNodes.end(),
+           "same-module fixture should expose both app/shared helper candidates");
+    expect(hasSymbolEdge(report, mainFn->id, (*preferredHelper)->id, savt::core::EdgeKind::Calls),
+           "syntax resolver should prefer the helper from the caller's inferred module");
+    expect(!hasSymbolEdge(report, mainFn->id, (*fallbackHelper)->id, savt::core::EdgeKind::Calls),
+           "syntax resolver should not link the lower-scoring cross-module helper candidate");
+    expect(std::none_of(report.diagnostics.begin(), report.diagnostics.end(), [](const std::string& diagnostic) {
+               return diagnostic.find("ambiguous call target: helper") != std::string::npos;
+           }),
+           "same-module resolution should not fall back to ambiguity diagnostics");
+
+    fs::remove_all(tempRoot, errorCode);
+}
+
 #ifdef SAVT_ENABLE_CLANG_TOOLING
 void testSemanticRequiredAppleClangCommandsResolveSystemHeaders() {
 #if defined(__APPLE__)
@@ -1210,6 +1374,10 @@ int main() {
     testSemanticRequiredBlocksWhenCompileCommandsAreMissing();
     testSemanticPreferredExplainsBackendUnavailability();
     testSyntaxOnlyAnalysisMarksFactsAsInferred();
+    testCollectSourceFilesSkipsToolchainDirectoriesUnderTools();
+    testLargeMixedOverviewAvoidsModuleScopedCapabilityExplosion();
+    testSyntaxAnalysisPreservesDistinctOverloads();
+    testSyntaxAnalysisPrefersSameModuleCallTarget();
 #ifdef SAVT_ENABLE_CLANG_TOOLING
     testSemanticRequiredAppleClangCommandsResolveSystemHeaders();
     testSemanticRequiredReportsSystemHeaderResolutionFailures();

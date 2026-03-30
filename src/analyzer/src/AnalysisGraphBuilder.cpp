@@ -45,6 +45,24 @@ AnalysisGraphBuilder::AnalysisGraphBuilder(std::filesystem::path rootPath, const
     report_.rootPath = normalizePath(rootPath_);
 }
 
+std::size_t AnalysisGraphBuilder::addOrMergeNode(
+    const savt::core::SymbolKind kind,
+    std::string displayName,
+    std::string qualifiedName,
+    const std::string& filePath,
+    const std::uint32_t line,
+    const savt::analyzer::SymbolIdentity& identity,
+    const savt::core::FactSource factSource) {
+    return addOrMergeNode(
+        kind,
+        std::move(displayName),
+        std::move(qualifiedName),
+        filePath,
+        line,
+        savt::analyzer::serializeSymbolIdentity(identity),
+        factSource);
+}
+
 savt::core::AnalysisReport& AnalysisGraphBuilder::report() {
     return report_;
 }
@@ -77,12 +95,56 @@ std::size_t AnalysisGraphBuilder::addOrMergeNode(
         displayName = qualifiedName;
     }
 
+    const auto shouldKeepModuleScopedCallableDistinct = [&](const std::size_t candidateId) {
+        const savt::core::SymbolNode* candidateNode = nodeById(candidateId);
+        if (candidateNode == nullptr ||
+            candidateNode->filePath.empty() ||
+            filePath.empty() ||
+            candidateNode->filePath == filePath) {
+            return false;
+        }
+
+        const bool incomingCallable =
+            kind == savt::core::SymbolKind::Function || kind == savt::core::SymbolKind::Method;
+        const bool existingCallable =
+            candidateNode->kind == savt::core::SymbolKind::Function ||
+            candidateNode->kind == savt::core::SymbolKind::Method;
+        if (!incomingCallable || !existingCallable) {
+            return false;
+        }
+
+        if (factSource != savt::core::FactSource::Inferred ||
+            candidateNode->factSource != savt::core::FactSource::Inferred) {
+            return false;
+        }
+
+        const auto existingModuleId = moduleIdForNode(candidateId);
+        if (!existingModuleId.has_value()) {
+            return false;
+        }
+
+        const auto incomingFileId = findFileIdByRelativePath(filePath);
+        if (!incomingFileId.has_value()) {
+            return false;
+        }
+
+        const auto incomingModuleIt = fileIdToModuleId_.find(*incomingFileId);
+        if (incomingModuleIt == fileIdToModuleId_.end()) {
+            return false;
+        }
+
+        return incomingModuleIt->second != *existingModuleId;
+    };
+
     std::optional<std::size_t> existingId;
     if (!identityKey.empty()) {
         const auto identityIt = identityToNodeId_.find(identityKey);
         if (identityIt != identityToNodeId_.end()) {
             existingId = identityIt->second;
         }
+    }
+    if (existingId.has_value() && shouldKeepModuleScopedCallableDistinct(*existingId)) {
+        existingId.reset();
     }
 
     if (!existingId.has_value() && !qualifiedName.empty()) {
@@ -98,6 +160,9 @@ std::size_t AnalysisGraphBuilder::addOrMergeNode(
                 existingId = candidateId;
             }
         }
+    }
+    if (existingId.has_value() && shouldKeepModuleScopedCallableDistinct(*existingId)) {
+        existingId.reset();
     }
 
     if (existingId.has_value()) {
@@ -125,6 +190,9 @@ std::size_t AnalysisGraphBuilder::addOrMergeNode(
             if (!existingNode->qualifiedName.empty()) {
                 appendUniqueNodeId(qualifiedToNodeIds_[existingNode->qualifiedName], existingNode->id);
             }
+            if (!existingNode->displayName.empty()) {
+                appendUniqueNodeId(displayNameToNodeIds_[existingNode->displayName], existingNode->id);
+            }
 
             if (kind != savt::core::SymbolKind::Module && !filePath.empty()) {
                 if (const auto fileId = findFileIdByRelativePath(filePath); fileId.has_value()) {
@@ -146,6 +214,7 @@ std::size_t AnalysisGraphBuilder::addOrMergeNode(
         line,
         factSource
     });
+    nodeIdToIndex_.emplace(nodeId, report_.nodes.size() - 1);
 
     const savt::core::SymbolNode& stored = report_.nodes.back();
     if (!stored.identityKey.empty()) {
@@ -179,25 +248,22 @@ void AnalysisGraphBuilder::addEdge(
         return;
     }
 
-    auto duplicate = std::find_if(
-        report_.edges.begin(),
-        report_.edges.end(),
-        [fromId, toId, kind](const savt::core::SymbolEdge& edge) {
-            return edge.fromId == fromId && edge.toId == toId && edge.kind == kind;
-        });
-
-    if (duplicate != report_.edges.end()) {
+    const EdgeKey key{fromId, toId, kind};
+    const auto duplicateIt = edgeToIndex_.find(key);
+    if (duplicateIt != edgeToIndex_.end()) {
+        savt::core::SymbolEdge& duplicate = report_.edges[duplicateIt->second];
         if (accumulateWeight) {
-            duplicate->weight += weight;
-            duplicate->supportCount += supportCount;
+            duplicate.weight += weight;
+            duplicate.supportCount += supportCount;
         } else {
-            duplicate->supportCount = std::max(duplicate->supportCount, supportCount);
+            duplicate.supportCount = std::max(duplicate.supportCount, supportCount);
         }
-        duplicate->factSource = mergeFactSource(duplicate->factSource, factSource);
+        duplicate.factSource = mergeFactSource(duplicate.factSource, factSource);
         return;
     }
 
     report_.edges.push_back(savt::core::SymbolEdge{fromId, toId, kind, weight, supportCount, factSource});
+    edgeToIndex_.emplace(key, report_.edges.size() - 1);
 }
 
 void AnalysisGraphBuilder::registerProjectFiles(const std::vector<std::filesystem::path>& sourceFiles) {
@@ -264,8 +330,9 @@ void AnalysisGraphBuilder::bindNodeToFile(const std::size_t nodeId, const std::s
 
 void AnalysisGraphBuilder::aggregateModuleDependencies(
     const std::initializer_list<savt::core::EdgeKind> edgeKinds) {
-    const std::vector<savt::core::SymbolEdge> baseEdges = report_.edges;
-    for (const savt::core::SymbolEdge& edge : baseEdges) {
+    const std::size_t baseEdgeCount = report_.edges.size();
+    for (std::size_t index = 0; index < baseEdgeCount; ++index) {
+        const savt::core::SymbolEdge& edge = report_.edges[index];
         if (std::find(edgeKinds.begin(), edgeKinds.end(), edge.kind) == edgeKinds.end()) {
             continue;
         }
@@ -298,7 +365,11 @@ void AnalysisGraphBuilder::aggregateModuleDependencies(
 }
 
 const savt::core::SymbolNode* AnalysisGraphBuilder::nodeById(const std::size_t nodeId) const {
-    return savt::core::findNodeById(report_, nodeId);
+    const auto iterator = nodeIdToIndex_.find(nodeId);
+    if (iterator == nodeIdToIndex_.end() || iterator->second >= report_.nodes.size()) {
+        return nullptr;
+    }
+    return &report_.nodes[iterator->second];
 }
 
 std::optional<std::size_t> AnalysisGraphBuilder::findSymbolByQualifiedName(const std::string& qualifiedName) const {
@@ -307,6 +378,14 @@ std::optional<std::size_t> AnalysisGraphBuilder::findSymbolByQualifiedName(const
         return std::nullopt;
     }
     return iterator->second.front();
+}
+
+std::vector<std::size_t> AnalysisGraphBuilder::findSymbolsByQualifiedName(const std::string& qualifiedName) const {
+    const auto iterator = qualifiedToNodeIds_.find(qualifiedName);
+    if (iterator == qualifiedToNodeIds_.end()) {
+        return {};
+    }
+    return iterator->second;
 }
 
 std::vector<std::size_t> AnalysisGraphBuilder::findSymbolsByDisplayName(const std::string& displayName) const {
@@ -396,6 +475,19 @@ std::optional<std::size_t> AnalysisGraphBuilder::fileIdForNode(const std::size_t
     return iterator->second;
 }
 
+std::optional<std::size_t> AnalysisGraphBuilder::moduleIdForNode(const std::size_t nodeId) const {
+    const auto fileId = fileIdForNode(nodeId);
+    if (!fileId.has_value()) {
+        return std::nullopt;
+    }
+
+    const auto iterator = fileIdToModuleId_.find(*fileId);
+    if (iterator == fileIdToModuleId_.end()) {
+        return std::nullopt;
+    }
+    return iterator->second;
+}
+
 bool AnalysisGraphBuilder::isProjectFilePath(const std::filesystem::path& candidatePath) const {
     std::error_code errorCode;
     const std::filesystem::path relativePath = std::filesystem::relative(candidatePath, rootPath_, errorCode);
@@ -425,10 +517,8 @@ bool AnalysisGraphBuilder::isProjectFilePath(const std::filesystem::path& candid
 }
 
 savt::core::SymbolNode* AnalysisGraphBuilder::mutableNodeById(const std::size_t nodeId) {
-    const auto iterator = std::find_if(report_.nodes.begin(), report_.nodes.end(), [nodeId](const savt::core::SymbolNode& node) {
-        return node.id == nodeId;
-    });
-    return iterator == report_.nodes.end() ? nullptr : &(*iterator);
+    const auto iterator = nodeIdToIndex_.find(nodeId);
+    return iterator == nodeIdToIndex_.end() ? nullptr : &report_.nodes[iterator->second];
 }
 
 }  // namespace savt::analyzer::detail

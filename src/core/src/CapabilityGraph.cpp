@@ -89,10 +89,17 @@ CapabilityAggregationMode chooseAggregationMode(const ArchitectureOverview& over
             return node.qmlFileCount > 0 || node.webFileCount > 0 || node.scriptFileCount > 0 || node.dataFileCount > 0;
         }));
 
-    if (overview.nodes.size() <= 16 || crossArtifactModuleCount >= 3) {
+    if (overview.nodes.size() <= 16) {
         return CapabilityAggregationMode::ModuleScoped;
     }
-    if (overview.nodes.size() <= 40) {
+
+    // Keep module-level detail for small mixed-language workspaces, but avoid
+    // exploding the scene for larger repos that happen to include UI/script/data artifacts.
+    if (crossArtifactModuleCount >= 3 && overview.nodes.size() <= 24) {
+        return CapabilityAggregationMode::ModuleScoped;
+    }
+
+    if (overview.nodes.size() <= 48) {
         return CapabilityAggregationMode::FolderRoleScoped;
     }
     return CapabilityAggregationMode::RoleScoped;

@@ -8,8 +8,14 @@
 #include <QVariantMap>
 
 #include "savt/ui/SceneMapper.h"
-
+#include <cstddef>
 #include <memory>
+#include <unordered_map>
+
+namespace savt::core {
+struct CapabilityGraph;
+struct CapabilityNode;
+}
 
 class QNetworkAccessManager;
 class QNetworkReply;
@@ -108,6 +114,7 @@ public:
     Q_INVOKABLE void clearAiExplanation();
     Q_INVOKABLE void requestAiExplanation(const QVariantMap& nodeData, const QString& userTask = QString());
     Q_INVOKABLE void requestProjectAiExplanation(const QString& userTask = QString());
+    Q_INVOKABLE QVariantMap capabilityNodeDetails(qulonglong nodeId) const;
     Q_INVOKABLE void copyCodeContextToClipboard(qulonglong nodeId);
     Q_INVOKABLE void copyTextToClipboard(const QString& text);
 
@@ -167,6 +174,7 @@ private:
     void setAnalysisPhase(QString value);
     void setSystemContextData(QVariantMap value);
     void setSystemContextCards(QVariantList value);
+    void setCapabilityGraph(std::shared_ptr<const savt::core::CapabilityGraph> value);
     void refreshAstPreview();
     void applyAiAvailability(const AiAvailabilityState& state);
     void applyAiReplyState(const AiReplyState& state);
@@ -187,6 +195,8 @@ private:
     void setAiScope(QString value);
     void resetAiState(bool keepSetupMessage = true);
     void finishAiReply(QNetworkReply* reply);
+    const savt::core::CapabilityNode* capabilityNodeById(std::size_t nodeId) const;
+    QVariantMap mergeCapabilityNodeData(QVariantMap nodeData) const;
 
     QString m_projectRootPath;
     QString m_statusMessage;
@@ -204,6 +214,8 @@ private:
     QString m_analysisPhase;
     QVariantMap m_systemContextData;
     QVariantList m_systemContextCards;
+    std::shared_ptr<const savt::core::CapabilityGraph> m_capabilityGraph;
+    std::unordered_map<std::size_t, std::size_t> m_capabilityNodeIndex;
     bool m_aiAvailable = false;
     QString m_aiConfigPath;
     QString m_aiSetupMessage;

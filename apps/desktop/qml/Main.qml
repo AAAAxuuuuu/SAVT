@@ -24,6 +24,9 @@ ApplicationWindow {
     readonly property var capabilityNodes: capabilitySceneData.nodes || []
     readonly property var capabilityEdges: capabilitySceneData.edges || []
     readonly property var capabilityGroups: capabilitySceneData.groups || []
+    property var capabilityNodeIndex: ({})
+    property var capabilityNeighborIndex: ({})
+    property var capabilityEdgesByNodeIndex: ({})
 
     property var c4Levels: [
         {"title": "L1 系统上下文", "eyebrow": "Landscape", "summary": "项目整体定位、外部输入输出和主要容器"},
@@ -73,13 +76,71 @@ ApplicationWindow {
         }
     }
 
+    function capabilityIdKey(nodeId) {
+        return String(nodeId)
+    }
+
+    function enrichCapabilityNode(node) {
+        if (!node || node.id === undefined)
+            return node
+        var detail = analysisController.capabilityNodeDetails(node.id)
+        if (!detail || detail.id === undefined)
+            return node
+        var merged = {}
+        for (var key in node)
+            merged[key] = node[key]
+        for (var detailKey in detail)
+            merged[detailKey] = detail[detailKey]
+        return merged
+    }
+
+    function rebuildCapabilityIndexes() {
+        var nodes = capabilityNodes
+        var edges = capabilityEdges
+        var nodeIndex = {}
+        var neighborIndex = {}
+        var edgesByNodeIndex = {}
+
+        for (var i = 0; i < nodes.length; ++i) {
+            var node = nodes[i]
+            nodeIndex[capabilityIdKey(node.id)] = node
+        }
+
+        for (var j = 0; j < edges.length; ++j) {
+            var edge = edges[j]
+            var fromKey = capabilityIdKey(edge.fromId)
+            var toKey = capabilityIdKey(edge.toId)
+
+            if (!neighborIndex[fromKey])
+                neighborIndex[fromKey] = {}
+            if (!neighborIndex[toKey])
+                neighborIndex[toKey] = {}
+            neighborIndex[fromKey][toKey] = true
+            neighborIndex[toKey][fromKey] = true
+
+            if (!edgesByNodeIndex[fromKey])
+                edgesByNodeIndex[fromKey] = []
+            if (!edgesByNodeIndex[toKey])
+                edgesByNodeIndex[toKey] = []
+            edgesByNodeIndex[fromKey].push(edge)
+            edgesByNodeIndex[toKey].push(edge)
+        }
+
+        capabilityNodeIndex = nodeIndex
+        capabilityNeighborIndex = neighborIndex
+        capabilityEdgesByNodeIndex = edgesByNodeIndex
+
+        if (selectedCapabilityNode && selectedCapabilityNode.id !== undefined) {
+            var selectedKey = capabilityIdKey(selectedCapabilityNode.id)
+            selectedCapabilityNode = nodeIndex[selectedKey] ? enrichCapabilityNode(nodeIndex[selectedKey]) : null
+        }
+    }
+
+    Component.onCompleted: rebuildCapabilityIndexes()
+
     Connections {
         target: analysisController
-
-        function onCapabilitySceneChanged() {
-            if (window.selectedCapabilityNode && !window.capabilityNodeById(window.selectedCapabilityNode.id))
-                window.selectedCapabilityNode = null
-        }
+        function onCapabilitySceneChanged() { window.rebuildCapabilityIndexes() }
     }
 
     Component {
@@ -531,11 +592,7 @@ ApplicationWindow {
     }
 
     function capabilityNodeById(nodeId) {
-        for (var i = 0; i < capabilityNodes.length; ++i) {
-            if (capabilityNodes[i].id === nodeId)
-                return capabilityNodes[i]
-        }
-        return null
+        return capabilityNodeIndex[capabilityIdKey(nodeId)] || null
     }
 
     function nodeShouldBeDisplayed(nodeId) {
@@ -545,7 +602,7 @@ ApplicationWindow {
     function selectCapabilityNode(node) {
         if (!node || node.id === undefined)
             return
-        selectedCapabilityNode = node
+        selectedCapabilityNode = enrichCapabilityNode(node)
     }
 
     function drillIntoCapabilityNode(node) {
@@ -559,9 +616,11 @@ ApplicationWindow {
     }
 
     function nodeDisplayRect(node) {
-        if (!node || !node.layoutBounds)
+        if (!node)
             return {"x": 0, "y": 0, "width": 0, "height": 0}
-        return node.layoutBounds
+        if (node.layoutBounds)
+            return node.layoutBounds
+        return {"x": node.x || 0, "y": node.y || 0, "width": node.width || 0, "height": node.height || 0}
     }
 
     function selectedNodeDisplayName() {
@@ -600,14 +659,8 @@ ApplicationWindow {
             return 1.0
         if (selectedCapabilityNode.id === node.id)
             return 1.0
-        for (var i = 0; i < capabilityEdges.length; ++i) {
-            var edge = capabilityEdges[i]
-            if ((edge.fromId === selectedCapabilityNode.id && edge.toId === node.id)
-                    || (edge.toId === selectedCapabilityNode.id && edge.fromId === node.id)) {
-                return 1.0
-            }
-        }
-        return 0.34
+        var selectedNeighbors = capabilityNeighborIndex[capabilityIdKey(selectedCapabilityNode.id)] || {}
+        return selectedNeighbors[capabilityIdKey(node.id)] ? 1.0 : 0.34
     }
 
     function edgeRoutePoints(edge) {
@@ -625,12 +678,7 @@ ApplicationWindow {
             return capabilityEdges.slice(0, Math.min(capabilityEdges.length, 180))
         if (!selectedCapabilityNode)
             return []
-        var filtered = []
-        for (var i = 0; i < capabilityEdges.length; ++i) {
-            if (edgeTouchesSelection(capabilityEdges[i]))
-                filtered.push(capabilityEdges[i])
-        }
-        return filtered
+        return capabilityEdgesByNodeIndex[capabilityIdKey(selectedCapabilityNode.id)] || []
     }
 
     function drawCapabilityEdge(ctx, edge) {

@@ -25,6 +25,7 @@ struct PendingAnalysisResult {
     QString astPreviewSummary;
     QString astPreviewText;
     CapabilitySceneData capabilityScene;
+    std::shared_ptr<const savt::core::CapabilityGraph> capabilityGraph;
     QVariantMap systemContextData;
     QVariantList systemContextCards;
     bool canceled = false;

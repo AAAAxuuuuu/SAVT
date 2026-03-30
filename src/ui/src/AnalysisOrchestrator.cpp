@@ -52,6 +52,7 @@ void clearPendingPresentation(PendingAnalysisResult& result) {
     result.astPreviewSummary = preview.summary;
     result.astPreviewText = preview.text;
     result.capabilityScene = {};
+    result.capabilityGraph.reset();
     result.systemContextData.clear();
     result.systemContextCards.clear();
 }
@@ -80,7 +81,7 @@ void populatePendingPresentation(
     const QString& cleanedPath,
     const core::AnalysisReport& report,
     const core::ArchitectureOverview& overview,
-    const core::CapabilityGraph& capabilityGraph,
+    const std::shared_ptr<const core::CapabilityGraph>& capabilityGraph,
     const layout::CapabilitySceneLayoutResult& capabilitySceneLayout,
     const layout::LayoutResult& layoutResult,
     PendingAnalysisResult& result) {
@@ -103,20 +104,21 @@ void populatePendingPresentation(
 
     promise.setProgressValueAndText(98, QStringLiteral("整理可视化数据..."));
     const auto sceneData =
-        SceneMapper::buildCapabilitySceneData(capabilityGraph, capabilitySceneLayout);
+        SceneMapper::buildCapabilitySceneData(*capabilityGraph, capabilitySceneLayout);
     if (promise.isCanceled()) {
         return;
     }
 
     result.statusMessage =
-        ReportService::buildStatusMessage(report, overview, capabilityGraph, layoutResult);
+        ReportService::buildStatusMessage(report, overview, *capabilityGraph, layoutResult);
     result.capabilityScene = sceneData;
-    result.analysisReport = formatCapabilityReportMarkdown(report, capabilityGraph);
-    result.systemContextReport = formatSystemContextReportMarkdown(capabilityGraph);
+    result.capabilityGraph = capabilityGraph;
+    result.analysisReport = formatCapabilityReportMarkdown(report, *capabilityGraph);
+    result.systemContextReport = formatSystemContextReportMarkdown(*capabilityGraph);
     result.systemContextData =
-        ReportService::buildSystemContextData(report, overview, capabilityGraph, cleanedPath);
+        ReportService::buildSystemContextData(report, overview, *capabilityGraph, cleanedPath);
     result.systemContextCards =
-        ReportService::buildSystemContextCards(report, overview, capabilityGraph);
+        ReportService::buildSystemContextCards(report, overview, *capabilityGraph);
 }
 
 }  // namespace
@@ -190,7 +192,9 @@ void AnalysisOrchestrator::run(
         }
 
         promise.setProgressValueAndText(85, QStringLiteral("生成能力视图..."));
-        const auto capabilityGraph = core::buildCapabilityGraph(report, overview);
+        const auto capabilityGraph =
+            std::make_shared<const core::CapabilityGraph>(
+                core::buildCapabilityGraph(report, overview));
         if (shouldAbortAnalysis(promise, result, QStringLiteral("生成能力视图"))) {
             if (output) {
                 *output = std::move(result);
@@ -200,7 +204,7 @@ void AnalysisOrchestrator::run(
 
         promise.setProgressValueAndText(92, QStringLiteral("计算模块布局..."));
         layout::LayeredGraphLayout layoutEngine;
-        const auto capabilitySceneLayout = layoutEngine.layoutCapabilityScene(capabilityGraph);
+        const auto capabilitySceneLayout = layoutEngine.layoutCapabilityScene(*capabilityGraph);
         const auto layoutResult = layoutEngine.layoutModules(report);
         if (shouldAbortAnalysis(promise, result, QStringLiteral("计算模块布局"))) {
             if (output) {
