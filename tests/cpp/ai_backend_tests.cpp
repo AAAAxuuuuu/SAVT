@@ -1,4 +1,4 @@
-﻿#include "savt/ai/DeepSeekClient.h"
+#include "savt/ai/DeepSeekClient.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -172,7 +172,7 @@ void testResponseParsing() {
             {
                 "message": {
                     "role": "assistant",
-                    "content": "{\"summary\":\"这是核心算法模块\",\"responsibility\":\"负责整理和计算项目里的图结构证据\",\"collaborators\":[\"App Backend Facade\",\"App Backend Graph\"],\"evidence\":[\"代表文件：App/backend/algorithm/AlgorithmLibrary.cpp\",\"关键符号：AlgorithmLibrary\"],\"uncertainty\":\"目前看不到完整语义调用链，所以只给出保守判断\",\"next_actions\":[\"检查 AlgorithmLibrary.cpp\",\"核对 Facade 到 Algorithm 的边\"]}"
+                    "content": "{\"summary\":\"Core algorithm module\",\"responsibility\":\"Computes graph evidence for the architecture view\",\"collaborators\":[\"App Backend Facade\",\"App Backend Graph\"],\"evidence\":[\"File: App/backend/algorithm/AlgorithmLibrary.cpp\",\"Symbol: AlgorithmLibrary\"],\"uncertainty\":\"This is a conservative summary built from the available node evidence\",\"next_actions\":[\"Inspect AlgorithmLibrary.cpp\",\"Verify the edge from Facade to Algorithm\"]}"
                 }
             }
         ]
@@ -184,12 +184,54 @@ void testResponseParsing() {
     const bool parsed = savt::ai::parseDeepSeekChatCompletionsResponse(response, &insight, &errorMessage, &rawContent);
     expect(parsed, "chat completions response should parse successfully");
     expect(errorMessage.isEmpty(), "successful response parse should not return an error");
-    expect(insight.summary == QStringLiteral("这是核心算法模块"), "summary should be extracted from the model response");
-    expect(insight.responsibility.contains(QStringLiteral("图结构证据")), "responsibility should be extracted from the model response");
+    expect(insight.summary == QStringLiteral("Core algorithm module"), "summary should be extracted from the model response");
+    expect(insight.responsibility.contains(QStringLiteral("graph evidence")), "responsibility should be extracted from the model response");
     expect(insight.collaborators.size() == 2, "collaborators list should be parsed");
     expect(insight.evidence.size() == 2, "evidence list should be parsed");
     expect(insight.nextActions.size() == 2, "next actions list should be parsed");
     expect(rawContent.contains(QStringLiteral("summary")), "raw content should preserve the model JSON body");
+}
+
+void testResponsesApiStyleResponseParsing() {
+    const QByteArray response = R"JSON({
+        "id": "resp_demo",
+        "output": [
+            {
+                "type": "message",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "text": "{\"summary\":\"Structured summary from a compatible gateway\",\"responsibility\":\"Adapts third-party output into SAVT JSON\",\"collaborators\":[\"Compatibility Gateway\"],\"evidence\":[\"output[0].content[0].text\"],\"uncertainty\":\"This is a compatibility regression test\",\"next_actions\":[\"Keep output_text compatibility\"]}"
+                    }
+                ]
+            }
+        ]
+    })JSON";
+
+    savt::ai::ArchitectureAssistantInsight insight;
+    QString errorMessage;
+    QString rawContent;
+    const bool parsed = savt::ai::parseDeepSeekChatCompletionsResponse(response, &insight, &errorMessage, &rawContent);
+    expect(parsed, "responses-api style output should parse successfully");
+    expect(errorMessage.isEmpty(), "responses-api style parse should not return an error");
+    expect(insight.summary.contains(QStringLiteral("compatible gateway")), "summary should be parsed from output_text content");
+    expect(insight.nextActions.size() == 1, "responses-api style parse should preserve next actions");
+    expect(rawContent.contains(QStringLiteral("responsibility")), "raw content should preserve output_text JSON body");
+}
+
+void testErrorResponseMessageExtraction() {
+    const QByteArray response = R"JSON({
+        "error": {
+            "message": "model not found"
+        }
+    })JSON";
+
+    savt::ai::ArchitectureAssistantInsight insight;
+    QString errorMessage;
+    QString rawContent;
+    const bool parsed = savt::ai::parseDeepSeekChatCompletionsResponse(response, &insight, &errorMessage, &rawContent);
+    expect(!parsed, "error response should fail parsing");
+    expect(errorMessage.contains(QStringLiteral("model not found")), "error message should be surfaced from the API response");
 }
 
 }  // namespace
@@ -202,6 +244,8 @@ int main() {
     testRequestPayloadAndHeaders();
     testCompatibleRequestHeaders();
     testResponseParsing();
+    testResponsesApiStyleResponseParsing();
+    testErrorResponseMessageExtraction();
 
     if (failureCount > 0) {
         std::cerr << "savt_ai_tests failed with " << failureCount << " assertion(s)." << std::endl;

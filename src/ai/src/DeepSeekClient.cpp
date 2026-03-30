@@ -1,4 +1,4 @@
-﻿#include "savt/ai/DeepSeekClient.h"
+#include "savt/ai/DeepSeekClient.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -205,6 +205,28 @@ QString extractMessageContent(const QJsonValue &value) {
   if (value.isString()) {
     return value.toString().trimmed();
   }
+  if (value.isObject()) {
+    const QJsonObject object = value.toObject();
+    const QString directText =
+        object.value(QStringLiteral("text")).toString().trimmed();
+    if (!directText.isEmpty()) {
+      return directText;
+    }
+    const QString outputText =
+        object.value(QStringLiteral("output_text")).toString().trimmed();
+    if (!outputText.isEmpty()) {
+      return outputText;
+    }
+    for (const QString &key : {QStringLiteral("content"),
+                               QStringLiteral("parts"),
+                               QStringLiteral("message")}) {
+      const QString nestedText = extractMessageContent(object.value(key));
+      if (!nestedText.isEmpty()) {
+        return nestedText;
+      }
+    }
+    return {};
+  }
   if (!value.isArray()) {
     return {};
   }
@@ -215,12 +237,24 @@ QString extractMessageContent(const QJsonValue &value) {
       continue;
     }
     const QJsonObject object = itemValue.toObject();
-    const QString type = object.value(QStringLiteral("type")).toString();
-    if (!type.isEmpty() && type != QStringLiteral("text")) {
+    const QString type =
+        object.value(QStringLiteral("type")).toString().trimmed().toLower();
+    if (!type.isEmpty() && type != QStringLiteral("text") &&
+        type != QStringLiteral("output_text") &&
+        type != QStringLiteral("input_text")) {
       continue;
     }
-    const QString text =
-        object.value(QStringLiteral("text")).toString().trimmed();
+    QString text = object.value(QStringLiteral("text")).toString().trimmed();
+    if (text.isEmpty()) {
+      text =
+          object.value(QStringLiteral("output_text")).toString().trimmed();
+    }
+    if (text.isEmpty()) {
+      text = extractMessageContent(object.value(QStringLiteral("content")));
+    }
+    if (text.isEmpty()) {
+      text = extractMessageContent(object.value(QStringLiteral("parts")));
+    }
     if (!text.isEmpty()) {
       parts.push_back(text);
     }
@@ -284,6 +318,175 @@ QString extractFirstJsonObject(QString text) {
   }
 
   return text.trimmed();
+}
+
+bool looksLikeInsightObject(const QJsonObject &object) {
+  return object.contains(QStringLiteral("summary")) ||
+         object.contains(QStringLiteral("responsibility")) ||
+         object.contains(QStringLiteral("collaborators")) ||
+         object.contains(QStringLiteral("evidence")) ||
+         object.contains(QStringLiteral("uncertainty")) ||
+         object.contains(QStringLiteral("next_actions"));
+}
+
+QString extractResponseErrorMessage(const QJsonValue &value,
+                                   const int depth = 0) {
+  if (depth > 4) {
+    return {};
+  }
+  if (value.isString()) {
+    return value.toString().trimmed();
+  }
+  if (value.isArray()) {
+    for (const QJsonValue &itemValue : value.toArray()) {
+      const QString message =
+          extractResponseErrorMessage(itemValue, depth + 1);
+      if (!message.isEmpty()) {
+        return message;
+      }
+    }
+    return {};
+  }
+  if (!value.isObject()) {
+    return {};
+  }
+
+  const QJsonObject object = value.toObject();
+  for (const QString &key : {QStringLiteral("message"),
+                             QStringLiteral("msg"),
+                             QStringLiteral("detail"),
+                             QStringLiteral("error_message"),
+                             QStringLiteral("description"),
+                             QStringLiteral("error_description")}) {
+    const QString message =
+        extractResponseErrorMessage(object.value(key), depth + 1);
+    if (!message.isEmpty()) {
+      return message;
+    }
+  }
+  return {};
+}
+
+QString extractAssistantTextFromChoice(const QJsonObject &choice);
+
+QString extractAssistantTextFromObject(const QJsonObject &object,
+                                       const int depth = 0) {
+  if (depth > 4) {
+    return {};
+  }
+
+  const QJsonArray choices =
+      object.value(QStringLiteral("choices")).toArray();
+  if (!choices.isEmpty()) {
+    for (const QJsonValue &choiceValue : choices) {
+      if (!choiceValue.isObject()) {
+        continue;
+      }
+      const QString content =
+          extractAssistantTextFromChoice(choiceValue.toObject());
+      if (!content.isEmpty()) {
+        return content;
+      }
+    }
+  }
+
+  const QJsonArray output = object.value(QStringLiteral("output")).toArray();
+  if (!output.isEmpty()) {
+    for (const QJsonValue &itemValue : output) {
+      const QString content = extractMessageContent(itemValue);
+      if (!content.isEmpty()) {
+        return content;
+      }
+    }
+  }
+
+  const QJsonArray candidates =
+      object.value(QStringLiteral("candidates")).toArray();
+  if (!candidates.isEmpty()) {
+    for (const QJsonValue &candidateValue : candidates) {
+      if (!candidateValue.isObject()) {
+        continue;
+      }
+      const QJsonObject candidateObject = candidateValue.toObject();
+      const QString content = extractMessageContent(
+          candidateObject.value(QStringLiteral("content")));
+      if (!content.isEmpty()) {
+        return content;
+      }
+    }
+  }
+
+  for (const QString &key : {QStringLiteral("message"),
+                             QStringLiteral("content"),
+                             QStringLiteral("text"),
+                             QStringLiteral("output_text"),
+                             QStringLiteral("response"),
+                             QStringLiteral("answer")}) {
+    const QString content = extractMessageContent(object.value(key));
+    if (!content.isEmpty()) {
+      return content;
+    }
+  }
+
+  for (const QString &key : {QStringLiteral("data"),
+                             QStringLiteral("result")}) {
+    const QJsonValue nestedValue = object.value(key);
+    if (nestedValue.isObject()) {
+      const QString content =
+          extractAssistantTextFromObject(nestedValue.toObject(), depth + 1);
+      if (!content.isEmpty()) {
+        return content;
+      }
+    } else if (nestedValue.isArray()) {
+      const QString content = extractMessageContent(nestedValue);
+      if (!content.isEmpty()) {
+        return content;
+      }
+    }
+  }
+
+  return {};
+}
+
+QString extractAssistantTextFromChoice(const QJsonObject &choice) {
+  for (const QString &key : {QStringLiteral("message"),
+                             QStringLiteral("delta"),
+                             QStringLiteral("text"),
+                             QStringLiteral("content")}) {
+    const QString content = extractMessageContent(choice.value(key));
+    if (!content.isEmpty()) {
+      return content;
+    }
+  }
+  return {};
+}
+
+QString responsePreviewText(const QByteArray &responseBytes) {
+  QString preview = QString::fromUtf8(responseBytes).trimmed();
+  if (preview.isEmpty()) {
+    return {};
+  }
+  preview.replace(QLatin1Char('\n'), QLatin1Char(' '));
+  preview.replace(QLatin1Char('\r'), QLatin1Char(' '));
+  while (preview.contains(QStringLiteral("  "))) {
+    preview.replace(QStringLiteral("  "), QStringLiteral(" "));
+  }
+  constexpr int kPreviewLimit = 220;
+  if (preview.size() > kPreviewLimit) {
+    preview = preview.left(kPreviewLimit) + QStringLiteral("...");
+  }
+  return preview;
+}
+
+QString topLevelKeysPreview(const QJsonObject &object) {
+  QStringList keys = object.keys();
+  std::sort(keys.begin(), keys.end());
+  constexpr int kKeyLimit = 8;
+  if (keys.size() > kKeyLimit) {
+    keys = keys.mid(0, kKeyLimit);
+    keys.push_back(QStringLiteral("..."));
+  }
+  return keys.join(QStringLiteral(", "));
 }
 
 QJsonObject buildEvidenceObject(const ArchitectureAssistantRequest &request) {
@@ -672,24 +875,44 @@ bool parseDeepSeekChatCompletionsResponse(
     return false;
   }
 
-  const QJsonArray choices =
-      document.object().value(QStringLiteral("choices")).toArray();
-  if (choices.isEmpty()) {
+  const QJsonObject rootObject = document.object();
+  const QString apiErrorMessage =
+      extractResponseErrorMessage(rootObject.value(QStringLiteral("error")));
+  if (!apiErrorMessage.isEmpty()) {
     if (errorMessage) {
-      *errorMessage =
-          QStringLiteral("DeepSeek response did not contain any choices.");
+      *errorMessage = apiErrorMessage;
     }
     return false;
   }
 
-  const QJsonObject firstChoice = choices.at(0).toObject();
-  const QJsonObject messageObject =
-      firstChoice.value(QStringLiteral("message")).toObject();
-  QString content =
-      extractMessageContent(messageObject.value(QStringLiteral("content")));
-  if (content.isEmpty()) {
-    content = extractMessageContent(firstChoice.value(QStringLiteral("text")));
+  if (looksLikeInsightObject(rootObject)) {
+    if (rawContent) {
+      *rawContent = QString::fromUtf8(
+          QJsonDocument(rootObject).toJson(QJsonDocument::Compact));
+    }
+    return parseArchitectureAssistantInsightJson(responseBytes, outInsight,
+                                                 errorMessage);
   }
+
+  for (const QString &key : {QStringLiteral("data"), QStringLiteral("result")}) {
+    const QJsonValue nestedValue = rootObject.value(key);
+    if (!nestedValue.isObject()) {
+      continue;
+    }
+    const QJsonObject nestedObject = nestedValue.toObject();
+    if (!looksLikeInsightObject(nestedObject)) {
+      continue;
+    }
+    const QByteArray nestedJson =
+        QJsonDocument(nestedObject).toJson(QJsonDocument::Compact);
+    if (rawContent) {
+      *rawContent = QString::fromUtf8(nestedJson);
+    }
+    return parseArchitectureAssistantInsightJson(nestedJson, outInsight,
+                                                 errorMessage);
+  }
+
+  QString content = extractAssistantTextFromObject(rootObject);
   content = extractFirstJsonObject(content);
 
   if (rawContent) {
@@ -697,9 +920,25 @@ bool parseDeepSeekChatCompletionsResponse(
   }
 
   if (content.isEmpty()) {
+    const QString topLevelMessage =
+        extractResponseErrorMessage(rootObject.value(QStringLiteral("message")));
+    if (!topLevelMessage.isEmpty() &&
+        !topLevelMessage.startsWith(QLatin1Char('{'))) {
+      if (errorMessage) {
+        *errorMessage = topLevelMessage;
+      }
+      return false;
+    }
     if (errorMessage) {
-      *errorMessage = QStringLiteral(
-          "DeepSeek response did not contain a usable message body.");
+      const QString keysPreview = topLevelKeysPreview(rootObject);
+      const QString preview = responsePreviewText(responseBytes);
+      *errorMessage = keysPreview.isEmpty()
+                          ? QStringLiteral("AI response did not contain a parseable message body.")
+                          : QStringLiteral("AI response shape is not yet supported. Top-level keys: %1.")
+                                .arg(keysPreview);
+      if (!preview.isEmpty()) {
+        *errorMessage += QStringLiteral("\nResponse preview: %1").arg(preview);
+      }
     }
     return false;
   }

@@ -1,4 +1,4 @@
-import QtQuick
+﻿import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
@@ -307,9 +307,59 @@ Item {
                                 theme: root.theme
                                 tone: "accent"
                                 compact: true
-                                text: analysisController.aiBusy ? "解读中..." : "生成解释"
-                                enabled: window.selectedCapabilityNode !== null && !analysisController.aiBusy
+                                text: analysisController.aiBusy
+                                      ? "解读中..."
+                                      : (analysisController.aiAvailable
+                                         ? "生成解释"
+                                         : "AI 未就绪")
+                                enabled: window.selectedCapabilityNode !== null
+                                         && analysisController.aiAvailable
+                                         && !analysisController.aiBusy
                                 onClicked: analysisController.requestAiExplanation(window.selectedCapabilityNode)
+                            }
+                            Button {
+                                text: "\u5237\u65b0 AI \u72b6\u6001"
+                                enabled: !analysisController.aiBusy
+                                onClicked: analysisController.refreshAiAvailability()
+                            }
+                        }
+
+                        Frame {
+                            Layout.fillWidth: true
+                            padding: 10
+                            background: Rectangle {
+                                radius: 8
+                                color: analysisController.aiAvailable ? "#eff6ff" : "#fffbeb"
+                                border.color: analysisController.aiAvailable ? "#93c5fd" : "#fcd34d"
+                            }
+
+                            ColumnLayout {
+                                width: parent.width
+                                anchors { top: parent.top; left: parent.left; right: parent.right; margins: 2 }
+                                spacing: 6
+
+                                Label {
+                                    text: analysisController.aiAvailable ? "AI \u72b6\u6001" : "AI \u914d\u7f6e\u63d0\u793a"
+                                    color: analysisController.aiAvailable ? "#1d4ed8" : "#92400e"
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WordWrap
+                                    lineHeight: 1.4
+                                    color: analysisController.aiAvailable ? "#1e3a8a" : "#78350f"
+                                    text: {
+                                        if (!analysisController.aiAvailable)
+                                            return analysisController.aiSetupMessage
+                                        if (window.selectedCapabilityNode === null)
+                                            return "AI \u5df2\u5c31\u7eea\u3002\u5148\u5728\u56fe\u91cc\u9009\u4e2d\u4e00\u4e2a\u6a21\u5757\uff0c\u518d\u751f\u6210 AI \u89e3\u8bfb\u3002"
+                                        return analysisController.aiStatusMessage.length > 0
+                                               ? analysisController.aiStatusMessage
+                                               : analysisController.aiSetupMessage
+                                    }
+                                }
                             }
                         }
 
