@@ -67,6 +67,17 @@ struct CapabilityNode {
     bool defaultCollapsed = false;
     std::size_t laneGroupId = 0;
     std::size_t detailGroupId = 0;
+    struct EvidencePackage {
+        std::vector<std::string> facts;
+        std::vector<std::string> rules;
+        std::vector<std::string> conclusions;
+        std::vector<std::string> sourceFiles;
+        std::vector<std::string> symbols;
+        std::vector<std::string> modules;
+        std::vector<std::string> relationships;
+        std::string confidenceLabel;
+        std::string confidenceReason;
+    } evidence;
 };
 
 struct CapabilityEdge {
@@ -77,6 +88,7 @@ struct CapabilityEdge {
     std::size_t weight = 1;
     std::string summary;
     bool defaultVisible = true;
+    CapabilityNode::EvidencePackage evidence;
 };
 
 struct CapabilityFlow {

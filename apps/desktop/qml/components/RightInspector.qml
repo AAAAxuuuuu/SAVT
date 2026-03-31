@@ -7,6 +7,36 @@ Item {
 
     required property QtObject theme
 
+    function confidenceLabelText(label) {
+        if (label === "high")
+            return "高置信"
+        if (label === "medium")
+            return "中置信"
+        if (label === "low")
+            return "低置信"
+        return "待补证据"
+    }
+
+    function confidenceFillColor(label) {
+        if (label === "high")
+            return "#edf7ee"
+        if (label === "medium")
+            return "#fff7e8"
+        if (label === "low")
+            return "#f9ecec"
+        return "#eef4f8"
+    }
+
+    function confidenceBorderColor(label) {
+        if (label === "high")
+            return "#9fc8aa"
+        if (label === "medium")
+            return "#e1c27b"
+        if (label === "low")
+            return "#d6a8a8"
+        return "#cad8e5"
+    }
+
     SurfaceCard {
         anchors.fill: parent
         minimumContentHeight: 520
@@ -37,7 +67,7 @@ Item {
 
                     Label {
                         Layout.fillWidth: true
-                        text: "围绕当前选中模块，集中查看职责、证据线索和 AI 说明。"
+                        text: "围绕当前图元素，集中查看事实、规则、结论、证据来源和 AI 附加说明。"
                         wrapMode: Text.WordWrap
                         maximumLineCount: 2
                         elide: Text.ElideRight
@@ -83,7 +113,9 @@ Item {
             spacing: 12
 
             TagChip {
-                text: window.selectedCapabilityNode ? "已选中模块" : "未选中"
+                text: window.selectedInspectorKind() === "edge"
+                      ? "已选中关系"
+                      : (window.selectedInspectorKind() === "node" ? "已选中模块" : "未选中")
                 fillColor: "#eef4f9"
                 borderColor: "#c8d6e4"
                 textColor: "#28435c"
@@ -98,10 +130,14 @@ Item {
 
                 Column {
                     anchors.centerIn: parent
+                    width: parent.width - 28
                     spacing: 12
 
                     Label {
-                        text: "AI"
+                        width: parent.width
+                        text: window.selectedInspectorTitle()
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignHCenter
                         color: root.theme.inkStrong
                         font.family: root.theme.displayFontFamily
                         font.pixelSize: 22
@@ -109,10 +145,12 @@ Item {
                     }
 
                     Label {
-                        width: parent.parent ? parent.parent.width - 28 : 60
+                        width: parent.width
                         horizontalAlignment: Text.AlignHCenter
                         wrapMode: Text.WordWrap
-                        text: "收起模式只保留状态。\n展开后查看模块细节。"
+                        text: window.selectedInspectorKind().length > 0
+                              ? "收起模式只保留当前选中状态。展开后查看完整证据链。"
+                              : "先在 L2 里选中模块，或在展开模式里选中关系。"
                         color: root.theme.inkMuted
                         font.family: root.theme.textFontFamily
                         font.pixelSize: 12
@@ -136,8 +174,104 @@ Item {
 
                 SurfaceCard {
                     Layout.fillWidth: true
-                    minimumContentHeight: 110
+                    minimumContentHeight: 126
                     fillColor: root.theme.surfaceSecondary
+                    borderColor: root.theme.borderSubtle
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 12
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: window.selectedInspectorTitle()
+                            color: root.theme.inkStrong
+                            wrapMode: Text.WordWrap
+                            font.family: root.theme.displayFontFamily
+                            font.pixelSize: 22
+                            font.weight: Font.DemiBold
+                        }
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: window.selectedInspectorSubtitle()
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 4
+                            elide: Text.ElideRight
+                            color: root.theme.inkMuted
+                            font.family: root.theme.textFontFamily
+                            font.pixelSize: 12
+                        }
+
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            TagChip {
+                                visible: window.selectedInspectorKind() === "node"
+                                text: window.selectedCapabilityNode ? window.displayNodeKind(window.selectedCapabilityNode.kind) : ""
+                                fillColor: "#ffffff"
+                                borderColor: root.theme.borderSubtle
+                                textColor: root.theme.inkNormal
+                            }
+
+                            TagChip {
+                                visible: window.selectedInspectorKind() === "node" && !!window.selectedCapabilityNode && (window.selectedCapabilityNode.role || "").length > 0
+                                text: window.selectedCapabilityNode ? window.selectedCapabilityNode.role : ""
+                                fillColor: "#ffffff"
+                                borderColor: root.theme.borderSubtle
+                                textColor: root.theme.inkNormal
+                            }
+
+                            TagChip {
+                                visible: window.selectedInspectorKind() === "node" && !!window.selectedCapabilityNode
+                                text: window.selectedCapabilityNode ? ("文件 " + (window.selectedCapabilityNode.fileCount || 0)) : ""
+                                fillColor: "#ffffff"
+                                borderColor: root.theme.borderSubtle
+                                textColor: root.theme.inkNormal
+                            }
+
+                            TagChip {
+                                visible: window.selectedInspectorKind() === "edge" && !!window.selectedCapabilityEdge
+                                text: window.selectedCapabilityEdge ? ("权重 " + (window.selectedCapabilityEdge.weight || 0)) : ""
+                                fillColor: "#ffffff"
+                                borderColor: root.theme.borderSubtle
+                                textColor: root.theme.inkNormal
+                            }
+
+                            TagChip {
+                                visible: window.selectedInspectorKind() === "edge" && !!window.selectedCapabilityEdge
+                                text: window.selectedCapabilityEdge ? window.selectedCapabilityEdge.kind : ""
+                                fillColor: "#ffffff"
+                                borderColor: root.theme.borderSubtle
+                                textColor: root.theme.inkNormal
+                            }
+                        }
+
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            visible: window.selectedInspectorKind() === "edge"
+
+                            Repeater {
+                                model: window.selectedEdgeEndpointNodes()
+
+                                AppButton {
+                                    theme: root.theme
+                                    compact: true
+                                    tone: "ghost"
+                                    text: "查看 " + (modelData.name || "节点")
+                                    onClicked: window.selectCapabilityNode(modelData)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                SurfaceCard {
+                    Layout.fillWidth: true
+                    minimumContentHeight: 110
+                    fillColor: root.theme.surfacePrimary
                     borderColor: root.theme.borderSubtle
 
                     ColumnLayout {
@@ -147,59 +281,104 @@ Item {
                         RowLayout {
                             Layout.fillWidth: true
 
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 6
+                            Label {
+                                text: "证据结论"
+                                color: root.theme.inkStrong
+                                font.family: root.theme.displayFontFamily
+                                font.pixelSize: 17
+                                font.weight: Font.DemiBold
+                            }
 
-                                Label {
-                                    text: window.selectedCapabilityNode ? window.selectedCapabilityNode.name : "尚未选择模块"
-                                    color: root.theme.inkStrong
-                                    wrapMode: Text.WordWrap
-                                    font.family: root.theme.displayFontFamily
-                                    font.pixelSize: 22
-                                    font.weight: Font.DemiBold
-                                    Layout.fillWidth: true
-                                }
+                            Item { Layout.fillWidth: true }
 
-                                Label {
-                                    Layout.fillWidth: true
-                                    text: window.selectedCapabilityNode ? window.selectedCapabilityNode.responsibility : "先在 L2 视图里点一个模块，再从这里看它的职责和上下文。"
-                                    wrapMode: Text.WordWrap
-                                    maximumLineCount: 3
-                                    elide: Text.ElideRight
-                                    color: root.theme.inkMuted
-                                    font.family: root.theme.textFontFamily
-                                    font.pixelSize: 12
-                                }
+                            TagChip {
+                                text: root.confidenceLabelText(window.selectedEvidenceConfidenceLabel())
+                                fillColor: root.confidenceFillColor(window.selectedEvidenceConfidenceLabel())
+                                borderColor: root.confidenceBorderColor(window.selectedEvidenceConfidenceLabel())
+                                textColor: root.theme.inkNormal
                             }
                         }
 
-                        Flow {
+                        Label {
                             Layout.fillWidth: true
-                            spacing: 8
+                            text: (window.selectedEvidenceConclusions()[0] || "当前还没有可展示的结论。")
+                            wrapMode: Text.WordWrap
+                            color: root.theme.inkStrong
+                            font.family: root.theme.textFontFamily
+                            font.pixelSize: 13
+                        }
 
-                            TagChip {
-                                visible: !!window.selectedCapabilityNode
-                                text: window.selectedCapabilityNode ? window.displayNodeKind(window.selectedCapabilityNode.kind) : ""
-                                fillColor: "#ffffff"
-                                borderColor: root.theme.borderSubtle
-                                textColor: root.theme.inkNormal
+                        Label {
+                            Layout.fillWidth: true
+                            text: window.selectedEvidenceConfidenceReason().length > 0
+                                  ? window.selectedEvidenceConfidenceReason()
+                                  : "还没有足够证据来给出可信度提示。"
+                            wrapMode: Text.WordWrap
+                            color: root.theme.inkMuted
+                            font.family: root.theme.textFontFamily
+                            font.pixelSize: 12
+                        }
+                    }
+                }
+
+                Repeater {
+                    model: [
+                        {"title": "事实", "items": window.selectedEvidenceFacts()},
+                        {"title": "规则", "items": window.selectedEvidenceRules()},
+                        {"title": "结论", "items": window.selectedEvidenceConclusions().slice(1)}
+                    ]
+
+                    SurfaceCard {
+                        Layout.fillWidth: true
+                        minimumContentHeight: 96
+                        fillColor: root.theme.surfacePrimary
+                        borderColor: root.theme.borderSubtle
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            spacing: 10
+
+                            Label {
+                                text: modelData.title
+                                color: root.theme.inkStrong
+                                font.family: root.theme.displayFontFamily
+                                font.pixelSize: 17
+                                font.weight: Font.DemiBold
                             }
 
-                            TagChip {
-                                visible: !!window.selectedCapabilityNode && (window.selectedCapabilityNode.role || "").length > 0
-                                text: window.selectedCapabilityNode ? window.selectedCapabilityNode.role : ""
-                                fillColor: "#ffffff"
-                                borderColor: root.theme.borderSubtle
-                                textColor: root.theme.inkNormal
+                            Label {
+                                Layout.fillWidth: true
+                                visible: (modelData.items || []).length === 0
+                                text: "当前还没有可展示的" + modelData.title + "。"
+                                wrapMode: Text.WordWrap
+                                color: root.theme.inkMuted
+                                font.family: root.theme.textFontFamily
+                                font.pixelSize: 12
                             }
 
-                            TagChip {
-                                visible: !!window.selectedCapabilityNode
-                                text: window.selectedCapabilityNode ? ("文件 " + (window.selectedCapabilityNode.fileCount || 0)) : ""
-                                fillColor: "#ffffff"
-                                borderColor: root.theme.borderSubtle
-                                textColor: root.theme.inkNormal
+                            Repeater {
+                                model: modelData.items || []
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    implicitHeight: sectionLabel.implicitHeight + 18
+                                    radius: 16
+                                    color: "#ffffff"
+                                    border.color: root.theme.borderSubtle
+
+                                    Label {
+                                        id: sectionLabel
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        anchors.margins: 12
+                                        text: modelData
+                                        wrapMode: Text.WordWrap
+                                        color: root.theme.inkNormal
+                                        font.family: root.theme.textFontFamily
+                                        font.pixelSize: 12
+                                    }
+                                }
                             }
                         }
                     }
@@ -207,7 +386,7 @@ Item {
 
                 SurfaceCard {
                     Layout.fillWidth: true
-                    minimumContentHeight: 118
+                    minimumContentHeight: 130
                     fillColor: root.theme.surfacePrimary
                     borderColor: root.theme.borderSubtle
 
@@ -216,7 +395,90 @@ Item {
                         spacing: 12
 
                         Label {
-                            text: "证据线索"
+                            text: "证据来源"
+                            color: root.theme.inkStrong
+                            font.family: root.theme.displayFontFamily
+                            font.pixelSize: 17
+                            font.weight: Font.DemiBold
+                        }
+
+                        GridLayout {
+                            Layout.fillWidth: true
+                            columns: 1
+                            rowSpacing: 10
+
+                            Repeater {
+                                model: [
+                                    {"title": "文件", "items": window.selectedEvidenceFiles(), "mono": true},
+                                    {"title": "符号", "items": window.selectedEvidenceSymbols(), "mono": true},
+                                    {"title": "模块", "items": window.selectedEvidenceModules(), "mono": false},
+                                    {"title": "关系", "items": window.selectedEvidenceRelationships(), "mono": false}
+                                ]
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Label {
+                                        text: modelData.title
+                                        color: root.theme.inkNormal
+                                        font.family: root.theme.textFontFamily
+                                        font.pixelSize: 12
+                                        font.weight: Font.DemiBold
+                                    }
+
+                                    Label {
+                                        Layout.fillWidth: true
+                                        visible: (modelData.items || []).length === 0
+                                        text: "暂无"
+                                        color: root.theme.inkMuted
+                                        font.family: root.theme.textFontFamily
+                                        font.pixelSize: 12
+                                    }
+
+                                    Repeater {
+                                        model: modelData.items || []
+
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            implicitHeight: sourceLabel.implicitHeight + 16
+                                            radius: 14
+                                            color: "#ffffff"
+                                            border.color: root.theme.borderSubtle
+
+                                            Label {
+                                                id: sourceLabel
+                                                anchors.left: parent.left
+                                                anchors.right: parent.right
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                anchors.margins: 10
+                                                text: modelData
+                                                wrapMode: Text.WordWrap
+                                                color: root.theme.inkNormal
+                                                font.family: root.theme.textFontFamily
+                                                font.pixelSize: 12
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                SurfaceCard {
+                    Layout.fillWidth: true
+                    minimumContentHeight: 110
+                    fillColor: root.theme.surfacePrimary
+                    borderColor: root.theme.borderSubtle
+                    visible: window.selectedInspectorKind() === "node"
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 12
+
+                        Label {
+                            text: "关系入口"
                             color: root.theme.inkStrong
                             font.family: root.theme.displayFontFamily
                             font.pixelSize: 17
@@ -225,40 +487,58 @@ Item {
 
                         Label {
                             Layout.fillWidth: true
-                            text: window.selectedNodeEvidenceSummary().length > 0
-                                  ? window.selectedNodeEvidenceSummary()
-                                  : "当前还没有提取到可展示的证据摘要。"
+                            visible: window.selectedNodeRelationshipItems().length === 0
+                            text: "当前节点还没有可下钻查看的关系。"
                             wrapMode: Text.WordWrap
-                            maximumLineCount: 3
-                            elide: Text.ElideRight
-                            color: root.theme.inkNormal
+                            color: root.theme.inkMuted
                             font.family: root.theme.textFontFamily
                             font.pixelSize: 12
                         }
 
                         Repeater {
-                            model: window.selectedCapabilityNode && window.selectedCapabilityNode.topSymbols
-                                   ? window.selectedCapabilityNode.topSymbols.slice(0, 6)
-                                   : []
+                            model: window.selectedNodeRelationshipItems()
 
                             Rectangle {
                                 Layout.fillWidth: true
-                                implicitHeight: evidenceLabel.implicitHeight + 18
                                 radius: 16
                                 color: "#ffffff"
                                 border.color: root.theme.borderSubtle
 
-                                Label {
-                                    id: evidenceLabel
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.verticalCenter: parent.verticalCenter
+                                RowLayout {
+                                    anchors.fill: parent
                                     anchors.margins: 12
-                                    text: modelData
-                                    wrapMode: Text.WordWrap
-                                    color: root.theme.inkNormal
-                                    font.family: root.theme.monoFontFamily
-                                    font.pixelSize: 12
+                                    spacing: 10
+
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        Label {
+                                            Layout.fillWidth: true
+                                            text: modelData.summary || ""
+                                            wrapMode: Text.WordWrap
+                                            color: root.theme.inkNormal
+                                            font.family: root.theme.textFontFamily
+                                            font.pixelSize: 12
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Label {
+                                            Layout.fillWidth: true
+                                            text: "权重 " + (modelData.weight || 0) + " · " + (modelData.kind || "")
+                                            color: root.theme.inkMuted
+                                            font.family: root.theme.textFontFamily
+                                            font.pixelSize: 11
+                                        }
+                                    }
+
+                                    AppButton {
+                                        theme: root.theme
+                                        compact: true
+                                        tone: "ghost"
+                                        text: "查看证据"
+                                        onClicked: window.selectCapabilityEdge(modelData)
+                                    }
                                 }
                             }
                         }
@@ -310,7 +590,7 @@ Item {
                                 text: analysisController.aiBusy
                                       ? "解读中..."
                                       : (analysisController.aiAvailable ? "生成解释" : "AI 未就绪")
-                                enabled: window.selectedCapabilityNode !== null
+                                enabled: window.selectedInspectorKind() === "node"
                                          && analysisController.aiAvailable
                                          && !analysisController.aiBusy
                                 onClicked: analysisController.requestAiExplanation(window.selectedCapabilityNode)
@@ -356,6 +636,8 @@ Item {
                                     text: {
                                         if (!analysisController.aiAvailable)
                                             return analysisController.aiSetupMessage
+                                        if (window.selectedInspectorKind() !== "node")
+                                            return "AI 解读只针对模块节点开放。要解释关系，请先查看上面的事实、规则和结论。"
                                         if (window.selectedCapabilityNode === null)
                                             return "AI 已就绪。先在图里选中一个模块，再生成 AI 解读。"
                                         return analysisController.aiStatusMessage.length > 0
@@ -379,7 +661,7 @@ Item {
 
                             Label {
                                 Layout.fillWidth: true
-                                text: "正在结合结构结果和右侧上下文生成说明。"
+                                text: "正在基于当前节点的静态证据生成补充说明。"
                                 wrapMode: Text.WordWrap
                                 color: root.theme.accentStrong
                                 font.family: root.theme.textFontFamily
@@ -390,7 +672,9 @@ Item {
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 10
-                            visible: analysisController.aiHasResult && !analysisController.aiBusy
+                            visible: window.selectedInspectorKind() === "node"
+                                     && analysisController.aiHasResult
+                                     && !analysisController.aiBusy
 
                             Label {
                                 Layout.fillWidth: true
@@ -509,7 +793,7 @@ Item {
                             Layout.fillWidth: true
                             tone: "accent"
                             text: "复制当前模块上下文"
-                            enabled: window.selectedCapabilityNode !== null
+                            enabled: window.selectedInspectorKind() === "node" && window.selectedCapabilityNode !== null
                             onClicked: {
                                 if (window.selectedCapabilityNode)
                                     analysisController.copyCodeContextToClipboard(window.selectedCapabilityNode.id)

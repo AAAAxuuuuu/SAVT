@@ -398,11 +398,26 @@ void testCrossArtifactOverviewAndCapabilityGraph() {
     expect(facadeNode != nullptr, "capability graph should keep the facade module visible as its own node");
     expect(facadeNode->collaboratorCount > 0, "facade node should keep direct collaborators");
     expect(!facadeNode->exampleFiles.empty(), "facade node should expose example files for traceability");
+    expect(!facadeNode->evidence.facts.empty(),
+           "capability nodes should expose fact-level evidence");
+    expect(!facadeNode->evidence.rules.empty(),
+           "capability nodes should expose matched rules for traceability");
+    expect(!facadeNode->evidence.conclusions.empty(),
+           "capability nodes should expose conclusion summaries");
+    expect(!facadeNode->evidence.confidenceLabel.empty(),
+           "capability nodes should expose a confidence hint");
 
     const auto* toolsCapability = findCapabilityByModule(capabilityGraph, "tools");
     expect(toolsCapability != nullptr, "tooling capability should be preserved");
     expect(toolsCapability->kind == savt::core::CapabilityNodeKind::Infrastructure,
            "tooling module should surface as infrastructure/support in the capability graph");
+
+    expect(std::any_of(capabilityGraph.edges.begin(), capabilityGraph.edges.end(), [](const savt::core::CapabilityEdge& edge) {
+               return !edge.evidence.facts.empty() &&
+                      !edge.evidence.rules.empty() &&
+                      !edge.evidence.conclusions.empty();
+           }),
+           "capability edges should expose traceable evidence packages");
 
     savt::layout::LayeredGraphLayout layoutEngine;
     const auto sceneLayout = layoutEngine.layoutCapabilityScene(capabilityGraph);
@@ -438,6 +453,10 @@ void testCapabilitySceneMapperPublishesSingleScenePayload() {
     entryNode.defaultPinned = true;
     entryNode.visualPriority = 5;
     entryNode.laneGroupId = 100;
+    entryNode.evidence.facts = {"entry capability"};
+    entryNode.evidence.rules = {"entry nodes stay visible"};
+    entryNode.evidence.conclusions = {"CLI is the first visible actor."};
+    entryNode.evidence.confidenceLabel = "high";
     graph.nodes.push_back(entryNode);
 
     savt::core::CapabilityNode capabilityNode;
@@ -446,6 +465,10 @@ void testCapabilitySceneMapperPublishesSingleScenePayload() {
     capabilityNode.name = "Analyzer";
     capabilityNode.collaboratorCount = 4;
     capabilityNode.laneGroupId = 101;
+    capabilityNode.evidence.facts = {"analysis capability"};
+    capabilityNode.evidence.rules = {"aggregated from module scoped overview"};
+    capabilityNode.evidence.conclusions = {"Analyzer owns project parsing."};
+    capabilityNode.evidence.confidenceLabel = "medium";
     graph.nodes.push_back(capabilityNode);
 
     savt::core::CapabilityEdge edge;
@@ -454,6 +477,10 @@ void testCapabilitySceneMapperPublishesSingleScenePayload() {
     edge.toId = 2;
     edge.kind = savt::core::CapabilityEdgeKind::Activates;
     edge.summary = "CLI kicks off analysis";
+    edge.evidence.facts = {"aggregated weight 1"};
+    edge.evidence.rules = {"entry dependencies become activates"};
+    edge.evidence.conclusions = {"CLI activates Analyzer."};
+    edge.evidence.confidenceLabel = "high";
     graph.edges.push_back(edge);
 
     savt::core::CapabilityGroup entryGroup;
@@ -491,11 +518,15 @@ void testCapabilitySceneMapperPublishesSingleScenePayload() {
     const QVariantMap firstNode = nodeItems.front().toMap();
     expect(firstNode.contains("layoutBounds"),
            "scene payload nodes should expose layout bounds from the layout layer");
+    expect(firstNode.value("evidence").toMap().value("facts").toList().size() == 1,
+           "scene payload nodes should expose nested evidence facts");
 
     const QVariantList edgeItems = sceneMap.value("edges").toList();
     const QVariantMap firstEdge = edgeItems.front().toMap();
     expect(firstEdge.value("routePointCount").toULongLong() >= 2,
            "scene payload edges should expose routed path points from the layout layer");
+    expect(firstEdge.value("evidence").toMap().value("rules").toList().size() == 1,
+           "scene payload edges should expose nested evidence rules");
 }
 
 void testAnalysisReportSerializesFactSources() {

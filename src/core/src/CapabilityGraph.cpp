@@ -12,6 +12,8 @@
 namespace savt::core {
 namespace {
 
+using EvidencePackage = CapabilityNode::EvidencePackage;
+
 struct CapabilityAggregate {
     CapabilityNode node;
     std::unordered_map<std::string, std::size_t> roleHistogram;
@@ -20,6 +22,22 @@ struct CapabilityAggregate {
     std::unordered_set<std::string> topSymbolSet;
     std::unordered_set<std::string> supportingRoleSet;
     std::unordered_set<std::string> exampleFileSet;
+};
+
+struct CapabilityNodeBuildTrace {
+    std::string roleBucket;
+    bool usedFolderScope = false;
+    bool hiddenByStrictPruning = false;
+    std::vector<std::string> matchedRules;
+};
+
+struct CapabilityEdgeAggregate {
+    CapabilityEdge edge;
+    std::unordered_set<std::string> sourceFileSet;
+    std::unordered_set<std::string> symbolSet;
+    std::unordered_set<std::string> moduleSet;
+    std::unordered_set<std::string> relationshipSet;
+    std::size_t supportingOverviewEdgeCount = 0;
 };
 
 enum class CapabilityAggregationMode {
@@ -66,6 +84,16 @@ std::string joinStrings(const std::vector<std::string>& values, const std::size_
         output << ", +" << (values.size() - count) << " more";
     }
     return output.str();
+}
+
+template <typename Set>
+std::vector<std::string> sortedVectorFromSet(const Set& values, const std::size_t limit = 0) {
+    std::vector<std::string> items(values.begin(), values.end());
+    std::sort(items.begin(), items.end());
+    if (limit > 0 && items.size() > limit) {
+        items.resize(limit);
+    }
+    return items;
 }
 
 const char* toString(const CapabilityAggregationMode mode) {
@@ -257,9 +285,55 @@ std::string utf8Literal(const char8_t* text) {
     return std::string(reinterpret_cast<const char*>(text));
 }
 
+std::string confidenceLabelFromScore(const std::size_t score) {
+    if (score >= 75) {
+        return "high";
+    }
+    if (score >= 45) {
+        return "medium";
+    }
+    return "low";
+}
+
+std::size_t computeNodeConfidenceScore(
+    const CapabilityNode& node,
+    const CapabilityAggregationMode aggregationMode) {
+    std::size_t score = 0;
+    score += std::min<std::size_t>(node.fileCount * 8, 32);
+    score += std::min<std::size_t>(node.topSymbols.size() * 12, 24);
+    score += std::min<std::size_t>(node.collaboratorCount * 4, 16);
+    score += node.reachableFromEntry ? 10 : 0;
+    score += node.kind == CapabilityNodeKind::Entry ? 18 : 0;
+    if (aggregationMode == CapabilityAggregationMode::ModuleScoped) {
+        score += 18;
+    } else if (aggregationMode == CapabilityAggregationMode::FolderRoleScoped) {
+        score += 8;
+    }
+    if (node.moduleCount > 3) {
+        score = score > 14 ? score - 14 : 0;
+    } else if (node.moduleCount == 1) {
+        score += 10;
+    }
+    if (node.exampleFiles.empty()) {
+        score = score > 10 ? score - 10 : 0;
+    }
+    return std::min<std::size_t>(score, 100);
+}
+
+std::size_t computeEdgeConfidenceScore(
+    const CapabilityEdge& edge,
+    const CapabilityEdgeAggregate& aggregate) {
+    std::size_t score = 22;
+    score += std::min<std::size_t>(edge.weight * 12, 36);
+    score += std::min<std::size_t>(aggregate.supportingOverviewEdgeCount * 10, 20);
+    score += std::min<std::size_t>(aggregate.sourceFileSet.size() * 4, 12);
+    score += std::min<std::size_t>(aggregate.symbolSet.size() * 4, 10);
+    return std::min<std::size_t>(score, 100);
+}
+
 
 // Heuristic labels for Vibe Coder.
-void applyVibeCoderHeuristics(CapabilityNode& node) {
+std::string applyVibeCoderHeuristics(CapabilityNode& node) {
     std::string evidence = node.name;
     for (const std::string& sym : node.topSymbols) {
         evidence += " " + sym;
@@ -289,7 +363,7 @@ void applyVibeCoderHeuristics(CapabilityNode& node) {
         node.dominantRole = utf8Literal(u8"\U0001F5BC\uFE0F Web \u8d44\u6e90");
         node.responsibility = utf8Literal(u8"\u63d0\u4f9b\u9875\u9762\u6837\u5f0f\u4e0e\u7ed3\u6784\u6587\u4ef6\uff0c\u4e3a\u524d\u7aef\u754c\u9762\u7684\u5c55\u793a\u6548\u679c\u63d0\u4f9b\u652f\u6491\u3002");
         node.summary = node.responsibility;
-        return;
+        return "Heuristic label rule: the node only exposed web asset files, so it was labeled as web resources.";
     }
 
     bool matched = true;
@@ -360,6 +434,10 @@ void applyVibeCoderHeuristics(CapabilityNode& node) {
         }
         node.summary = output.str();
     }
+    if (!matched) {
+        return {};
+    }
+    return "Heuristic label rule: node title and responsibility were refined from symbol, module, and file-name keywords.";
 }
 std::size_t strictL2PruningWeight(const CapabilityNode& node) {
     std::size_t weight = node.visualPriority * 100 + node.collaboratorCount * 10 + node.fileCount;
@@ -590,6 +668,170 @@ std::string buildSupportGroupSummary(const std::size_t count) {
     return output.str();
 }
 
+EvidencePackage buildNodeEvidencePackage(
+    const CapabilityNode& node,
+    const CapabilityAggregationMode aggregationMode,
+    const CapabilityNodeBuildTrace& trace,
+    const std::vector<std::string>& flowNames) {
+    EvidencePackage evidence;
+    evidence.sourceFiles = node.exampleFiles;
+    evidence.symbols = node.topSymbols;
+    evidence.modules = node.moduleNames;
+    evidence.relationships = node.collaboratorNames;
+
+    evidence.facts.push_back(
+        "Capability kind: " + std::string(toString(node.kind)) +
+        ", dominant role: " + node.dominantRole + ".");
+    evidence.facts.push_back(
+        "Aggregates " + std::to_string(node.moduleCount) + " module(s) and " +
+        std::to_string(node.fileCount) + " file(s); stage span " +
+        std::to_string(node.stageStart) +
+        (node.stageEnd != node.stageStart ? "-" + std::to_string(node.stageEnd)
+                                          : std::string()) +
+        ".");
+    if (!node.folderHint.empty()) {
+        evidence.facts.push_back("Folder scope hint: " + humanize(node.folderHint) + ".");
+    }
+    if (node.reachableFromEntry) {
+        evidence.facts.push_back("Reachable from an entry capability in the inferred workflow.");
+    }
+    if (node.flowParticipationCount > 0) {
+        evidence.facts.push_back(
+            "Participates in " + std::to_string(node.flowParticipationCount) +
+            " capability flow(s).");
+    }
+    if (!flowNames.empty()) {
+        evidence.relationships.insert(
+            evidence.relationships.end(), flowNames.begin(), flowNames.end());
+        evidence.facts.push_back(
+            "Related flows: " + joinStrings(flowNames, 3) + ".");
+    }
+
+    evidence.rules.push_back(
+        "Aggregation rule: " + std::string(toString(aggregationMode)) +
+        " grouped the underlying overview nodes into this capability.");
+    if (trace.usedFolderScope && !node.folderHint.empty()) {
+        evidence.rules.push_back(
+            "Folder scope rule: nodes under '" + node.folderHint +
+            "' were kept together before role-based aggregation.");
+    }
+    if (node.kind == CapabilityNodeKind::Entry) {
+        evidence.rules.push_back(
+            "Kind rule: entry-point overview modules are surfaced as entry capabilities.");
+    } else if (node.kind == CapabilityNodeKind::Infrastructure) {
+        evidence.rules.push_back(
+            "Kind rule: support-oriented roles such as storage, data, tooling, dependency, or leaf-only modules become infrastructure.");
+    } else {
+        evidence.rules.push_back(
+            "Kind rule: non-entry, non-support modules remain business-facing capabilities.");
+    }
+    if (!trace.roleBucket.empty()) {
+        evidence.rules.push_back(
+            "Role bucketing rule: overview roles were normalized into the '" +
+            trace.roleBucket + "' capability bucket.");
+    }
+    if (node.defaultPinned) {
+        evidence.rules.push_back(
+            "Visibility rule: this node starts pinned in the default scene.");
+    } else if (node.defaultVisible) {
+        evidence.rules.push_back(
+            "Visibility rule: this node stays visible in the default scene because it ranked high enough for the first-read graph.");
+    } else if (trace.hiddenByStrictPruning) {
+        evidence.rules.push_back(
+            "Visibility rule: this node was hidden by strict L2 pruning to keep the default graph bounded.");
+    } else {
+        evidence.rules.push_back(
+            "Visibility rule: this node starts collapsed so the default graph stays readable.");
+    }
+    evidence.rules.insert(
+        evidence.rules.end(), trace.matchedRules.begin(), trace.matchedRules.end());
+
+    evidence.conclusions.push_back(node.responsibility);
+    evidence.conclusions.push_back(node.summary);
+    if (!node.riskLevel.empty()) {
+        evidence.conclusions.push_back(
+            "Risk hint: level=" + node.riskLevel +
+            ", score=" + std::to_string(node.riskScore) + ".");
+    }
+
+    const std::size_t confidenceScore =
+        computeNodeConfidenceScore(node, aggregationMode);
+    evidence.confidenceLabel = confidenceLabelFromScore(confidenceScore);
+    if (evidence.confidenceLabel == "high") {
+        evidence.confidenceReason =
+            "The node is backed by focused files, symbols, and relatively tight aggregation.";
+    } else if (evidence.confidenceLabel == "medium") {
+        evidence.confidenceReason =
+            "The node has usable file/symbol evidence, but some aggregation or heuristics are still involved.";
+    } else {
+        evidence.confidenceReason =
+            "The node depends on broad aggregation or sparse symbol evidence, so the conclusion should stay conservative.";
+    }
+    return evidence;
+}
+
+EvidencePackage buildEdgeEvidencePackage(
+    const CapabilityEdge& edge,
+    const CapabilityNode& fromNode,
+    const CapabilityNode& toNode,
+    const CapabilityEdgeAggregate& aggregate) {
+    EvidencePackage evidence;
+    evidence.sourceFiles = sortedVectorFromSet(aggregate.sourceFileSet, 8);
+    evidence.symbols = sortedVectorFromSet(aggregate.symbolSet, 8);
+    evidence.modules = sortedVectorFromSet(aggregate.moduleSet, 8);
+    evidence.relationships = sortedVectorFromSet(aggregate.relationshipSet, 8);
+
+    evidence.facts.push_back(
+        "Connects '" + fromNode.name + "' -> '" + toNode.name + "' with aggregated weight " +
+        std::to_string(edge.weight) + ".");
+    evidence.facts.push_back(
+        "Built from " + std::to_string(aggregate.supportingOverviewEdgeCount) +
+        " supporting overview dependency edge(s).");
+    evidence.facts.push_back(
+        "Edge kind: " + std::string(toString(edge.kind)) +
+        ", visible by default: " + std::string(edge.defaultVisible ? "yes" : "no") + ".");
+
+    if (edge.kind == CapabilityEdgeKind::Activates) {
+        evidence.rules.push_back(
+            "Edge kind rule: any dependency leaving an entry capability becomes 'activates'.");
+    } else if (edge.kind == CapabilityEdgeKind::UsesInfrastructure) {
+        evidence.rules.push_back(
+            "Edge kind rule: dependencies that land on infrastructure become 'uses_infrastructure'.");
+    } else {
+        evidence.rules.push_back(
+            "Edge kind rule: business-to-business handoffs remain 'enables'.");
+    }
+    evidence.rules.push_back(
+        "Aggregation rule: supporting overview edges between the same capability pair were merged into one scene edge.");
+    if (!edge.defaultVisible) {
+        evidence.rules.push_back(
+            "Visibility rule: the edge is hidden when one or both endpoint nodes start collapsed.");
+    } else {
+        evidence.rules.push_back(
+            "Visibility rule: the edge stays visible because both endpoint nodes are visible in the default scene.");
+    }
+
+    evidence.conclusions.push_back(edge.summary);
+    evidence.conclusions.push_back(
+        "This relationship links " + fromNode.name + " to " + toNode.name +
+        " in the current capability view.");
+
+    const std::size_t confidenceScore =
+        computeEdgeConfidenceScore(edge, aggregate);
+    evidence.confidenceLabel = confidenceLabelFromScore(confidenceScore);
+    if (evidence.confidenceLabel == "high") {
+        evidence.confidenceReason =
+            "Multiple supporting dependency edges and concrete file/symbol traces back this relationship.";
+    } else if (evidence.confidenceLabel == "medium") {
+        evidence.confidenceReason =
+            "The relationship is supported, but only by a limited number of aggregated module dependencies.";
+    } else {
+        evidence.confidenceReason =
+            "This relationship currently rests on sparse dependency evidence and should be treated as directional guidance.";
+    }
+    return evidence;
+}
+
 }  // namespace
 
 const char* toString(const CapabilityNodeKind kind) {
@@ -676,9 +918,16 @@ CapabilityGraph buildCapabilityGraph(const AnalysisReport& report, const Archite
         graph.diagnostics.push_back("Capability graph preserves module-level detail to stay close to the project's C4 container/component structure.");
     }
 
+    std::unordered_map<std::size_t, const OverviewNode*> overviewNodeIndex;
+    overviewNodeIndex.reserve(overview.nodes.size());
+    for (const OverviewNode& node : overview.nodes) {
+        overviewNodeIndex.emplace(node.id, &node);
+    }
+
     std::unordered_map<std::string, CapabilityAggregate> aggregates;
     std::vector<std::string> aggregateOrder;
     std::unordered_map<std::size_t, std::size_t> overviewNodeToCapabilityId;
+    std::unordered_map<std::size_t, CapabilityNodeBuildTrace> nodeBuildTraces;
     std::size_t nextNodeId = 1;
 
     for (const OverviewNode& node : overview.nodes) {
@@ -702,6 +951,11 @@ CapabilityGraph buildCapabilityGraph(const AnalysisReport& report, const Archite
                 aggregate.node.summary = node.summary;
             }
             aggregateOrder.push_back(key);
+
+            CapabilityNodeBuildTrace trace;
+            trace.roleBucket = roleBucket;
+            trace.usedFolderScope = useFolderScope;
+            nodeBuildTraces.emplace(aggregate.node.id, std::move(trace));
         }
 
         overviewNodeToCapabilityId[node.id] = aggregate.node.id;
@@ -758,7 +1012,8 @@ CapabilityGraph buildCapabilityGraph(const AnalysisReport& report, const Archite
         return left.name < right.name;
     });
 
-    std::unordered_map<std::string, CapabilityEdge> edgeAggregates;
+    std::unordered_map<std::string, CapabilityEdgeAggregate> edgeAggregates;
+    std::unordered_map<std::size_t, CapabilityEdgeAggregate> edgeEvidenceAggregates;
     std::size_t nextEdgeId = 1;
     for (const OverviewEdge& edge : overview.edges) {
         const auto fromCapabilityIt = overviewNodeToCapabilityId.find(edge.fromId);
@@ -777,7 +1032,8 @@ CapabilityGraph buildCapabilityGraph(const AnalysisReport& report, const Archite
         }
 
         const std::string edgeKey = std::to_string(fromNode->id) + ">" + std::to_string(toNode->id);
-        CapabilityEdge& aggregateEdge = edgeAggregates[edgeKey];
+        CapabilityEdgeAggregate& aggregate = edgeAggregates[edgeKey];
+        CapabilityEdge& aggregateEdge = aggregate.edge;
         if (aggregateEdge.id == 0) {
             aggregateEdge.id = nextEdgeId++;
             aggregateEdge.fromId = fromNode->id;
@@ -786,11 +1042,46 @@ CapabilityGraph buildCapabilityGraph(const AnalysisReport& report, const Archite
             aggregateEdge.weight = 0;
         }
         aggregateEdge.weight += edge.weight;
+        ++aggregate.supportingOverviewEdgeCount;
+
+        const OverviewNode* fromOverview = nullptr;
+        const OverviewNode* toOverview = nullptr;
+        if (const auto overviewIt = overviewNodeIndex.find(edge.fromId);
+            overviewIt != overviewNodeIndex.end()) {
+            fromOverview = overviewIt->second;
+        }
+        if (const auto overviewIt = overviewNodeIndex.find(edge.toId);
+            overviewIt != overviewNodeIndex.end()) {
+            toOverview = overviewIt->second;
+        }
+
+        if (fromOverview != nullptr) {
+            aggregate.moduleSet.emplace(fromOverview->name);
+            for (const std::string& filePath : fromOverview->filePaths) {
+                aggregate.sourceFileSet.emplace(filePath);
+            }
+            for (const std::string& symbol : fromOverview->topSymbols) {
+                aggregate.symbolSet.emplace(symbol);
+            }
+        }
+        if (toOverview != nullptr) {
+            aggregate.moduleSet.emplace(toOverview->name);
+            for (const std::string& filePath : toOverview->filePaths) {
+                aggregate.sourceFileSet.emplace(filePath);
+            }
+            for (const std::string& symbol : toOverview->topSymbols) {
+                aggregate.symbolSet.emplace(symbol);
+            }
+        }
+        if (fromOverview != nullptr && toOverview != nullptr) {
+            aggregate.relationshipSet.emplace(fromOverview->name + " -> " + toOverview->name);
+        }
     }
 
-    for (auto& [key, edge] : edgeAggregates) {
+    for (auto& [key, aggregate] : edgeAggregates) {
         static_cast<void>(key);
-        graph.edges.push_back(std::move(edge));
+        edgeEvidenceAggregates.emplace(aggregate.edge.id, aggregate);
+        graph.edges.push_back(std::move(aggregate.edge));
     }
 
     std::sort(graph.edges.begin(), graph.edges.end(), [](const CapabilityEdge& left, const CapabilityEdge& right) {
@@ -891,13 +1182,40 @@ CapabilityGraph buildCapabilityGraph(const AnalysisReport& report, const Archite
         }
         return left.id < right.id;
     });
+
+    std::unordered_map<std::size_t, std::vector<std::string>> flowNamesByNode;
+    for (const CapabilityFlow& flow : graph.flows) {
+        for (const std::size_t nodeId : flow.nodeIds) {
+            flowNamesByNode[nodeId].push_back(flow.name);
+        }
+    }
+
     for (CapabilityNode& node : graph.nodes) {
         node.defaultPinned = node.kind == CapabilityNodeKind::Entry;
-        applyVibeCoderHeuristics(node);
+        if (auto traceIt = nodeBuildTraces.find(node.id); traceIt != nodeBuildTraces.end()) {
+            const std::string heuristicRule = applyVibeCoderHeuristics(node);
+            if (!heuristicRule.empty()) {
+                traceIt->second.matchedRules.push_back(heuristicRule);
+            }
+        } else {
+            applyVibeCoderHeuristics(node);
+        }
         node.visualPriority = computeVisualPriority(node);
+    }
+
+    std::unordered_map<std::size_t, bool> prePruningVisibility;
+    for (const CapabilityNode& node : graph.nodes) {
+        prePruningVisibility.emplace(node.id, node.defaultVisible);
     }
     applyDependencyModuleCollapse(graph);  // 鈽?鍏堟姌鍙犲ぇ浣撻噺涓夋柟搴?
     applyStrictL2Pruning(graph);
+    for (CapabilityNode& node : graph.nodes) {
+        const auto beforeIt = prePruningVisibility.find(node.id);
+        if (beforeIt != prePruningVisibility.end() && beforeIt->second &&
+            !node.defaultVisible) {
+            nodeBuildTraces[node.id].hiddenByStrictPruning = true;
+        }
+    }
 
     std::unordered_set<std::size_t> visibleNodeIds;
     const bool showEverythingByDefault = graph.nodes.size() <= 18 ||
@@ -1025,6 +1343,14 @@ CapabilityGraph buildCapabilityGraph(const AnalysisReport& report, const Archite
         }
 
         node.defaultCollapsed = !node.defaultVisible;
+        auto flowNames = flowNamesByNode[node.id];
+        std::sort(flowNames.begin(), flowNames.end());
+        flowNames.erase(std::unique(flowNames.begin(), flowNames.end()), flowNames.end());
+        node.evidence = buildNodeEvidencePackage(
+            node,
+            aggregationMode,
+            nodeBuildTraces[node.id],
+            flowNames);
     }
     std::size_t nextGroupId = 1;
     auto makeGroup = [&](const CapabilityGroupKind kind,
@@ -1149,6 +1475,11 @@ CapabilityGraph buildCapabilityGraph(const AnalysisReport& report, const Archite
         }
         edge.defaultVisible = fromNode->defaultVisible && toNode->defaultVisible;
         edge.summary = buildCapabilityEdgeSummary(*fromNode, *toNode, edge.kind, edge.weight);
+        if (const auto aggregateIt = edgeEvidenceAggregates.find(edge.id);
+            aggregateIt != edgeEvidenceAggregates.end()) {
+            edge.evidence = buildEdgeEvidencePackage(
+                edge, *fromNode, *toNode, aggregateIt->second);
+        }
     }
 
     std::sort(graph.groups.begin(), graph.groups.end(), [](const CapabilityGroup& left, const CapabilityGroup& right) {

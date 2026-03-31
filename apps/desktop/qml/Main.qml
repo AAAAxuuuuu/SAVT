@@ -14,6 +14,7 @@ ApplicationWindow {
 
     property var theme: appTheme
     property var selectedCapabilityNode: null
+    property var selectedCapabilityEdge: null
     property var capabilityNavigationStack: []
     property int selectedC4LevelIndex: 1
     property string relationshipViewMode: "focused"
@@ -25,6 +26,7 @@ ApplicationWindow {
     readonly property var capabilityEdges: capabilitySceneData.edges || []
     readonly property var capabilityGroups: capabilitySceneData.groups || []
     property var capabilityNodeIndex: ({})
+    property var capabilityEdgeIndex: ({})
     property var capabilityNeighborIndex: ({})
     property var capabilityEdgesByNodeIndex: ({})
 
@@ -84,6 +86,7 @@ ApplicationWindow {
         var nodes = capabilityNodes
         var edges = capabilityEdges
         var nodeIndex = {}
+        var edgeIndex = {}
         var neighborIndex = {}
         var edgesByNodeIndex = {}
 
@@ -94,6 +97,7 @@ ApplicationWindow {
 
         for (var j = 0; j < edges.length; ++j) {
             var edge = edges[j]
+            edgeIndex[String(edge.id)] = edge
             var fromKey = capabilityIdKey(edge.fromId)
             var toKey = capabilityIdKey(edge.toId)
 
@@ -113,6 +117,7 @@ ApplicationWindow {
         }
 
         capabilityNodeIndex = nodeIndex
+        capabilityEdgeIndex = edgeIndex
         capabilityNeighborIndex = neighborIndex
         capabilityEdgesByNodeIndex = edgesByNodeIndex
 
@@ -120,6 +125,8 @@ ApplicationWindow {
             var selectedKey = capabilityIdKey(selectedCapabilityNode.id)
             selectedCapabilityNode = nodeIndex[selectedKey] || null
         }
+        if (selectedCapabilityEdge && selectedCapabilityEdge.id !== undefined)
+            selectedCapabilityEdge = edgeIndex[String(selectedCapabilityEdge.id)] || null
     }
 
     Component.onCompleted: rebuildCapabilityIndexes()
@@ -581,6 +588,10 @@ ApplicationWindow {
         return capabilityNodeIndex[capabilityIdKey(nodeId)] || null
     }
 
+    function capabilityEdgeById(edgeId) {
+        return capabilityEdgeIndex[String(edgeId)] || null
+    }
+
     function nodeShouldBeDisplayed(nodeId) {
         return true
     }
@@ -588,7 +599,15 @@ ApplicationWindow {
     function selectCapabilityNode(node) {
         if (!node || node.id === undefined)
             return
+        selectedCapabilityEdge = null
         selectedCapabilityNode = node
+    }
+
+    function selectCapabilityEdge(edge) {
+        if (!edge || edge.id === undefined)
+            return
+        selectedCapabilityNode = null
+        selectedCapabilityEdge = edge
     }
 
     function drillIntoCapabilityNode(node) {
@@ -626,6 +645,106 @@ ApplicationWindow {
         return values.slice(0, 4).join("、")
     }
 
+    function selectedInspectorKind() {
+        if (selectedCapabilityEdge && selectedCapabilityEdge.id !== undefined)
+            return "edge"
+        if (selectedCapabilityNode && selectedCapabilityNode.id !== undefined)
+            return "node"
+        return ""
+    }
+
+    function selectedEvidencePackage() {
+        if (selectedInspectorKind() === "edge")
+            return selectedCapabilityEdge && selectedCapabilityEdge.evidence ? selectedCapabilityEdge.evidence : ({})
+        if (selectedInspectorKind() === "node")
+            return selectedCapabilityNode && selectedCapabilityNode.evidence ? selectedCapabilityNode.evidence : ({})
+        return ({})
+    }
+
+    function selectedEvidenceFacts() {
+        return selectedEvidencePackage().facts || []
+    }
+
+    function selectedEvidenceRules() {
+        return selectedEvidencePackage().rules || []
+    }
+
+    function selectedEvidenceConclusions() {
+        return selectedEvidencePackage().conclusions || []
+    }
+
+    function selectedEvidenceFiles() {
+        return selectedEvidencePackage().sourceFiles || []
+    }
+
+    function selectedEvidenceSymbols() {
+        return selectedEvidencePackage().symbols || []
+    }
+
+    function selectedEvidenceModules() {
+        return selectedEvidencePackage().modules || []
+    }
+
+    function selectedEvidenceRelationships() {
+        return selectedEvidencePackage().relationships || []
+    }
+
+    function selectedEvidenceConfidenceLabel() {
+        return selectedEvidencePackage().confidenceLabel || ""
+    }
+
+    function selectedEvidenceConfidenceReason() {
+        return selectedEvidencePackage().confidenceReason || ""
+    }
+
+    function selectedInspectorTitle() {
+        if (selectedInspectorKind() === "edge") {
+            var edge = selectedCapabilityEdge || {}
+            return (edge.fromName || "上游") + " → " + (edge.toName || "下游")
+        }
+        return selectedCapabilityNode ? selectedCapabilityNode.name : "尚未选择图元素"
+    }
+
+    function selectedInspectorSubtitle() {
+        if (selectedInspectorKind() === "edge")
+            return selectedCapabilityEdge ? selectedCapabilityEdge.summary : ""
+        return selectedCapabilityNode ? selectedCapabilityNode.responsibility : "先在 L2 视图里点一个模块，或在右侧关系列表里点一条边。"
+    }
+
+    function selectedNodeRelationshipItems() {
+        if (!selectedCapabilityNode || selectedCapabilityNode.id === undefined)
+            return []
+        var edges = capabilityEdgesByNodeIndex[capabilityIdKey(selectedCapabilityNode.id)] || []
+        var items = edges.slice()
+        items.sort(function(left, right) {
+            var leftWeight = left.weight || 0
+            var rightWeight = right.weight || 0
+            if (leftWeight !== rightWeight)
+                return rightWeight - leftWeight
+            var leftSummary = left.summary || ""
+            var rightSummary = right.summary || ""
+            if (leftSummary < rightSummary)
+                return -1
+            if (leftSummary > rightSummary)
+                return 1
+            return 0
+        })
+        return items
+    }
+
+    function selectedEdgeEndpointNodes() {
+        if (!selectedCapabilityEdge)
+            return []
+        var items = []
+        var fromNode = capabilityNodeById(selectedCapabilityEdge.fromId)
+        var toNode = capabilityNodeById(selectedCapabilityEdge.toId)
+        if (fromNode)
+            items.push(fromNode)
+        if (toNode)
+            items.push(toNode)
+        return items
+    }
+
     function capabilitySceneBounds() {
         return capabilitySceneData.bounds ? capabilitySceneData.bounds : {"x": 0, "y": 0, "width": 0, "height": 0}
     }
@@ -641,7 +760,11 @@ ApplicationWindow {
     }
 
     function capabilityNodeOpacity(node) {
-        if (!node || !selectedCapabilityNode || selectedCapabilityNode.id === undefined)
+        if (!node)
+            return 1.0
+        if (selectedCapabilityEdge && selectedCapabilityEdge.id !== undefined)
+            return (selectedCapabilityEdge.fromId === node.id || selectedCapabilityEdge.toId === node.id) ? 1.0 : 0.34
+        if (!selectedCapabilityNode || selectedCapabilityNode.id === undefined)
             return 1.0
         if (selectedCapabilityNode.id === node.id)
             return 1.0
@@ -656,12 +779,16 @@ ApplicationWindow {
     }
 
     function edgeTouchesSelection(edge) {
+        if (selectedCapabilityEdge && selectedCapabilityEdge.id !== undefined)
+            return selectedCapabilityEdge.id === edge.id
         return selectedCapabilityNode && (edge.fromId === selectedCapabilityNode.id || edge.toId === selectedCapabilityNode.id)
     }
 
     function visibleCapabilityEdges() {
         if (relationshipViewMode === "all")
             return capabilityEdges.slice(0, Math.min(capabilityEdges.length, 180))
+        if (selectedCapabilityEdge && selectedCapabilityEdge.id !== undefined)
+            return [selectedCapabilityEdge]
         if (!selectedCapabilityNode)
             return []
         return capabilityEdgesByNodeIndex[capabilityIdKey(selectedCapabilityNode.id)] || []
@@ -741,7 +868,9 @@ ApplicationWindow {
                         }
 
                         TagChip {
-                            text: selectedCapabilityNode ? ("已选中 " + selectedCapabilityNode.name) : c4Levels[selectedC4LevelIndex].eyebrow
+                            text: selectedInspectorKind() === "edge"
+                                  ? ("已选中关系 " + selectedInspectorTitle())
+                                  : (selectedCapabilityNode ? ("已选中 " + selectedCapabilityNode.name) : c4Levels[selectedC4LevelIndex].eyebrow)
                             fillColor: "#ffffff"
                             borderColor: theme.borderSubtle
                             textColor: theme.inkNormal

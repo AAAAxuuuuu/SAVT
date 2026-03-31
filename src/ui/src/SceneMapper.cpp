@@ -39,6 +39,20 @@ QVariantMap toVariantRect(const double x, const double y, const double width, co
     return item;
 }
 
+QVariantMap toVariantEvidencePackage(const core::CapabilityNode::EvidencePackage& evidence) {
+    QVariantMap item;
+    item.insert(QStringLiteral("facts"), toVariantStringList(evidence.facts));
+    item.insert(QStringLiteral("rules"), toVariantStringList(evidence.rules));
+    item.insert(QStringLiteral("conclusions"), toVariantStringList(evidence.conclusions));
+    item.insert(QStringLiteral("sourceFiles"), toVariantStringList(evidence.sourceFiles));
+    item.insert(QStringLiteral("symbols"), toVariantStringList(evidence.symbols));
+    item.insert(QStringLiteral("modules"), toVariantStringList(evidence.modules));
+    item.insert(QStringLiteral("relationships"), toVariantStringList(evidence.relationships));
+    item.insert(QStringLiteral("confidenceLabel"), QString::fromStdString(evidence.confidenceLabel));
+    item.insert(QStringLiteral("confidenceReason"), QString::fromStdString(evidence.confidenceReason));
+    return item;
+}
+
 }  // namespace
 
 QVariantMap SceneMapper::toVariantMap(const CapabilitySceneData& scene) {
@@ -128,6 +142,7 @@ CapabilitySceneData SceneMapper::buildCapabilitySceneData(
         item.insert(QStringLiteral("width"), nodeLayout.width);
         item.insert(QStringLiteral("height"), nodeLayout.height);
         item.insert(QStringLiteral("layoutBounds"), toVariantRect(nodeLayout.x, nodeLayout.y, nodeLayout.width, nodeLayout.height));
+        item.insert(QStringLiteral("evidence"), toVariantEvidencePackage(node.evidence));
         scene.nodeItems.push_back(item);
     }
 
@@ -156,6 +171,7 @@ CapabilitySceneData SceneMapper::buildCapabilitySceneData(
             item.insert(QStringLiteral("x2"), edgeLayout.routePoints.back().x);
             item.insert(QStringLiteral("y2"), edgeLayout.routePoints.back().y);
         }
+        item.insert(QStringLiteral("evidence"), toVariantEvidencePackage(edgeIt->second->evidence));
         scene.edgeItems.push_back(item);
     }
 
