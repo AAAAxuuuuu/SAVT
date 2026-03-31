@@ -539,6 +539,65 @@ void testAnalysisReportSerializesFactSources() {
            "json report summary should expose semantic node counts");
 }
 
+void testCollectSourceFilesSkipsToolchainDirectoriesUnderTools() {
+    namespace fs = std::filesystem;
+
+    const fs::path tempRoot = makeTempDirectory("savt_skip_toolchain_dirs");
+    writeTextFile(tempRoot / "src" / "main.cpp", "int main() { return 0; }\n");
+    writeTextFile(tempRoot / "tools" / "llvm" / "include" / "clang" / "AST.h",
+                  "class ToolchainOnlyHeader {};\n");
+    writeTextFile(tempRoot / "tools" / "downloads" / "manifest.json", "{ \"name\": \"llvm\" }\n");
+    writeTextFile(tempRoot / ".qtc_clangd" / "index" / "cache.h", "class CacheOnlyHeader {};\n");
+
+    const auto files =
+        savt::analyzer::detail::collectSourceFiles(tempRoot, savt::analyzer::AnalyzerOptions{});
+
+    std::vector<std::string> relativePaths;
+    relativePaths.reserve(files.size());
+    for (const fs::path& filePath : files) {
+        relativePaths.push_back(savt::analyzer::detail::relativizePath(tempRoot, filePath));
+    }
+
+    expect(containsText(relativePaths, "src/main.cpp"),
+           "real project sources should still be collected");
+    expect(!containsText(relativePaths, "tools/llvm/include/clang/AST.h"),
+           "toolchain headers under tools/llvm should be skipped");
+    expect(!containsText(relativePaths, "tools/downloads/manifest.json"),
+           "downloaded tool payloads under tools/downloads should be skipped");
+    expect(!containsText(relativePaths, ".qtc_clangd/index/cache.h"),
+           "Qt Creator clangd cache directories should be skipped");
+
+    std::error_code errorCode;
+    fs::remove_all(tempRoot, errorCode);
+}
+
+void testLargeMixedOverviewAvoidsModuleScopedCapabilityExplosion() {
+    savt::core::AnalysisReport report;
+    savt::core::ArchitectureOverview overview;
+
+    for (std::size_t index = 0; index < 36; ++index) {
+        savt::core::OverviewNode node;
+        node.id = index + 1;
+        node.kind = savt::core::OverviewNodeKind::Module;
+        node.name = "workspace/module_" + std::to_string(index + 1);
+        node.folderKey = "workspace";
+        node.summary = "synthetic large mixed workspace module";
+        node.fileCount = 1;
+        node.sourceFileCount = 1;
+        node.role = (index % 3 == 0) ? "presentation" : ((index % 3 == 1) ? "analysis" : "storage");
+        if (index < 3) {
+            node.qmlFileCount = 1;
+        }
+        overview.nodes.push_back(std::move(node));
+    }
+
+    const auto graph = savt::core::buildCapabilityGraph(report, overview);
+    expect(!containsText(graph.diagnostics, "Capability aggregation mode: module_scoped."),
+           "large mixed-language workspaces should no longer force module-scoped capability graphs");
+    expect(graph.nodes.size() < overview.nodes.size(),
+           "large mixed-language workspaces should aggregate capability nodes to keep the scene bounded");
+}
+
 void testAnalysisGraphBuilderPreservesDistinctSemanticOverloads() {
     using savt::analyzer::AnalyzerOptions;
     using savt::analyzer::detail::AnalysisGraphBuilder;
@@ -1368,6 +1427,8 @@ int main() {
     testCrossArtifactOverviewAndCapabilityGraph();
     testCapabilitySceneMapperPublishesSingleScenePayload();
     testAnalysisReportSerializesFactSources();
+    testCollectSourceFilesSkipsToolchainDirectoriesUnderTools();
+    testLargeMixedOverviewAvoidsModuleScopedCapabilityExplosion();
     testAnalysisGraphBuilderPreservesDistinctSemanticOverloads();
     testNodeBackendRelativeImportsAndRoleClassification();
     testSpringBootJavaImportsAndRoleClassification();

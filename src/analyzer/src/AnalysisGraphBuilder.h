@@ -66,6 +66,23 @@ public:
     bool isProjectFilePath(const std::filesystem::path& candidatePath) const;
 
 private:
+    struct EdgeKey {
+        std::size_t fromId = 0;
+        std::size_t toId = 0;
+        savt::core::EdgeKind kind = savt::core::EdgeKind::Contains;
+
+        bool operator==(const EdgeKey& other) const {
+            return fromId == other.fromId && toId == other.toId && kind == other.kind;
+        }
+    };
+
+    struct EdgeKeyHash {
+        std::size_t operator()(const EdgeKey& key) const {
+            const auto kindValue = static_cast<std::size_t>(key.kind);
+            return (key.fromId * 1315423911u) ^ (key.toId * 2654435761u) ^ kindValue;
+        }
+    };
+
     savt::core::SymbolNode* mutableNodeById(std::size_t nodeId);
 
     std::filesystem::path rootPath_;
@@ -81,6 +98,8 @@ private:
     std::unordered_map<std::string, std::vector<std::size_t>> basenameToFileIds_;
     std::unordered_map<std::size_t, std::size_t> nodeIdToFileId_;
     std::unordered_map<std::size_t, std::size_t> fileIdToModuleId_;
+    std::unordered_map<std::size_t, std::size_t> nodeIdToIndex_;
+    std::unordered_map<EdgeKey, std::size_t, EdgeKeyHash> edgeToIndex_;
 };
 
 }  // namespace savt::analyzer::detail

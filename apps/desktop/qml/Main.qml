@@ -80,20 +80,6 @@ ApplicationWindow {
         return String(nodeId)
     }
 
-    function enrichCapabilityNode(node) {
-        if (!node || node.id === undefined)
-            return node
-        var detail = analysisController.capabilityNodeDetails(node.id)
-        if (!detail || detail.id === undefined)
-            return node
-        var merged = {}
-        for (var key in node)
-            merged[key] = node[key]
-        for (var detailKey in detail)
-            merged[detailKey] = detail[detailKey]
-        return merged
-    }
-
     function rebuildCapabilityIndexes() {
         var nodes = capabilityNodes
         var edges = capabilityEdges
@@ -132,7 +118,7 @@ ApplicationWindow {
 
         if (selectedCapabilityNode && selectedCapabilityNode.id !== undefined) {
             var selectedKey = capabilityIdKey(selectedCapabilityNode.id)
-            selectedCapabilityNode = nodeIndex[selectedKey] ? enrichCapabilityNode(nodeIndex[selectedKey]) : null
+            selectedCapabilityNode = nodeIndex[selectedKey] || null
         }
     }
 
@@ -602,7 +588,7 @@ ApplicationWindow {
     function selectCapabilityNode(node) {
         if (!node || node.id === undefined)
             return
-        selectedCapabilityNode = enrichCapabilityNode(node)
+        selectedCapabilityNode = node
     }
 
     function drillIntoCapabilityNode(node) {

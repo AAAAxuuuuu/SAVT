@@ -1,4 +1,4 @@
-#include "savt/ai/DeepSeekClient.h"
+﻿#include "savt/ai/DeepSeekClient.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -370,7 +370,7 @@ QString extractResponseErrorMessage(const QJsonValue &value,
 QString extractAssistantTextFromChoice(const QJsonObject &choice);
 
 QString extractAssistantTextFromObject(const QJsonObject &object,
-                                       const int depth = 0) {
+                                      const int depth = 0) {
   if (depth > 4) {
     return {};
   }

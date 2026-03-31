@@ -93,8 +93,8 @@ CapabilityAggregationMode chooseAggregationMode(const ArchitectureOverview& over
         return CapabilityAggregationMode::ModuleScoped;
     }
 
-    // Keep module-level detail for small mixed-language workspaces, but avoid
-    // exploding the scene for larger repos that happen to include UI/script/data artifacts.
+    // Small mixed-language repos benefit from module detail, but larger ones
+    // should aggregate sooner to avoid exploding the scene.
     if (crossArtifactModuleCount >= 3 && overview.nodes.size() <= 24) {
         return CapabilityAggregationMode::ModuleScoped;
     }

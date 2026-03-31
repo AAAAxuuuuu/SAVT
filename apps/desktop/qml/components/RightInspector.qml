@@ -1,4 +1,4 @@
-﻿import QtQuick
+import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
@@ -309,52 +309,55 @@ Item {
                                 compact: true
                                 text: analysisController.aiBusy
                                       ? "解读中..."
-                                      : (analysisController.aiAvailable
-                                         ? "生成解释"
-                                         : "AI 未就绪")
+                                      : (analysisController.aiAvailable ? "生成解释" : "AI 未就绪")
                                 enabled: window.selectedCapabilityNode !== null
                                          && analysisController.aiAvailable
                                          && !analysisController.aiBusy
                                 onClicked: analysisController.requestAiExplanation(window.selectedCapabilityNode)
                             }
-                            Button {
-                                text: "\u5237\u65b0 AI \u72b6\u6001"
+
+                            AppButton {
+                                theme: root.theme
+                                tone: "ghost"
+                                compact: true
+                                text: "刷新状态"
                                 enabled: !analysisController.aiBusy
                                 onClicked: analysisController.refreshAiAvailability()
                             }
                         }
 
-                        Frame {
+                        Rectangle {
                             Layout.fillWidth: true
-                            padding: 10
-                            background: Rectangle {
-                                radius: 8
-                                color: analysisController.aiAvailable ? "#eff6ff" : "#fffbeb"
-                                border.color: analysisController.aiAvailable ? "#93c5fd" : "#fcd34d"
-                            }
+                            radius: 16
+                            color: analysisController.aiAvailable ? "#eff6ff" : "#fff7e7"
+                            border.color: analysisController.aiAvailable ? "#9ec4ee" : "#e8c97f"
 
                             ColumnLayout {
-                                width: parent.width
-                                anchors { top: parent.top; left: parent.left; right: parent.right; margins: 2 }
+                                anchors.fill: parent
+                                anchors.margins: 14
                                 spacing: 6
 
                                 Label {
-                                    text: analysisController.aiAvailable ? "AI \u72b6\u6001" : "AI \u914d\u7f6e\u63d0\u793a"
-                                    color: analysisController.aiAvailable ? "#1d4ed8" : "#92400e"
+                                    text: analysisController.aiAvailable ? "AI 状态" : "AI 配置提示"
+                                    color: analysisController.aiAvailable ? "#1f5e96" : "#8a5d12"
+                                    font.family: root.theme.textFontFamily
                                     font.pixelSize: 12
-                                    font.bold: true
+                                    font.weight: Font.DemiBold
                                 }
 
                                 Label {
                                     Layout.fillWidth: true
                                     wrapMode: Text.WordWrap
-                                    lineHeight: 1.4
-                                    color: analysisController.aiAvailable ? "#1e3a8a" : "#78350f"
+                                    maximumLineCount: 4
+                                    elide: Text.ElideRight
+                                    color: analysisController.aiAvailable ? "#2c4f74" : "#7a5823"
+                                    font.family: root.theme.textFontFamily
+                                    font.pixelSize: 12
                                     text: {
                                         if (!analysisController.aiAvailable)
                                             return analysisController.aiSetupMessage
                                         if (window.selectedCapabilityNode === null)
-                                            return "AI \u5df2\u5c31\u7eea\u3002\u5148\u5728\u56fe\u91cc\u9009\u4e2d\u4e00\u4e2a\u6a21\u5757\uff0c\u518d\u751f\u6210 AI \u89e3\u8bfb\u3002"
+                                            return "AI 已就绪。先在图里选中一个模块，再生成 AI 解读。"
                                         return analysisController.aiStatusMessage.length > 0
                                                ? analysisController.aiStatusMessage
                                                : analysisController.aiSetupMessage
