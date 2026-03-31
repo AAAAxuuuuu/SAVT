@@ -9,11 +9,13 @@ namespace savt::ui {
 
 namespace {
 
-constexpr std::size_t kMaxDetailedEdgeRouteCount = 72;
-
-bool shouldIncludeDetailedEdgeRoutes(
-    const layout::CapabilitySceneLayoutResult& layout) {
-    return layout.edges.size() <= kMaxDetailedEdgeRouteCount;
+QVariantList toVariantStringList(const std::vector<std::string>& values) {
+    QVariantList items;
+    items.reserve(static_cast<qsizetype>(values.size()));
+    for (const std::string& value : values) {
+        items.push_back(QString::fromStdString(value));
+    }
+    return items;
 }
 
 QVariantList toVariantPointList(const std::vector<savt::layout::ScenePoint>& points) {
@@ -54,7 +56,6 @@ CapabilitySceneData SceneMapper::buildCapabilitySceneData(
     CapabilitySceneData scene;
     scene.sceneWidth = layout.width;
     scene.sceneHeight = layout.height;
-    const bool includeDetailedEdgeRoutes = shouldIncludeDetailedEdgeRoutes(layout);
 
     std::unordered_map<std::size_t, const core::CapabilityNode*> nodeIndex;
     nodeIndex.reserve(graph.nodes.size());
@@ -88,15 +89,45 @@ CapabilitySceneData SceneMapper::buildCapabilitySceneData(
         item.insert(QStringLiteral("role"), QString::fromStdString(node.dominantRole));
         item.insert(QStringLiteral("responsibility"), QString::fromStdString(node.responsibility));
         item.insert(QStringLiteral("summary"), QString::fromStdString(node.summary));
+        item.insert(QStringLiteral("folderHint"), QString::fromStdString(node.folderHint));
+        item.insert(QStringLiteral("moduleNames"), toVariantStringList(node.moduleNames));
+        item.insert(QStringLiteral("exampleFiles"), toVariantStringList(node.exampleFiles));
+        item.insert(QStringLiteral("topSymbols"), toVariantStringList(node.topSymbols));
+        item.insert(QStringLiteral("collaboratorNames"), toVariantStringList(node.collaboratorNames));
+        item.insert(QStringLiteral("supportingRoles"), toVariantStringList(node.supportingRoles));
+        item.insert(QStringLiteral("technologyTags"), toVariantStringList(node.technologyTags));
+        item.insert(QStringLiteral("riskSignals"), toVariantStringList(node.riskSignals));
+        item.insert(QStringLiteral("moduleCount"), static_cast<qulonglong>(node.moduleCount));
         item.insert(QStringLiteral("fileCount"), static_cast<qulonglong>(node.fileCount));
+        item.insert(QStringLiteral("sourceFileCount"), static_cast<qulonglong>(node.sourceFileCount));
+        item.insert(QStringLiteral("qmlFileCount"), static_cast<qulonglong>(node.qmlFileCount));
+        item.insert(QStringLiteral("webFileCount"), static_cast<qulonglong>(node.webFileCount));
+        item.insert(QStringLiteral("scriptFileCount"), static_cast<qulonglong>(node.scriptFileCount));
+        item.insert(QStringLiteral("dataFileCount"), static_cast<qulonglong>(node.dataFileCount));
+        item.insert(QStringLiteral("stageStart"), static_cast<qulonglong>(node.stageStart));
+        item.insert(QStringLiteral("stageEnd"), static_cast<qulonglong>(node.stageEnd));
+        item.insert(QStringLiteral("incomingEdgeCount"), static_cast<qulonglong>(node.incomingEdgeCount));
+        item.insert(QStringLiteral("outgoingEdgeCount"), static_cast<qulonglong>(node.outgoingEdgeCount));
+        item.insert(QStringLiteral("aggregatedDependencyWeight"), static_cast<qulonglong>(node.aggregatedDependencyWeight));
+        item.insert(QStringLiteral("flowParticipationCount"), static_cast<qulonglong>(node.flowParticipationCount));
+        item.insert(QStringLiteral("collaboratorCount"), static_cast<qulonglong>(node.collaboratorCount));
+        item.insert(QStringLiteral("riskScore"), static_cast<qulonglong>(node.riskScore));
+        item.insert(QStringLiteral("riskLevel"), QString::fromStdString(node.riskLevel));
+        item.insert(QStringLiteral("priority"), static_cast<qulonglong>(node.visualPriority));
         item.insert(QStringLiteral("pinned"), node.defaultPinned);
+        item.insert(QStringLiteral("collapsed"), node.defaultCollapsed);
+        item.insert(QStringLiteral("reachableFromEntry"), node.reachableFromEntry);
+        item.insert(QStringLiteral("cycleParticipant"), node.cycleParticipant);
+        item.insert(QStringLiteral("laneGroupId"), static_cast<qulonglong>(node.laneGroupId));
+        item.insert(QStringLiteral("detailGroupId"), static_cast<qulonglong>(node.detailGroupId));
+        item.insert(QStringLiteral("importanceScale"), nodeLayout.importanceScale);
+        item.insert(QStringLiteral("layoutLaneIndex"), static_cast<qulonglong>(nodeLayout.laneIndex));
+        item.insert(QStringLiteral("layoutOrder"), static_cast<qulonglong>(nodeLayout.orderInLane));
         item.insert(QStringLiteral("x"), nodeLayout.x);
         item.insert(QStringLiteral("y"), nodeLayout.y);
         item.insert(QStringLiteral("width"), nodeLayout.width);
         item.insert(QStringLiteral("height"), nodeLayout.height);
-        item.insert(
-            QStringLiteral("layoutBounds"),
-            toVariantRect(nodeLayout.x, nodeLayout.y, nodeLayout.width, nodeLayout.height));
+        item.insert(QStringLiteral("layoutBounds"), toVariantRect(nodeLayout.x, nodeLayout.y, nodeLayout.width, nodeLayout.height));
         scene.nodeItems.push_back(item);
     }
 
@@ -113,9 +144,17 @@ CapabilitySceneData SceneMapper::buildCapabilitySceneData(
         item.insert(QStringLiteral("fromId"), static_cast<qulonglong>(edgeLayout.fromId));
         item.insert(QStringLiteral("toId"), static_cast<qulonglong>(edgeLayout.toId));
         item.insert(QStringLiteral("kind"), QString::fromStdString(core::toString(edgeIt->second->kind)));
+        item.insert(QStringLiteral("summary"), QString::fromStdString(edgeIt->second->summary));
         item.insert(QStringLiteral("weight"), static_cast<qulonglong>(edgeIt->second->weight));
-        if (includeDetailedEdgeRoutes && !edgeLayout.routePoints.empty()) {
-            item.insert(QStringLiteral("routePoints"), toVariantPointList(edgeLayout.routePoints));
+        item.insert(QStringLiteral("fromName"), QString::fromStdString(fromNodeIt->second->name));
+        item.insert(QStringLiteral("toName"), QString::fromStdString(toNodeIt->second->name));
+        item.insert(QStringLiteral("routePoints"), toVariantPointList(edgeLayout.routePoints));
+        item.insert(QStringLiteral("routePointCount"), static_cast<qulonglong>(edgeLayout.routePoints.size()));
+        if (!edgeLayout.routePoints.empty()) {
+            item.insert(QStringLiteral("x1"), edgeLayout.routePoints.front().x);
+            item.insert(QStringLiteral("y1"), edgeLayout.routePoints.front().y);
+            item.insert(QStringLiteral("x2"), edgeLayout.routePoints.back().x);
+            item.insert(QStringLiteral("y2"), edgeLayout.routePoints.back().y);
         }
         scene.edgeItems.push_back(item);
     }
@@ -131,14 +170,24 @@ CapabilitySceneData SceneMapper::buildCapabilitySceneData(
         item.insert(QStringLiteral("id"), static_cast<qulonglong>(group.id));
         item.insert(QStringLiteral("kind"), QString::fromStdString(core::toString(group.kind)));
         item.insert(QStringLiteral("name"), QString::fromStdString(group.name));
+        item.insert(QStringLiteral("summary"), QString::fromStdString(group.summary));
+        item.insert(QStringLiteral("expanded"), group.defaultExpanded);
+        item.insert(QStringLiteral("visible"), group.defaultVisible);
+        item.insert(QStringLiteral("hiddenCount"), static_cast<qulonglong>(group.hiddenNodeCount));
+        item.insert(QStringLiteral("nodeCount"), static_cast<qulonglong>(group.nodeIds.size()));
+        item.insert(QStringLiteral("layoutVisibleNodeCount"), static_cast<qulonglong>(groupLayout.visibleNodeIds.size()));
         item.insert(QStringLiteral("hasBounds"), groupLayout.hasBounds);
         item.insert(QStringLiteral("x"), groupLayout.x);
         item.insert(QStringLiteral("y"), groupLayout.y);
         item.insert(QStringLiteral("width"), groupLayout.width);
         item.insert(QStringLiteral("height"), groupLayout.height);
-        item.insert(
-            QStringLiteral("layoutBounds"),
-            toVariantRect(groupLayout.x, groupLayout.y, groupLayout.width, groupLayout.height));
+        item.insert(QStringLiteral("layoutBounds"), toVariantRect(groupLayout.x, groupLayout.y, groupLayout.width, groupLayout.height));
+        QVariantList visibleNodeIds;
+        visibleNodeIds.reserve(static_cast<qsizetype>(groupLayout.visibleNodeIds.size()));
+        for (const std::size_t nodeId : groupLayout.visibleNodeIds) {
+            visibleNodeIds.push_back(static_cast<qulonglong>(nodeId));
+        }
+        item.insert(QStringLiteral("layoutVisibleNodeIds"), visibleNodeIds);
         scene.groupItems.push_back(item);
     }
 

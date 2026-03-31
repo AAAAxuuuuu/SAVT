@@ -45,24 +45,6 @@ AnalysisGraphBuilder::AnalysisGraphBuilder(std::filesystem::path rootPath, const
     report_.rootPath = normalizePath(rootPath_);
 }
 
-std::size_t AnalysisGraphBuilder::addOrMergeNode(
-    const savt::core::SymbolKind kind,
-    std::string displayName,
-    std::string qualifiedName,
-    const std::string& filePath,
-    const std::uint32_t line,
-    const savt::analyzer::SymbolIdentity& identity,
-    const savt::core::FactSource factSource) {
-    return addOrMergeNode(
-        kind,
-        std::move(displayName),
-        std::move(qualifiedName),
-        filePath,
-        line,
-        savt::analyzer::serializeSymbolIdentity(identity),
-        factSource);
-}
-
 savt::core::AnalysisReport& AnalysisGraphBuilder::report() {
     return report_;
 }
@@ -95,56 +77,12 @@ std::size_t AnalysisGraphBuilder::addOrMergeNode(
         displayName = qualifiedName;
     }
 
-    const auto shouldKeepModuleScopedCallableDistinct = [&](const std::size_t candidateId) {
-        const savt::core::SymbolNode* candidateNode = nodeById(candidateId);
-        if (candidateNode == nullptr ||
-            candidateNode->filePath.empty() ||
-            filePath.empty() ||
-            candidateNode->filePath == filePath) {
-            return false;
-        }
-
-        const bool incomingCallable =
-            kind == savt::core::SymbolKind::Function || kind == savt::core::SymbolKind::Method;
-        const bool existingCallable =
-            candidateNode->kind == savt::core::SymbolKind::Function ||
-            candidateNode->kind == savt::core::SymbolKind::Method;
-        if (!incomingCallable || !existingCallable) {
-            return false;
-        }
-
-        if (factSource != savt::core::FactSource::Inferred ||
-            candidateNode->factSource != savt::core::FactSource::Inferred) {
-            return false;
-        }
-
-        const auto existingModuleId = moduleIdForNode(candidateId);
-        if (!existingModuleId.has_value()) {
-            return false;
-        }
-
-        const auto incomingFileId = findFileIdByRelativePath(filePath);
-        if (!incomingFileId.has_value()) {
-            return false;
-        }
-
-        const auto incomingModuleIt = fileIdToModuleId_.find(*incomingFileId);
-        if (incomingModuleIt == fileIdToModuleId_.end()) {
-            return false;
-        }
-
-        return incomingModuleIt->second != *existingModuleId;
-    };
-
     std::optional<std::size_t> existingId;
     if (!identityKey.empty()) {
         const auto identityIt = identityToNodeId_.find(identityKey);
         if (identityIt != identityToNodeId_.end()) {
             existingId = identityIt->second;
         }
-    }
-    if (existingId.has_value() && shouldKeepModuleScopedCallableDistinct(*existingId)) {
-        existingId.reset();
     }
 
     if (!existingId.has_value() && !qualifiedName.empty()) {
@@ -160,9 +98,6 @@ std::size_t AnalysisGraphBuilder::addOrMergeNode(
                 existingId = candidateId;
             }
         }
-    }
-    if (existingId.has_value() && shouldKeepModuleScopedCallableDistinct(*existingId)) {
-        existingId.reset();
     }
 
     if (existingId.has_value()) {
@@ -380,14 +315,6 @@ std::optional<std::size_t> AnalysisGraphBuilder::findSymbolByQualifiedName(const
     return iterator->second.front();
 }
 
-std::vector<std::size_t> AnalysisGraphBuilder::findSymbolsByQualifiedName(const std::string& qualifiedName) const {
-    const auto iterator = qualifiedToNodeIds_.find(qualifiedName);
-    if (iterator == qualifiedToNodeIds_.end()) {
-        return {};
-    }
-    return iterator->second;
-}
-
 std::vector<std::size_t> AnalysisGraphBuilder::findSymbolsByDisplayName(const std::string& displayName) const {
     const auto iterator = displayNameToNodeIds_.find(displayName);
     if (iterator == displayNameToNodeIds_.end()) {
@@ -470,19 +397,6 @@ std::optional<std::size_t> AnalysisGraphBuilder::resolveIncludeTarget(
 std::optional<std::size_t> AnalysisGraphBuilder::fileIdForNode(const std::size_t nodeId) const {
     const auto iterator = nodeIdToFileId_.find(nodeId);
     if (iterator == nodeIdToFileId_.end()) {
-        return std::nullopt;
-    }
-    return iterator->second;
-}
-
-std::optional<std::size_t> AnalysisGraphBuilder::moduleIdForNode(const std::size_t nodeId) const {
-    const auto fileId = fileIdForNode(nodeId);
-    if (!fileId.has_value()) {
-        return std::nullopt;
-    }
-
-    const auto iterator = fileIdToModuleId_.find(*fileId);
-    if (iterator == fileIdToModuleId_.end()) {
         return std::nullopt;
     }
     return iterator->second;

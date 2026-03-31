@@ -1,7 +1,5 @@
 #include "savt/ui/AiService.h"
 
-#include "savt/core/CapabilityGraph.h"
-
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
@@ -19,16 +17,6 @@ QStringList toQStringList(const QVariant& value) {
     QStringList items;
     for (const QVariant& entry : value.toList()) {
         const QString cleaned = entry.toString().trimmed();
-        if (!cleaned.isEmpty() && !items.contains(cleaned))
-            items.push_back(cleaned);
-    }
-    return items;
-}
-
-QStringList toQStringList(const std::vector<std::string>& values) {
-    QStringList items;
-    for (const std::string& value : values) {
-        const QString cleaned = QString::fromStdString(value).trimmed();
         if (!cleaned.isEmpty() && !items.contains(cleaned))
             items.push_back(cleaned);
     }
@@ -158,7 +146,7 @@ ai::ArchitectureAssistantRequest buildProjectRequest(
     const AiRequestContext& context,
     const QVariantMap& systemContextData,
     const QVariantList& systemContextCards,
-    const core::CapabilityGraph* capabilityGraph) {
+    const QVariantList& capabilityNodeItems) {
     ai::ArchitectureAssistantRequest request;
     request.projectName = projectNameFromRootPath(context.projectRootPath);
     request.projectRootPath = QDir::toNativeSeparators(context.projectRootPath);
@@ -205,17 +193,17 @@ ai::ArchitectureAssistantRequest buildProjectRequest(
             .arg(systemContextData.value(QStringLiteral("technologySummary"))
                      .toString()
                      .trimmed())};
-    if (capabilityGraph == nullptr)
-        return request;
-
-    for (const core::CapabilityNode& node : capabilityGraph->nodes) {
-        for (const QString& path : toQStringList(node.exampleFiles)) {
+    for (const QVariant& value : capabilityNodeItems) {
+        const QVariantMap node = value.toMap();
+        for (const QString& path :
+             toQStringList(node.value(QStringLiteral("exampleFiles")))) {
             if (!request.exampleFiles.contains(path) &&
                 request.exampleFiles.size() < 8) {
                 request.exampleFiles.push_back(path);
             }
         }
-        for (const QString& symbol : toQStringList(node.topSymbols)) {
+        for (const QString& symbol :
+             toQStringList(node.value(QStringLiteral("topSymbols")))) {
             if (!request.topSymbols.contains(symbol) &&
                 request.topSymbols.size() < 8) {
                 request.topSymbols.push_back(symbol);
@@ -297,13 +285,12 @@ AiPreparedRequest AiService::prepareProjectRequest(
     const AiRequestContext& context,
     const QVariantMap& systemContextData,
     const QVariantList& systemContextCards,
-    const core::CapabilityGraph* capabilityGraph) {
+    const QVariantList& capabilityNodeItems) {
     AiPreparedRequest prepared;
     prepared.scope = QStringLiteral("system_context");
     prepared.availability = inspectAvailability();
 
-    if (systemContextData.isEmpty() || capabilityGraph == nullptr ||
-        capabilityGraph->nodes.empty()) {
+    if (systemContextData.isEmpty() || capabilityNodeItems.isEmpty()) {
         prepared.failureStatusMessage =
             QStringLiteral("先完成一次项目分析，再生成项目级系统上下文解读。");
         return prepared;
@@ -332,7 +319,7 @@ AiPreparedRequest AiService::prepareProjectRequest(
     prepared.pendingStatusMessage =
         QStringLiteral("正在向 AI 模型请求项目级系统上下文解读...");
     prepared.assistantRequest = buildProjectRequest(
-        context, systemContextData, systemContextCards, capabilityGraph);
+        context, systemContextData, systemContextCards, capabilityNodeItems);
     prepared.networkRequest =
         ai::buildDeepSeekChatCompletionsRequest(loadResult.config);
     prepared.payload = ai::buildDeepSeekChatCompletionsPayload(

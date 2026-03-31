@@ -8,10 +8,6 @@
 #include <QVariantList>
 #include <QVariantMap>
 
-namespace savt::core {
-struct CapabilityGraph;
-}
-
 namespace savt::ui {
 
 struct AiAvailabilityState {
@@ -63,7 +59,7 @@ public:
         const AiRequestContext& context,
         const QVariantMap& systemContextData,
         const QVariantList& systemContextCards,
-        const savt::core::CapabilityGraph* capabilityGraph);
+        const QVariantList& capabilityNodeItems);
 
     static AiReplyState parseReply(
         const QByteArray& responseBytes,
