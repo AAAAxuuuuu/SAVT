@@ -5,8 +5,35 @@
 #include "SyntaxProjectAnalyzer.h"
 #include "savt/core/ProjectAnalysisConfig.h"
 
+#include <charconv>
+#include <cstdint>
+#include <iomanip>
+#include <sstream>
+#include <system_error>
+
 namespace savt::analyzer {
 namespace {
+
+constexpr std::uint64_t kFnvOffsetBasis = 14695981039346656037ull;
+constexpr std::uint64_t kFnvPrime = 1099511628211ull;
+
+void hashBytes(std::uint64_t& state, const void* data, const std::size_t size) {
+    const auto* bytes = static_cast<const unsigned char*>(data);
+    for (std::size_t index = 0; index < size; ++index) {
+        state ^= static_cast<std::uint64_t>(bytes[index]);
+        state *= kFnvPrime;
+    }
+}
+
+void hashString(std::uint64_t& state, const std::string_view value) {
+    hashBytes(state, value.data(), value.size());
+}
+
+std::string hashToHex(const std::uint64_t value) {
+    std::ostringstream output;
+    output << std::hex << std::setfill('0') << std::setw(16) << value;
+    return output.str();
+}
 
 std::string joinPathList(const std::vector<std::filesystem::path>& paths, const std::size_t maxItems = 8) {
     std::string text;
@@ -128,6 +155,52 @@ void finalizeSemanticReport(
 }
 
 }  // namespace
+
+ProjectScanManifest CppProjectAnalyzer::buildScanManifest(
+    const std::filesystem::path& rootPath,
+    const AnalyzerOptions& options) const {
+    const std::filesystem::path normalizedRoot = rootPath.lexically_normal();
+    ProjectScanManifest manifest;
+    manifest.rootPath = normalizedRoot;
+    manifest.sourceFiles = detail::collectSourceFiles(normalizedRoot, options);
+    manifest.discoveredFiles = manifest.sourceFiles.size();
+
+    std::uint64_t fingerprint = kFnvOffsetBasis;
+    hashString(fingerprint, detail::normalizePath(normalizedRoot));
+    for (const std::filesystem::path& filePath : manifest.sourceFiles) {
+        if (detail::isCancellationRequested(options)) {
+            manifest.diagnostics.push_back("Project scan canceled before metadata fingerprint completed.");
+            break;
+        }
+
+        const std::string relativePath = detail::relativizePath(normalizedRoot, filePath);
+        hashString(fingerprint, relativePath);
+
+        std::error_code errorCode;
+        const auto fileSize = std::filesystem::file_size(filePath, errorCode);
+        if (errorCode) {
+            manifest.diagnostics.push_back(
+                "Project scan could not read file size for: " + detail::normalizePath(filePath));
+            hashString(fingerprint, "size:error");
+        } else {
+            hashBytes(fingerprint, &fileSize, sizeof(fileSize));
+        }
+
+        errorCode.clear();
+        const auto lastWriteTime = std::filesystem::last_write_time(filePath, errorCode);
+        if (errorCode) {
+            manifest.diagnostics.push_back(
+                "Project scan could not read timestamp for: " + detail::normalizePath(filePath));
+            hashString(fingerprint, "mtime:error");
+        } else {
+            const auto tickCount = lastWriteTime.time_since_epoch().count();
+            hashBytes(fingerprint, &tickCount, sizeof(tickCount));
+        }
+    }
+
+    manifest.metadataFingerprint = hashToHex(fingerprint);
+    return manifest;
+}
 
 savt::core::AnalysisReport CppProjectAnalyzer::analyzeProject(
     const std::filesystem::path& rootPath,

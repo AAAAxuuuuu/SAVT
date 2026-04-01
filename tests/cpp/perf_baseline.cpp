@@ -1,7 +1,5 @@
 #include "savt/analyzer/CppProjectAnalyzer.h"
-#include "savt/core/ArchitectureOverview.h"
-#include "savt/core/CapabilityGraph.h"
-#include "savt/layout/LayeredGraphLayout.h"
+#include "savt/ui/IncrementalAnalysisPipeline.h"
 
 #include <chrono>
 #include <cstdlib>
@@ -31,11 +29,12 @@ struct PerfResult {
     std::size_t overviewNodes = 0;
     std::size_t capabilityNodes = 0;
     std::size_t capabilityEdges = 0;
-    double analyzeMs = 0.0;
-    double overviewMs = 0.0;
-    double capabilityMs = 0.0;
-    double layoutMs = 0.0;
-    double totalMs = 0.0;
+    double coldTotalMs = 0.0;
+    double hotTotalMs = 0.0;
+    bool hotScanHit = false;
+    bool hotParseHit = false;
+    bool hotAggregateHit = false;
+    bool hotLayoutHit = false;
     double peakMemoryMb = 0.0;
 };
 
@@ -107,40 +106,39 @@ std::filesystem::path createSyntheticLargeWorkspace(const std::size_t totalFiles
 }
 
 PerfResult measureProject(const std::string& label, const std::filesystem::path& rootPath) {
-    savt::analyzer::CppProjectAnalyzer analyzer;
     savt::analyzer::AnalyzerOptions options;
     options.precision = savt::analyzer::AnalyzerPrecision::SyntaxOnly;
 
     PerfResult result;
     result.label = label;
 
-    savt::core::AnalysisReport report;
-    savt::core::ArchitectureOverview overview;
-    savt::core::CapabilityGraph capabilityGraph;
-    savt::layout::CapabilitySceneLayoutResult layoutResult;
-    savt::layout::LayeredGraphLayout layoutEngine;
+    savt::ui::IncrementalAnalysisPipeline::clear();
 
-    const auto totalStart = Clock::now();
-    result.analyzeMs = measureMs([&] { report = analyzer.analyzeProject(rootPath, options); });
-    result.overviewMs = measureMs([&] { overview = savt::core::buildArchitectureOverview(report); });
-    result.capabilityMs = measureMs([&] { capabilityGraph = savt::core::buildCapabilityGraph(report, overview); });
-    result.layoutMs = measureMs([&] { layoutResult = layoutEngine.layoutCapabilityScene(capabilityGraph); });
-    const auto totalEnd = Clock::now();
+    savt::ui::IncrementalAnalysisArtifacts coldArtifacts;
+    savt::ui::IncrementalAnalysisArtifacts hotArtifacts;
+    result.coldTotalMs = measureMs([&] {
+        coldArtifacts = savt::ui::IncrementalAnalysisPipeline::analyze(rootPath, options);
+    });
+    result.hotTotalMs = measureMs([&] {
+        hotArtifacts = savt::ui::IncrementalAnalysisPipeline::analyze(rootPath, options);
+    });
 
-    result.totalMs = std::chrono::duration<double, std::milli>(totalEnd - totalStart).count();
-    result.discoveredFiles = report.discoveredFiles;
-    result.parsedFiles = report.parsedFiles;
-    result.overviewNodes = overview.nodes.size();
-    result.capabilityNodes = capabilityGraph.nodes.size();
-    result.capabilityEdges = capabilityGraph.edges.size();
+    result.discoveredFiles = coldArtifacts.report.discoveredFiles;
+    result.parsedFiles = coldArtifacts.report.parsedFiles;
+    result.overviewNodes = coldArtifacts.overview.nodes.size();
+    result.capabilityNodes = coldArtifacts.capabilityGraph.nodes.size();
+    result.capabilityEdges = coldArtifacts.capabilityGraph.edges.size();
+    result.hotScanHit = hotArtifacts.scanLayer.hit;
+    result.hotParseHit = hotArtifacts.parseLayer.hit;
+    result.hotAggregateHit = hotArtifacts.aggregateLayer.hit;
+    result.hotLayoutHit = hotArtifacts.layoutLayer.hit;
     result.peakMemoryMb = peakMemoryMb();
-    static_cast<void>(layoutResult);
     return result;
 }
 
 void printHumanReadable(const std::vector<PerfResult>& results) {
     std::cout << "label,discovered,parsed,overview_nodes,capability_nodes,capability_edges,"
-                 "analyze_ms,overview_ms,capability_ms,layout_ms,total_ms,peak_memory_mb\n";
+                 "cold_total_ms,hot_total_ms,hot_scan_hit,hot_parse_hit,hot_aggregate_hit,hot_layout_hit,peak_memory_mb\n";
     for (const PerfResult& result : results) {
         std::cout << result.label << ','
                   << result.discoveredFiles << ','
@@ -149,11 +147,12 @@ void printHumanReadable(const std::vector<PerfResult>& results) {
                   << result.capabilityNodes << ','
                   << result.capabilityEdges << ','
                   << std::fixed << std::setprecision(2)
-                  << result.analyzeMs << ','
-                  << result.overviewMs << ','
-                  << result.capabilityMs << ','
-                  << result.layoutMs << ','
-                  << result.totalMs << ','
+                  << result.coldTotalMs << ','
+                  << result.hotTotalMs << ','
+                  << (result.hotScanHit ? 1 : 0) << ','
+                  << (result.hotParseHit ? 1 : 0) << ','
+                  << (result.hotAggregateHit ? 1 : 0) << ','
+                  << (result.hotLayoutHit ? 1 : 0) << ','
                   << result.peakMemoryMb << '\n';
     }
 }

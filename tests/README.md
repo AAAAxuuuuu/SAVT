@@ -41,11 +41,12 @@ These scripts run the smallest repeatable configure/build/test paths for this re
 
 Use this baseline before and after incremental refactor batches so regressions are visible immediately.
 
-Additional coverage introduced in phase 9:
+Additional coverage introduced in phases 9 and 10:
 
 - `savt_ui_tests` covers `AstPreviewService`, `ReportService`, and `AnalysisController` startup/default-state behavior.
+- `savt_ui_tests` now also covers the incremental analysis pipeline, including stable-layer cache hits and source-change invalidation.
 - `savt_perf_smoke` runs the lightweight performance baseline tool against representative fixtures plus a synthetic workspace sample.
-- `./build/.../tests/savt_perf_baseline --full` records a 10k+ file syntax-only baseline with scan/analyze, overview, capability, layout, and peak memory metrics.
+- `./build/.../tests/savt_perf_baseline --full` now records both cold and hot incremental-analysis timings, plus per-layer cache-hit flags for a 10k+ file synthetic sample.
 
 Snapshot coverage lives under `tests/fixtures/precision/` and `tests/golden/precision/`.
 

@@ -1,44 +1,20 @@
 #include "savt/ui/AnalysisOrchestrator.h"
 
-#include "savt/analyzer/CppProjectAnalyzer.h"
-#include "savt/core/ComponentGraph.h"
 #include "savt/ui/AnalysisTextFormatter.h"
 #include "savt/ui/AstPreviewService.h"
+#include "savt/ui/IncrementalAnalysisPipeline.h"
 #include "savt/ui/ReportService.h"
 #include "savt/ui/SceneMapper.h"
 
 #include <QDir>
 #include <QFileInfo>
 
-#include <array>
 #include <filesystem>
-#include <optional>
 #include <stdexcept>
 
 namespace savt::ui {
 
 namespace {
-
-std::optional<std::filesystem::path>
-locateCompilationDatabase(const QString& projectRootPath) {
-    const std::filesystem::path rootPath(projectRootPath.toStdString());
-    if (rootPath.empty()) {
-        return std::nullopt;
-    }
-
-    const std::array<std::filesystem::path, 4> directCandidates = {
-        rootPath / "compile_commands.json",
-        rootPath / ".qtc_clangd" / "compile_commands.json",
-        rootPath / "build" / "compile_commands.json",
-        rootPath / "build" / ".qtc_clangd" / "compile_commands.json"};
-    for (const std::filesystem::path& candidate : directCandidates) {
-        std::error_code errorCode;
-        if (std::filesystem::exists(candidate, errorCode)) {
-            return candidate.lexically_normal();
-        }
-    }
-    return std::nullopt;
-}
 
 void clearPendingPresentation(PendingAnalysisResult& result) {
     result.astFileItems.clear();
@@ -161,67 +137,35 @@ void AnalysisOrchestrator::run(
         analyzer::AnalyzerOptions options;
         options.precision = analyzer::AnalyzerPrecision::SemanticPreferred;
         options.cancellationRequested = [&promise]() { return promise.isCanceled(); };
-
-        promise.setProgressValueAndText(15, QStringLiteral("检测编译数据库..."));
-        if (const auto compilationDatabasePath = locateCompilationDatabase(cleanedPath);
-            compilationDatabasePath.has_value()) {
-            options.compilationDatabasePath = *compilationDatabasePath;
-        }
-        if (shouldAbortAnalysis(promise, result, QStringLiteral("检测编译数据库"))) {
+        const auto artifacts = IncrementalAnalysisPipeline::analyze(
+            std::filesystem::path(cleanedPath.toStdString()),
+            options,
+            [&promise](const int progressValue, const std::string& label) {
+                promise.setProgressValueAndText(
+                    progressValue,
+                    QString::fromStdString(label));
+            });
+        if (artifacts.canceled ||
+            shouldAbortAnalysis(
+                promise,
+                result,
+                QString::fromStdString(artifacts.canceledPhase))) {
             if (output) {
                 *output = std::move(result);
             }
             return;
         }
 
-        promise.setProgressValueAndText(25, QStringLiteral("解析源码并构建关系图..."));
-        analyzer::CppProjectAnalyzer analyzer;
-        const auto report = analyzer.analyzeProject(cleanedPath.toStdString(), options);
-        if (shouldAbortAnalysis(promise, result, QStringLiteral("解析源码并构建关系图"))) {
-            if (output) {
-                *output = std::move(result);
-            }
-            return;
-        }
-
-        promise.setProgressValueAndText(75, QStringLiteral("提炼架构总览..."));
-        const auto overview = core::buildArchitectureOverview(report);
-        if (shouldAbortAnalysis(promise, result, QStringLiteral("提炼架构总览"))) {
-            if (output) {
-                *output = std::move(result);
-            }
-            return;
-        }
-
-        promise.setProgressValueAndText(85, QStringLiteral("生成能力视图..."));
-        const auto capabilityGraph = core::buildCapabilityGraph(report, overview);
-        if (shouldAbortAnalysis(promise, result, QStringLiteral("生成能力视图"))) {
-            if (output) {
-                *output = std::move(result);
-            }
-            return;
-        }
-
-        promise.setProgressValueAndText(92, QStringLiteral("计算模块布局..."));
-        layout::LayeredGraphLayout layoutEngine;
-        const auto capabilitySceneLayout = layoutEngine.layoutCapabilityScene(capabilityGraph);
-        const auto layoutResult = layoutEngine.layoutModules(report);
-        if (shouldAbortAnalysis(promise, result, QStringLiteral("计算模块布局"))) {
-            if (output) {
-                *output = std::move(result);
-            }
-            return;
-        }
-
-        promise.setProgressValueAndText(94, QStringLiteral("生成 L3 组件视图..."));
         QVariantMap componentSceneCatalog;
-        for (const core::CapabilityNode& capabilityNode : capabilityGraph.nodes) {
-            const auto componentGraph =
-                core::buildComponentGraphForCapability(report, overview, capabilityGraph, capabilityNode.id);
-            const auto componentLayout =
-                layoutEngine.layoutComponentScene(componentGraph);
+        for (const core::CapabilityNode& capabilityNode : artifacts.capabilityGraph.nodes) {
+            const auto graphIt = artifacts.componentGraphs.find(capabilityNode.id);
+            const auto layoutIt = artifacts.componentLayouts.find(capabilityNode.id);
+            if (graphIt == artifacts.componentGraphs.end() ||
+                layoutIt == artifacts.componentLayouts.end()) {
+                continue;
+            }
             const auto componentScene =
-                SceneMapper::buildComponentSceneData(componentGraph, componentLayout);
+                SceneMapper::buildComponentSceneData(graphIt->second, layoutIt->second);
             componentSceneCatalog.insert(
                 QString::number(static_cast<qulonglong>(capabilityNode.id)),
                 SceneMapper::toVariantMap(componentScene));
@@ -236,12 +180,12 @@ void AnalysisOrchestrator::run(
         populatePendingPresentation(
             promise,
             cleanedPath,
-            report,
-            overview,
-            capabilityGraph,
-            capabilitySceneLayout,
+            artifacts.report,
+            artifacts.overview,
+            artifacts.capabilityGraph,
+            artifacts.capabilitySceneLayout,
             componentSceneCatalog,
-            layoutResult,
+            artifacts.moduleLayout,
             result);
         if (shouldAbortAnalysis(promise, result, QStringLiteral("整理分析结果"))) {
             if (output) {

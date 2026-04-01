@@ -5,6 +5,8 @@
 #include <cstddef>
 #include <filesystem>
 #include <functional>
+#include <string>
+#include <vector>
 
 namespace savt::analyzer {
 
@@ -23,8 +25,20 @@ struct AnalyzerOptions {
     std::function<bool()> cancellationRequested;
 };
 
+struct ProjectScanManifest {
+    std::filesystem::path rootPath;
+    std::vector<std::filesystem::path> sourceFiles;
+    std::size_t discoveredFiles = 0;
+    std::string metadataFingerprint;
+    std::vector<std::string> diagnostics;
+};
+
 class CppProjectAnalyzer {
 public:
+    ProjectScanManifest buildScanManifest(
+        const std::filesystem::path& rootPath,
+        const AnalyzerOptions& options = {}) const;
+
     savt::core::AnalysisReport analyzeProject(
         const std::filesystem::path& rootPath,
         const AnalyzerOptions& options = {}) const;

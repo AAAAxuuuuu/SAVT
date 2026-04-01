@@ -458,6 +458,13 @@ QString ReportService::buildStatusMessage(
         return QStringLiteral("未能进入语义分析：%1").arg(semanticExplanation);
     }
     if (report.parsedFiles > 0) {
+        const auto cacheHitCount = static_cast<qulonglong>(std::count_if(
+            report.diagnostics.begin(),
+            report.diagnostics.end(),
+            [](const std::string& diagnostic) {
+                return diagnostic.starts_with("Incremental cache") &&
+                       diagnostic.find(" hit:") != std::string::npos;
+            }));
         QString message = QStringLiteral("已读取 %1 个源码文件，并整理出 %2 个默认可见模块、%3 条主要关系和 %4 个分组。")
                               .arg(static_cast<qulonglong>(report.parsedFiles))
                               .arg(visibleNodeCount)
@@ -471,6 +478,9 @@ QString ReportService::buildStatusMessage(
         }
         if (overview.nodes.empty()) {
             message += QStringLiteral(" 当前还没有提炼出稳定的高层模块，建议优先查看入口和主流程。");
+        }
+        if (cacheHitCount > 0) {
+            message += QStringLiteral(" 本次分析命中了 %1 层增量缓存。").arg(cacheHitCount);
         }
         return message;
     }

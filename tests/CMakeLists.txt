@@ -98,6 +98,7 @@ target_link_libraries(savt_perf_baseline
         savt_analyzer
         savt_core
         savt_layout
+        savt_ui
 )
 
 file(TO_CMAKE_PATH "${CMAKE_SOURCE_DIR}" SAVT_PERF_SOURCE_ROOT)

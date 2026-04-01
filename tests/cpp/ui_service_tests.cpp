@@ -1,5 +1,6 @@
 #include "savt/ui/AnalysisController.h"
 #include "savt/ui/AstPreviewService.h"
+#include "savt/ui/IncrementalAnalysisPipeline.h"
 #include "savt/ui/ReportService.h"
 
 #include "savt/core/ArchitectureOverview.h"
@@ -13,6 +14,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <thread>
 
 namespace {
 
@@ -189,6 +191,84 @@ void testAnalysisControllerStartsFromStableDefaultState() {
            "analysis controller should initialize the AST preview through AstPreviewService");
 }
 
+void testIncrementalAnalysisPipelineReusesStableLayers() {
+    namespace fs = std::filesystem;
+
+    const fs::path tempRoot = makeTempDirectory("savt_ui_incremental_cache_hit");
+    writeTextFile(tempRoot / "apps" / "desktop" / "main.cpp", "int main() { return helper(); }\n");
+    writeTextFile(tempRoot / "src" / "helper.cpp", "int helper() { return 42; }\n");
+
+    savt::ui::IncrementalAnalysisPipeline::clear();
+
+    savt::analyzer::AnalyzerOptions options;
+    options.precision = savt::analyzer::AnalyzerPrecision::SyntaxOnly;
+
+    const auto coldArtifacts =
+        savt::ui::IncrementalAnalysisPipeline::analyze(tempRoot, options);
+    expect(!coldArtifacts.scanLayer.hit,
+           "first incremental run should miss the scan cache");
+    expect(!coldArtifacts.parseLayer.hit,
+           "first incremental run should miss the parse cache");
+    expect(!coldArtifacts.aggregateLayer.hit,
+           "first incremental run should miss the aggregate cache");
+    expect(!coldArtifacts.layoutLayer.hit,
+           "first incremental run should miss the layout cache");
+
+    const auto hotArtifacts =
+        savt::ui::IncrementalAnalysisPipeline::analyze(tempRoot, options);
+    expect(hotArtifacts.scanLayer.hit,
+           "second incremental run should hit the scan cache");
+    expect(hotArtifacts.parseLayer.hit,
+           "second incremental run should hit the parse cache");
+    expect(hotArtifacts.aggregateLayer.hit,
+           "second incremental run should hit the aggregate cache");
+    expect(hotArtifacts.layoutLayer.hit,
+           "second incremental run should hit the layout cache");
+    expect(hotArtifacts.report.parsedFiles == coldArtifacts.report.parsedFiles,
+           "cached incremental run should preserve parsed file counts");
+
+    std::error_code errorCode;
+    fs::remove_all(tempRoot, errorCode);
+}
+
+void testIncrementalAnalysisPipelineInvalidatesChangedSourceFiles() {
+    namespace fs = std::filesystem;
+    using namespace std::chrono_literals;
+
+    const fs::path tempRoot = makeTempDirectory("savt_ui_incremental_cache_invalidate");
+    writeTextFile(tempRoot / "apps" / "desktop" / "main.cpp", "int main() { return helper(); }\n");
+    writeTextFile(tempRoot / "src" / "helper.cpp", "int helper() { return 7; }\n");
+
+    savt::ui::IncrementalAnalysisPipeline::clear();
+
+    savt::analyzer::AnalyzerOptions options;
+    options.precision = savt::analyzer::AnalyzerPrecision::SyntaxOnly;
+
+    const auto baselineArtifacts =
+        savt::ui::IncrementalAnalysisPipeline::analyze(tempRoot, options);
+    expect(!baselineArtifacts.parseLayer.hit,
+           "baseline incremental run should build a fresh parse cache entry");
+
+    std::this_thread::sleep_for(20ms);
+    writeTextFile(tempRoot / "src" / "helper.cpp", "int helper() { return helper_impl(); }\nint helper_impl() { return 9; }\n");
+
+    const auto invalidatedArtifacts =
+        savt::ui::IncrementalAnalysisPipeline::analyze(tempRoot, options);
+    expect(!invalidatedArtifacts.scanLayer.hit,
+           "changing a tracked source file should invalidate the scan cache");
+    expect(!invalidatedArtifacts.parseLayer.hit,
+           "changing a tracked source file should invalidate the parse cache");
+    expect(!invalidatedArtifacts.aggregateLayer.hit,
+           "changing a tracked source file should invalidate the aggregate cache");
+    expect(!invalidatedArtifacts.layoutLayer.hit,
+           "changing a tracked source file should invalidate the layout cache");
+    expect(invalidatedArtifacts.report.nodes.size() >= baselineArtifacts.report.nodes.size(),
+           "invalidated rerun should rebuild the updated symbol graph");
+
+    std::error_code errorCode;
+    fs::remove_all(tempRoot, errorCode);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -196,6 +276,8 @@ int main(int argc, char** argv) {
     testAstPreviewServiceBuildsItemsAndParsesCppPreview();
     testReportServiceBuildsReadableSystemContextPayload();
     testAnalysisControllerStartsFromStableDefaultState();
+    testIncrementalAnalysisPipelineReusesStableLayers();
+    testIncrementalAnalysisPipelineInvalidatesChangedSourceFiles();
     std::cout << "[PASS] savt_ui_tests\n";
     return 0;
 }

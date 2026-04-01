@@ -3,11 +3,13 @@ add_library(savt_ui STATIC
     include/savt/ui/AiService.h
     include/savt/ui/AstPreviewService.h
     include/savt/ui/AnalysisOrchestrator.h
+    include/savt/ui/IncrementalAnalysisPipeline.h
     include/savt/ui/ReportService.h
     include/savt/ui/SceneMapper.h
     src/AiService.cpp
     src/AstPreviewService.cpp
     src/AnalysisController.cpp
+    src/IncrementalAnalysisPipeline.cpp
     src/AnalysisOrchestrator.cpp
     src/ReportService.cpp
     src/SceneMapper.cpp
