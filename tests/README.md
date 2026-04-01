@@ -7,6 +7,8 @@ Current test targets:
 - `savt_backend_tests`
 - `savt_snapshot_tests`
 - `savt_ai_tests`
+- `savt_ui_tests`
+- `savt_perf_smoke`
 - `savt_utf8_check`
 
 Recommended baseline entry points:
@@ -34,10 +36,16 @@ scripts\dev\verify-mingw-debug.bat
 These scripts run the smallest repeatable configure/build/test paths for this repository:
 
 1. configure one shared debug preset with `SAVT_BUILD_TESTS=ON`
-2. build `savt_backend_tests`, `savt_snapshot_tests`, and `savt_ai_tests`
+2. build `savt_backend_tests`, `savt_snapshot_tests`, `savt_ai_tests`, `savt_ui_tests`, and `savt_perf_baseline`
 3. run `ctest` against the matching build directory
 
 Use this baseline before and after incremental refactor batches so regressions are visible immediately.
+
+Additional coverage introduced in phase 9:
+
+- `savt_ui_tests` covers `AstPreviewService`, `ReportService`, and `AnalysisController` startup/default-state behavior.
+- `savt_perf_smoke` runs the lightweight performance baseline tool against representative fixtures plus a synthetic workspace sample.
+- `./build/.../tests/savt_perf_baseline --full` records a 10k+ file syntax-only baseline with scan/analyze, overview, capability, layout, and peak memory metrics.
 
 Snapshot coverage lives under `tests/fixtures/precision/` and `tests/golden/precision/`.
 

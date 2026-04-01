@@ -72,6 +72,46 @@ set_target_properties(savt_ai_tests PROPERTIES
 
 add_test(NAME savt_ai_tests COMMAND $<TARGET_FILE:savt_ai_tests>)
 
+add_executable(savt_ui_tests
+    cpp/ui_service_tests.cpp
+)
+
+target_link_libraries(savt_ui_tests
+    PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        savt_ui
+)
+
+set_target_properties(savt_ui_tests PROPERTIES
+    FOLDER tests
+)
+
+add_test(NAME savt_ui_tests COMMAND $<TARGET_FILE:savt_ui_tests>)
+
+add_executable(savt_perf_baseline
+    cpp/perf_baseline.cpp
+)
+
+target_link_libraries(savt_perf_baseline
+    PRIVATE
+        savt_analyzer
+        savt_core
+        savt_layout
+)
+
+file(TO_CMAKE_PATH "${CMAKE_SOURCE_DIR}" SAVT_PERF_SOURCE_ROOT)
+target_compile_definitions(savt_perf_baseline
+    PRIVATE
+        "SAVT_PERF_SOURCE_ROOT=\"${SAVT_PERF_SOURCE_ROOT}\""
+)
+
+set_target_properties(savt_perf_baseline PROPERTIES
+    FOLDER tests
+)
+
+add_test(NAME savt_perf_smoke COMMAND $<TARGET_FILE:savt_perf_baseline>)
+
 if(WIN32 AND SAVT_POWERSHELL_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/scripts/dev/check_utf8.ps1")
     add_test(NAME savt_utf8_check
         COMMAND "${SAVT_POWERSHELL_EXECUTABLE}"
@@ -114,6 +154,12 @@ set_tests_properties(savt_snapshot_tests PROPERTIES
     ENVIRONMENT "${SAVT_TEST_PATH_ENV}"
 )
 set_tests_properties(savt_ai_tests PROPERTIES
+    ENVIRONMENT "${SAVT_TEST_PATH_ENV}"
+)
+set_tests_properties(savt_ui_tests PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;${SAVT_TEST_PATH_ENV}"
+)
+set_tests_properties(savt_perf_smoke PROPERTIES
     ENVIRONMENT "${SAVT_TEST_PATH_ENV}"
 )
 if(WIN32 AND SAVT_POWERSHELL_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/scripts/dev/check_utf8.ps1")
