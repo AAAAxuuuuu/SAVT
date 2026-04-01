@@ -1,4 +1,5 @@
 #include "savt/core/CapabilityGraph.h"
+#include "savt/core/ProjectAnalysisConfig.h"
 
 #include <algorithm>
 #include <cctype>
@@ -94,6 +95,21 @@ std::vector<std::string> sortedVectorFromSet(const Set& values, const std::size_
         items.resize(limit);
     }
     return items;
+}
+
+bool capabilityMatchesConfigPrefix(const CapabilityNode& node, const std::string& prefix) {
+    if (matchesProjectConfigPrefix(node.name, prefix) ||
+        matchesProjectConfigPrefix(node.folderHint, prefix)) {
+        return true;
+    }
+
+    const auto matchesIn = [&](const std::vector<std::string>& values) {
+        return std::any_of(values.begin(), values.end(), [&](const std::string& value) {
+            return matchesProjectConfigPrefix(value, prefix);
+        });
+    };
+
+    return matchesIn(node.moduleNames) || matchesIn(node.exampleFiles);
 }
 
 const char* toString(const CapabilityAggregationMode mode) {
@@ -896,12 +912,49 @@ void applyDependencyModuleCollapse(CapabilityGraph& graph) {
     }
 }
 
+std::size_t applyConfiguredDependencyFolds(
+    CapabilityGraph& graph,
+    const ProjectAnalysisConfig& config) {
+    if (!config.loaded || config.dependencyFoldRules.empty()) {
+        return 0;
+    }
+
+    std::size_t foldedNodeCount = 0;
+    for (CapabilityNode& node : graph.nodes) {
+        for (const ProjectDependencyFoldRule& rule : config.dependencyFoldRules) {
+            if (!capabilityMatchesConfigPrefix(node, rule.matchPrefix)) {
+                continue;
+            }
+
+            if (rule.hideByDefault) {
+                node.defaultVisible = false;
+            }
+            if (rule.collapse) {
+                node.defaultCollapsed = true;
+            }
+            if (node.kind != CapabilityNodeKind::Entry) {
+                node.kind = CapabilityNodeKind::Infrastructure;
+            }
+            ++foldedNodeCount;
+            break;
+        }
+    }
+
+    return foldedNodeCount;
+}
+
 CapabilityGraph buildCapabilityGraph(const AnalysisReport& report, const ArchitectureOverview& overview) {
     CapabilityGraph graph;
     if (overview.nodes.empty()) {
         graph.diagnostics.push_back("No overview nodes were available, so no capability graph could be derived.");
         return graph;
     }
+
+    const ProjectAnalysisConfig projectConfig = loadProjectAnalysisConfig(report.rootPath);
+    graph.diagnostics.insert(
+        graph.diagnostics.end(),
+        projectConfig.diagnostics.begin(),
+        projectConfig.diagnostics.end());
 
     if (report.semanticAnalysisRequested && !report.semanticAnalysisEnabled) {
         graph.diagnostics.push_back("Capability graph is based on fallback analysis because semantic analysis was unavailable.");
@@ -1208,6 +1261,12 @@ CapabilityGraph buildCapabilityGraph(const AnalysisReport& report, const Archite
         prePruningVisibility.emplace(node.id, node.defaultVisible);
     }
     applyDependencyModuleCollapse(graph);  // 鈽?鍏堟姌鍙犲ぇ浣撻噺涓夋柟搴?
+    const std::size_t configuredFoldCount = applyConfiguredDependencyFolds(graph, projectConfig);
+    if (configuredFoldCount > 0) {
+        graph.diagnostics.push_back(
+            "Project config folded " + std::to_string(configuredFoldCount) +
+            " dependency/support node(s) by default.");
+    }
     applyStrictL2Pruning(graph);
     for (CapabilityNode& node : graph.nodes) {
         const auto beforeIt = prePruningVisibility.find(node.id);
@@ -1343,13 +1402,40 @@ CapabilityGraph buildCapabilityGraph(const AnalysisReport& report, const Archite
         }
 
         node.defaultCollapsed = !node.defaultVisible;
+        CapabilityNodeBuildTrace& trace = nodeBuildTraces[node.id];
+        const auto appendTraceRule = [&](std::string rule) {
+            if (std::find(trace.matchedRules.begin(), trace.matchedRules.end(), rule) == trace.matchedRules.end()) {
+                trace.matchedRules.push_back(std::move(rule));
+            }
+        };
+        for (const ProjectRoleOverrideRule& rule : projectConfig.roleOverrides) {
+            if (capabilityMatchesConfigPrefix(node, rule.matchPrefix)) {
+                appendTraceRule(
+                    "Project config role override: '" + rule.matchPrefix +
+                    "' -> role '" + rule.role + "'.");
+            }
+        }
+        for (const ProjectEntryOverrideRule& rule : projectConfig.entryOverrides) {
+            if (capabilityMatchesConfigPrefix(node, rule.matchPrefix)) {
+                appendTraceRule(
+                    "Project config entry override: '" + rule.matchPrefix +
+                    "' -> " + std::string(rule.entry ? "entry" : "non-entry") + ".");
+            }
+        }
+        for (const ProjectDependencyFoldRule& rule : projectConfig.dependencyFoldRules) {
+            if (capabilityMatchesConfigPrefix(node, rule.matchPrefix)) {
+                appendTraceRule(
+                    "Project config dependency fold: '" + rule.matchPrefix +
+                    "' is collapsed in the default capability scene.");
+            }
+        }
         auto flowNames = flowNamesByNode[node.id];
         std::sort(flowNames.begin(), flowNames.end());
         flowNames.erase(std::unique(flowNames.begin(), flowNames.end()), flowNames.end());
         node.evidence = buildNodeEvidencePackage(
             node,
             aggregationMode,
-            nodeBuildTraces[node.id],
+            trace,
             flowNames);
     }
     std::size_t nextGroupId = 1;

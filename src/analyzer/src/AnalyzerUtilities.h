@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "savt/analyzer/CppProjectAnalyzer.h"
+#include "savt/core/ProjectAnalysisConfig.h"
 
 #include <filesystem>
 #include <optional>
@@ -38,8 +39,12 @@ std::string toUnixPath(std::string value);
 std::string normalizePath(const std::filesystem::path& value);
 std::string relativizePath(const std::filesystem::path& rootPath, const std::filesystem::path& filePath);
 std::vector<std::string> splitPathSegments(std::string_view path);
-std::unordered_map<std::string, std::string> inferModuleNames(const std::vector<std::string>& relativePaths);
-std::string inferModuleName(const std::string& relativePath);
+std::unordered_map<std::string, std::string> inferModuleNames(
+    const std::vector<std::string>& relativePaths,
+    const savt::core::ProjectAnalysisConfig* config = nullptr);
+std::string inferModuleName(
+    const std::string& relativePath,
+    const savt::core::ProjectAnalysisConfig* config = nullptr);
 const char* toString(AnalyzerPrecision precision);
 bool isCancellationRequested(const AnalyzerOptions& options);
 bool isSemanticBackendBuilt();

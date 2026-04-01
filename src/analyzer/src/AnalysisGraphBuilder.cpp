@@ -233,12 +233,15 @@ void AnalysisGraphBuilder::registerModules() {
     for (const FileRecord& file : files_) {
         relativePaths.push_back(file.relativePath);
     }
-    const std::unordered_map<std::string, std::string> inferredModuleNames = inferModuleNames(relativePaths);
+    const savt::core::ProjectAnalysisConfig projectConfig =
+        savt::core::loadProjectAnalysisConfig(rootPath_);
+    const std::unordered_map<std::string, std::string> inferredModuleNames =
+        inferModuleNames(relativePaths, &projectConfig);
 
     for (const FileRecord& file : files_) {
         const auto inferredIt = inferredModuleNames.find(file.relativePath);
         const std::string moduleName = inferredIt == inferredModuleNames.end()
-                                           ? inferModuleName(file.relativePath)
+                                           ? inferModuleName(file.relativePath, &projectConfig)
                                            : inferredIt->second;
         auto moduleIt = moduleNameToId.find(moduleName);
         if (moduleIt == moduleNameToId.end()) {

@@ -259,6 +259,120 @@ void testAdaptiveModuleInference() {
            "java services should be grouped by business package instead of collapsing into src/main");
 }
 
+void testProjectConfigSkipsConfiguredDirectoriesAndMergesModules() {
+    namespace fs = std::filesystem;
+
+    const fs::path tempRoot = makeTempDirectory("savt_project_config_scan");
+    writeTextFile(tempRoot / "config" / "savt.project.json", R"JSON({
+  "version": 1,
+  "analysis": {
+    "ignoreDirectories": ["tests/fixtures"],
+    "moduleMerges": [
+      { "match": "src/ui", "module": "workspace/ui" }
+    ]
+  }
+})JSON");
+    writeTextFile(tempRoot / "src" / "ui" / "MainWindow.cpp", "class MainWindow {};\n");
+    writeTextFile(tempRoot / "src" / "ui" / "Panel.cpp", "class Panel {};\n");
+    writeTextFile(tempRoot / "src" / "engine" / "Engine.cpp", "class Engine {};\n");
+    writeTextFile(tempRoot / "tests" / "fixtures" / "seed.json", "{ \"fixture\": true }\n");
+
+    const savt::analyzer::CppProjectAnalyzer analyzer;
+    savt::analyzer::AnalyzerOptions options;
+    options.precision = savt::analyzer::AnalyzerPrecision::SyntaxOnly;
+
+    const auto report = analyzer.analyzeProject(tempRoot, options);
+
+    expect(std::any_of(report.diagnostics.begin(), report.diagnostics.end(), [](const std::string& diagnostic) {
+               return diagnostic.find("Project analysis config loaded") != std::string::npos;
+           }),
+           "analysis diagnostics should mention that a project config was loaded");
+    expect(findSingleNodeByQualifiedName(report, "tests/fixtures/seed.json") == nullptr,
+           "configured ignore directories should keep architecture-relevant fixture files out of the scan");
+    expect(findReportModule(report, "workspace/ui") != nullptr,
+           "project config module merge rules should remap matching files into the configured module");
+    expect(findReportModule(report, "src/ui") == nullptr,
+           "project config module merge rules should replace the original inferred module name");
+
+    std::error_code errorCode;
+    fs::remove_all(tempRoot, errorCode);
+}
+
+void testProjectConfigOverridesEntryRoleAndDependencyFolding() {
+    namespace fs = std::filesystem;
+
+    const fs::path tempRoot = makeTempDirectory("savt_project_config_overrides");
+    writeTextFile(tempRoot / "config" / "savt.project.json", R"JSON({
+  "version": 1,
+  "analysis": {
+    "roleOverrides": [
+      { "match": "src/frontdesk", "role": "presentation" },
+      { "match": "src/backoffice", "role": "storage" }
+    ],
+    "entryOverrides": [
+      { "match": "src/frontdesk", "entry": true }
+    ],
+    "dependencyFoldRules": [
+      { "match": "vendor", "collapse": true, "hideByDefault": true }
+    ]
+  }
+})JSON");
+
+    using savt::core::AnalysisReport;
+    using savt::core::EdgeKind;
+    using savt::core::SymbolKind;
+
+    AnalysisReport report;
+    report.rootPath = tempRoot.generic_string();
+    report.nodes = {
+        {1, SymbolKind::Module, "src/frontdesk/shell", "module:src/frontdesk/shell", "module:src/frontdesk/shell", "src/frontdesk/shell", 0},
+        {2, SymbolKind::Module, "src/backoffice/engine", "module:src/backoffice/engine", "module:src/backoffice/engine", "src/backoffice/engine", 0},
+        {3, SymbolKind::Module, "vendor/qxlsx", "module:vendor/qxlsx", "module:vendor/qxlsx", "vendor/qxlsx", 0},
+        {10, SymbolKind::File, "shell.cpp", "src/frontdesk/shell.cpp", "file:src/frontdesk/shell.cpp", "src/frontdesk/shell.cpp", 0},
+        {11, SymbolKind::File, "engine.cpp", "src/backoffice/engine.cpp", "file:src/backoffice/engine.cpp", "src/backoffice/engine.cpp", 0},
+        {12, SymbolKind::File, "xlsx.cpp", "vendor/qxlsx/xlsx.cpp", "file:vendor/qxlsx/xlsx.cpp", "vendor/qxlsx/xlsx.cpp", 0},
+        {20, SymbolKind::Class, "ShellView", "ShellView", "type:ShellView", "src/frontdesk/shell.cpp", 3},
+        {21, SymbolKind::Class, "EngineService", "EngineService", "type:EngineService", "src/backoffice/engine.cpp", 6},
+        {22, SymbolKind::Class, "Workbook", "Workbook", "type:Workbook", "vendor/qxlsx/xlsx.cpp", 9}
+    };
+    report.edges = {
+        {1, 10, EdgeKind::Contains, 1},
+        {2, 11, EdgeKind::Contains, 1},
+        {3, 12, EdgeKind::Contains, 1},
+        {1, 2, EdgeKind::DependsOn, 3},
+        {2, 3, EdgeKind::DependsOn, 2}
+    };
+
+    const auto overview = savt::core::buildArchitectureOverview(report);
+    const auto capabilityGraph = savt::core::buildCapabilityGraph(report, overview);
+
+    const auto* frontdeskNode = findOverviewNode(overview, "src/frontdesk/shell");
+    expect(frontdeskNode != nullptr, "overview should preserve the configured frontdesk module");
+    expect(frontdeskNode->kind == savt::core::OverviewNodeKind::EntryPointModule,
+           "project config entry overrides should force matching modules to become entry modules");
+    expect(frontdeskNode->role == "presentation",
+           "project config role overrides should replace the inferred overview role");
+
+    const auto* backofficeNode = findOverviewNode(overview, "src/backoffice/engine");
+    expect(backofficeNode != nullptr && backofficeNode->role == "storage",
+           "project config role overrides should also apply to non-entry overview modules");
+
+    const auto* dependencyCapability = findCapabilityByModule(capabilityGraph, "vendor/qxlsx");
+    expect(dependencyCapability != nullptr,
+           "capability graph should still surface configured dependency nodes");
+    expect(dependencyCapability->defaultCollapsed,
+           "project config dependency fold rules should collapse matching support nodes by default");
+    expect(!dependencyCapability->defaultVisible,
+           "project config dependency fold rules should hide matching support nodes by default");
+    expect(std::any_of(capabilityGraph.diagnostics.begin(), capabilityGraph.diagnostics.end(), [](const std::string& diagnostic) {
+               return diagnostic.find("folded") != std::string::npos;
+           }),
+           "capability diagnostics should mention configured dependency folding");
+
+    std::error_code errorCode;
+    fs::remove_all(tempRoot, errorCode);
+}
+
 void testDependencyAndPrimaryEntryClassification() {
     using savt::core::AnalysisReport;
     using savt::core::EdgeKind;
@@ -1488,6 +1602,8 @@ Box<int>* makeBox() {
 
 int main() {
     testAdaptiveModuleInference();
+    testProjectConfigSkipsConfiguredDirectoriesAndMergesModules();
+    testProjectConfigOverridesEntryRoleAndDependencyFolding();
     testDependencyAndPrimaryEntryClassification();
     testCrossArtifactOverviewAndCapabilityGraph();
     testCapabilitySceneMapperPublishesSingleScenePayload();

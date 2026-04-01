@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "analysis": {
+    "ignoreDirectories": [
+      "config",
+      "tests/fixtures",
+      "tests/golden",
+      "docs"
+    ],
+    "moduleMerges": [
+      { "match": "src/core/include", "module": "src/core" },
+      { "match": "src/core/src", "module": "src/core" },
+      { "match": "src/ui/include", "module": "src/ui" },
+      { "match": "src/ui/src", "module": "src/ui" }
+    ],
+    "roleOverrides": [
+      { "match": "apps/desktop", "role": "presentation" },
+      { "match": "src/ui", "role": "presentation" },
+      { "match": "src/layout", "role": "visualization" },
+      { "match": "src/parser", "role": "analysis" },
+      { "match": "src/analyzer", "role": "analysis" },
+      { "match": "src/ai", "role": "analysis" },
+      { "match": "src/core", "role": "core_model" }
+    ],
+    "entryOverrides": [
+      { "match": "apps/desktop", "entry": true }
+    ],
+    "dependencyFoldRules": [
+      { "match": "third_party", "collapse": true, "hideByDefault": true },
+      { "match": "tools/llvm", "collapse": true, "hideByDefault": true }
+    ]
+  }
+}

@@ -1,5 +1,7 @@
 ﻿#include "savt/core/ArchitectureOverview.h"
 
+#include "savt/core/ProjectAnalysisConfig.h"
+
 #include <algorithm>
 #include <cctype>
 #include <functional>
@@ -165,6 +167,17 @@ std::string buildNodeEvidenceText(const OverviewNode& node) {
         output << symbol << ' ';
     }
     return output.str();
+}
+
+bool nodeMatchesConfigPrefix(const OverviewNode& node, const std::string& prefix) {
+    if (matchesProjectConfigPrefix(node.name, prefix) ||
+        matchesProjectConfigPrefix(node.folderKey, prefix)) {
+        return true;
+    }
+
+    return std::any_of(node.filePaths.begin(), node.filePaths.end(), [&](const std::string& filePath) {
+        return matchesProjectConfigPrefix(filePath, prefix);
+    });
 }
 
 bool isDependencyLikeModule(const OverviewNode& node) {
@@ -336,6 +349,30 @@ std::string classifyModuleRole(const OverviewNode& node) {
     return "mixed";
 }
 
+std::optional<std::string> configuredRoleOverride(
+    const OverviewNode& node,
+    const ProjectAnalysisConfig& config) {
+    std::optional<std::string> role;
+    for (const ProjectRoleOverrideRule& rule : config.roleOverrides) {
+        if (nodeMatchesConfigPrefix(node, rule.matchPrefix)) {
+            role = rule.role;
+        }
+    }
+    return role;
+}
+
+std::optional<bool> configuredEntryOverride(
+    const OverviewNode& node,
+    const ProjectAnalysisConfig& config) {
+    std::optional<bool> entry;
+    for (const ProjectEntryOverrideRule& rule : config.entryOverrides) {
+        if (nodeMatchesConfigPrefix(node, rule.matchPrefix)) {
+            entry = rule.entry;
+        }
+    }
+    return entry;
+}
+
 std::string stageNameForIndex(const std::size_t stageIndex, const std::size_t maxStageIndex) {
     if (stageIndex == 0) {
         return "entry";
@@ -462,6 +499,9 @@ const char* toString(const OverviewGroupKind kind) {
 
 ArchitectureOverview buildArchitectureOverview(const AnalysisReport& report) {
     ArchitectureOverview overview;
+    const ProjectAnalysisConfig projectConfig = loadProjectAnalysisConfig(report.rootPath);
+    std::size_t roleOverrideMatchCount = 0;
+    std::size_t entryOverrideMatchCount = 0;
 
     std::unordered_map<std::string, std::size_t> filePathToFileNodeId;
     for (const SymbolNode& node : report.nodes) {
@@ -595,12 +635,26 @@ ArchitectureOverview buildArchitectureOverview(const AnalysisReport& report) {
         std::sort(aggregate.node.filePaths.begin(), aggregate.node.filePaths.end());
         aggregate.node.name = refineModuleDisplayName(aggregate.node);
         aggregate.node.role = classifyModuleRole(aggregate.node);
-        if ((isDependencyLikeModule(aggregate.node) || isWorkspaceAuxiliaryModule(aggregate.node)) &&
-            aggregate.node.kind == OverviewNodeKind::EntryPointModule) {
+        if (const auto configuredRole = configuredRoleOverride(aggregate.node, projectConfig); configuredRole.has_value()) {
+            aggregate.node.role = *configuredRole;
+            ++roleOverrideMatchCount;
+        }
+        const auto configuredEntry = configuredEntryOverride(aggregate.node, projectConfig);
+        const bool suppressImplicitEntry =
+            aggregate.node.role == "dependency" ||
+            isDependencyLikeModule(aggregate.node) || isWorkspaceAuxiliaryModule(aggregate.node);
+        if (suppressImplicitEntry && aggregate.node.kind == OverviewNodeKind::EntryPointModule &&
+            (!configuredEntry.has_value() || !configuredEntry.value())) {
             aggregate.node.kind = OverviewNodeKind::Module;
         }
-        if (aggregate.node.kind != OverviewNodeKind::EntryPointModule && isLikelyEntryModule(aggregate.node)) {
+        if (!configuredEntry.has_value() &&
+            aggregate.node.kind != OverviewNodeKind::EntryPointModule &&
+            isLikelyEntryModule(aggregate.node)) {
             aggregate.node.kind = OverviewNodeKind::EntryPointModule;
+        }
+        if (configuredEntry.has_value()) {
+            aggregate.node.kind = *configuredEntry ? OverviewNodeKind::EntryPointModule : OverviewNodeKind::Module;
+            ++entryOverrideMatchCount;
         }
         overview.nodes.push_back(std::move(aggregate.node));
     }
@@ -615,6 +669,23 @@ ArchitectureOverview buildArchitectureOverview(const AnalysisReport& report) {
     std::unordered_map<std::size_t, OverviewNode*> overviewNodeById;
     for (OverviewNode& node : overview.nodes) {
         overviewNodeById.emplace(node.id, &node);
+    }
+
+    overview.diagnostics.insert(
+        overview.diagnostics.end(),
+        projectConfig.diagnostics.begin(),
+        projectConfig.diagnostics.end());
+    if (projectConfig.loaded) {
+        if (roleOverrideMatchCount > 0) {
+            overview.diagnostics.push_back(
+                "Project config applied " + std::to_string(roleOverrideMatchCount) +
+                " role override(s) during overview generation.");
+        }
+        if (entryOverrideMatchCount > 0) {
+            overview.diagnostics.push_back(
+                "Project config applied " + std::to_string(entryOverrideMatchCount) +
+                " entry override(s) during overview generation.");
+        }
     }
 
     std::unordered_map<std::size_t, std::vector<OverviewEdge>> adjacency;
@@ -1202,5 +1273,3 @@ std::string formatArchitectureOverview(
 }
 
 }  // namespace savt::core
-
-

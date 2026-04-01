@@ -90,6 +90,10 @@ bool pathContainsSegment(const std::string& normalizedLowerPath, const std::stri
            normalizedLowerPath.ends_with("/" + std::string(segment));
 }
 
+bool matchesConfiguredPathPrefix(const std::string& candidate, const std::string& prefix) {
+    return savt::core::matchesProjectConfigPrefix(candidate, prefix);
+}
+
 bool isLikelyToolchainDirectory(const std::string& nameLower) {
     return nameLower == "llvm" ||
            nameLower == "clang" ||
@@ -105,6 +109,49 @@ bool isLikelyToolchainDirectory(const std::string& nameLower) {
            nameLower.starts_with("msvc") ||
            nameLower == "qt" ||
            nameLower.starts_with("qt-");
+}
+
+bool shouldSkipConfiguredDirectory(
+    const std::filesystem::path& rootPath,
+    const std::filesystem::path& directoryPath,
+    const savt::core::ProjectAnalysisConfig& config) {
+    if (!config.loaded || config.ignoreDirectories.empty()) {
+        return false;
+    }
+
+    std::error_code errorCode;
+    const std::filesystem::path relativeDirectory =
+        std::filesystem::relative(directoryPath, rootPath, errorCode);
+    const std::string relativePath = errorCode
+        ? normalizePath(directoryPath)
+        : normalizePath(relativeDirectory);
+    if (relativePath.empty() || relativePath == ".") {
+        return false;
+    }
+
+    return std::any_of(
+        config.ignoreDirectories.begin(),
+        config.ignoreDirectories.end(),
+        [&](const std::string& prefix) {
+            return matchesConfiguredPathPrefix(relativePath, prefix);
+        });
+}
+
+std::string applyConfiguredModuleMerge(
+    const std::string& relativePath,
+    std::string inferredModuleName,
+    const savt::core::ProjectAnalysisConfig* config) {
+    if (config == nullptr || !config->loaded) {
+        return inferredModuleName;
+    }
+
+    for (const savt::core::ProjectModuleMergeRule& rule : config->moduleMerges) {
+        if (matchesConfiguredPathPrefix(relativePath, rule.matchPrefix) ||
+            matchesConfiguredPathPrefix(inferredModuleName, rule.matchPrefix)) {
+            inferredModuleName = rule.targetModule;
+        }
+    }
+    return inferredModuleName;
 }
 
 std::string componentStemForFile(const std::filesystem::path& relativePath) {
@@ -367,6 +414,8 @@ std::vector<std::filesystem::path> collectSourceFiles(
     const std::filesystem::path& rootPath,
     const AnalyzerOptions& options) {
     std::vector<std::filesystem::path> files;
+    const savt::core::ProjectAnalysisConfig projectConfig =
+        savt::core::loadProjectAnalysisConfig(rootPath);
 
     std::error_code errorCode;
     std::filesystem::recursive_directory_iterator iterator(
@@ -386,7 +435,8 @@ std::vector<std::filesystem::path> collectSourceFiles(
 
         const std::filesystem::directory_entry& entry = *iterator;
         if (entry.is_directory(errorCode)) {
-            if (shouldSkipDirectory(entry.path(), options)) {
+            if (shouldSkipDirectory(entry.path(), options) ||
+                shouldSkipConfiguredDirectory(rootPath, entry.path(), projectConfig)) {
                 iterator.disable_recursion_pending();
             }
             continue;
@@ -451,7 +501,9 @@ std::vector<std::string> splitPathSegments(std::string_view path) {
     return segments;
 }
 
-std::unordered_map<std::string, std::string> inferModuleNames(const std::vector<std::string>& relativePaths) {
+std::unordered_map<std::string, std::string> inferModuleNames(
+    const std::vector<std::string>& relativePaths,
+    const savt::core::ProjectAnalysisConfig* config) {
     std::unordered_map<std::string, std::string> moduleNames;
     std::unordered_map<std::string, TopLevelStats> topLevelStats;
     std::unordered_map<std::string, PrefixStats> prefixStats;
@@ -577,23 +629,27 @@ std::unordered_map<std::string, std::string> inferModuleNames(const std::vector<
             moduleName = topLevelName;
         }
 
-        moduleNames.emplace(relativePath, std::move(moduleName));
+        moduleNames.emplace(relativePath, applyConfiguredModuleMerge(relativePath, std::move(moduleName), config));
     }
 
     return moduleNames;
 }
 
-std::string inferModuleName(const std::string& relativePath) {
+std::string inferModuleName(
+    const std::string& relativePath,
+    const savt::core::ProjectAnalysisConfig* config) {
     const std::vector<std::string> segments = splitPathSegments(relativePath);
     if (segments.empty()) {
         return "(root)";
     }
     if (segments.size() == 1) {
-        return isLikelyDirectorySegment(segments.front()) ? segments.front() : std::string("(root)");
+        const std::string moduleName =
+            isLikelyDirectorySegment(segments.front()) ? segments.front() : std::string("(root)");
+        return applyConfiguredModuleMerge(relativePath, moduleName, config);
     }
 
     if (isDependencyLikeSegment(segments.front()) || isNumericOnlySegment(segments.front())) {
-        return segments.front();
+        return applyConfiguredModuleMerge(relativePath, segments.front(), config);
     }
 
     static const std::unordered_set<std::string> groupedRoots = {
@@ -601,14 +657,14 @@ std::string inferModuleName(const std::string& relativePath) {
     };
 
     if (const std::string javaModule = javaModuleName(segments, nullptr); !javaModule.empty()) {
-        return javaModule;
+        return applyConfiguredModuleMerge(relativePath, javaModule, config);
     }
 
     if (groupedRoots.contains(segments.front()) && segments.size() >= 2) {
-        return groupedRootModuleName(segments);
+        return applyConfiguredModuleMerge(relativePath, groupedRootModuleName(segments), config);
     }
 
-    return segments.front();
+    return applyConfiguredModuleMerge(relativePath, segments.front(), config);
 }
 
 const char* toString(const AnalyzerPrecision precision) {

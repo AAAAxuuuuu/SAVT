@@ -3,6 +3,7 @@
 #include "AnalyzerUtilities.h"
 #include "SemanticProjectAnalyzer.h"
 #include "SyntaxProjectAnalyzer.h"
+#include "savt/core/ProjectAnalysisConfig.h"
 
 namespace savt::analyzer {
 namespace {
@@ -137,8 +138,13 @@ savt::core::AnalysisReport CppProjectAnalyzer::analyzeProject(
     const auto compilationDatabaseProbe = detail::probeCompilationDatabase(normalizedRoot, options);
     const auto& compilationDatabasePath = compilationDatabaseProbe.resolvedPath;
     const auto backendInfo = detail::semanticBackendBuildInfo();
+    const auto projectConfig = savt::core::loadProjectAnalysisConfig(normalizedRoot);
 
     std::vector<std::string> preflightDiagnostics;
+    preflightDiagnostics.insert(
+        preflightDiagnostics.end(),
+        projectConfig.diagnostics.begin(),
+        projectConfig.diagnostics.end());
     std::string semanticStatusCode = semanticRequested ? "semantic_ready" : "not_requested";
     std::string semanticStatusMessage = semanticRequested
         ? "Semantic analysis is ready to start."
