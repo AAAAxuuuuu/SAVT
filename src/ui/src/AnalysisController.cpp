@@ -99,6 +99,10 @@ QVariantMap AnalysisController::capabilityScene() const {
     return SceneMapper::toVariantMap(m_capabilityScene);
 }
 
+QVariantMap AnalysisController::componentSceneCatalog() const {
+    return m_componentSceneCatalog;
+}
+
 QVariantList AnalysisController::capabilityNodeItems() const {
     return m_capabilityScene.nodeItems;
 }
@@ -442,6 +446,7 @@ void AnalysisController::finishAnalysis() {
     setAstPreviewSummary(result->astPreviewSummary);
     setAstPreviewText(result->astPreviewText);
     setCapabilityScene(result->capabilityScene);
+    setComponentSceneCatalog(result->componentSceneCatalog);
     if (m_systemContextReport != result->systemContextReport) {
         m_systemContextReport = result->systemContextReport;
         emit systemContextReportChanged();
@@ -459,6 +464,7 @@ void AnalysisController::clearVisualizationState() {
     setAstPreviewSummary(preview.summary);
     setAstPreviewText(preview.text);
     setCapabilityScene({});
+    setComponentSceneCatalog({});
     setSystemContextData({});
     setSystemContextCards({});
     if (!m_systemContextReport.isEmpty()) {
@@ -567,6 +573,14 @@ void AnalysisController::setCapabilityScene(CapabilitySceneData value) {
     if (sceneHeightChanged) {
         emit capabilitySceneHeightChanged();
     }
+}
+
+void AnalysisController::setComponentSceneCatalog(QVariantMap value) {
+    if (m_componentSceneCatalog == value) {
+        return;
+    }
+    m_componentSceneCatalog = std::move(value);
+    emit componentSceneCatalogChanged();
 }
 
 void AnalysisController::setAnalyzing(const bool value) {

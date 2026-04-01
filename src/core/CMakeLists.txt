@@ -2,6 +2,7 @@ add_library(savt_core STATIC
     src/ArchitectureGraph.cpp
     src/ArchitectureOverview.cpp
     src/CapabilityGraph.cpp
+    src/ComponentGraph.cpp
     src/SyntaxTree.cpp
 )
 

@@ -78,6 +78,36 @@ void expandGroupBounds(
     group.height = mergedMaxY - mergedMinY;
 }
 
+void expandGroupBounds(
+    ComponentSceneGroupLayout& group,
+    const SceneRect& rect,
+    const double padding) {
+    const double minX = rect.x - padding;
+    const double minY = rect.y - padding;
+    const double maxX = rect.x + rect.width + padding;
+    const double maxY = rect.y + rect.height + padding;
+
+    if (!group.hasBounds) {
+        group.hasBounds = true;
+        group.x = minX;
+        group.y = minY;
+        group.width = maxX - minX;
+        group.height = maxY - minY;
+        return;
+    }
+
+    const double currentMaxX = group.x + group.width;
+    const double currentMaxY = group.y + group.height;
+    const double mergedMinX = std::min(group.x, minX);
+    const double mergedMinY = std::min(group.y, minY);
+    const double mergedMaxX = std::max(currentMaxX, maxX);
+    const double mergedMaxY = std::max(currentMaxY, maxY);
+    group.x = mergedMinX;
+    group.y = mergedMinY;
+    group.width = mergedMaxX - mergedMinX;
+    group.height = mergedMaxY - mergedMinY;
+}
+
 }  // namespace
 
 LayoutResult LayeredGraphLayout::layoutModules(
@@ -318,6 +348,106 @@ CapabilitySceneLayoutResult LayeredGraphLayout::layoutCapabilityScene(
     });
 
     result.width = currentX - options.columnGap + options.marginX;
+    result.height = std::max(maxBottom + options.marginY, options.minSceneHeight);
+    return result;
+}
+
+ComponentSceneLayoutResult LayeredGraphLayout::layoutComponentScene(
+    const savt::core::ComponentGraph& graph,
+    const ComponentSceneLayoutOptions& options) const {
+    ComponentSceneLayoutResult result;
+    result.diagnostics = graph.diagnostics;
+
+    if (graph.nodes.empty()) {
+        result.diagnostics.push_back("No component nodes found for L3 layout.");
+        return result;
+    }
+
+    std::size_t maxStageIndex = 0;
+    for (const savt::core::ComponentNode& node : graph.nodes) {
+        maxStageIndex = std::max(maxStageIndex, node.stageIndex);
+    }
+
+    std::vector<std::vector<const savt::core::ComponentNode*>> stages(maxStageIndex + 1);
+    for (const savt::core::ComponentNode& node : graph.nodes) {
+        if (node.defaultVisible) {
+            stages[node.stageIndex].push_back(&node);
+        }
+    }
+
+    for (auto& stageNodes : stages) {
+        std::sort(stageNodes.begin(), stageNodes.end(), [](const savt::core::ComponentNode* left, const savt::core::ComponentNode* right) {
+            if (left->defaultPinned != right->defaultPinned) {
+                return left->defaultPinned;
+            }
+            if (left->visualPriority != right->visualPriority) {
+                return left->visualPriority > right->visualPriority;
+            }
+            return left->name < right->name;
+        });
+    }
+
+    std::unordered_map<std::size_t, SceneRect> nodeRects;
+    double currentX = options.marginX;
+    double maxBottom = options.marginY;
+
+    for (std::size_t stageIndex = 0; stageIndex < stages.size(); ++stageIndex) {
+        double currentY = options.marginY;
+        for (std::size_t order = 0; order < stages[stageIndex].size(); ++order) {
+            const savt::core::ComponentNode& node = *stages[stageIndex][order];
+            result.nodes.push_back(ComponentSceneNodeLayout{
+                node.id,
+                stageIndex,
+                order,
+                currentX,
+                currentY,
+                options.baseNodeWidth,
+                options.baseNodeHeight});
+            nodeRects.emplace(node.id, SceneRect{currentX, currentY, options.baseNodeWidth, options.baseNodeHeight});
+            maxBottom = std::max(maxBottom, currentY + options.baseNodeHeight);
+            currentY += options.baseNodeHeight + options.rowGap;
+        }
+        currentX += options.baseNodeWidth + options.columnGap;
+    }
+
+    for (const savt::core::ComponentEdge& edge : graph.edges) {
+        if (!edge.defaultVisible) {
+            continue;
+        }
+        const auto fromRectIt = nodeRects.find(edge.fromId);
+        const auto toRectIt = nodeRects.find(edge.toId);
+        if (fromRectIt == nodeRects.end() || toRectIt == nodeRects.end()) {
+            continue;
+        }
+
+        const SceneRect& fromRect = fromRectIt->second;
+        const SceneRect& toRect = toRectIt->second;
+        ComponentSceneEdgeLayout edgeLayout;
+        edgeLayout.edgeId = edge.id;
+        edgeLayout.fromId = edge.fromId;
+        edgeLayout.toId = edge.toId;
+        edgeLayout.routePoints = {
+            ScenePoint{fromRect.x + fromRect.width, fromRect.y + fromRect.height * 0.5},
+            ScenePoint{toRect.x, toRect.y + toRect.height * 0.5}};
+        result.edges.push_back(std::move(edgeLayout));
+    }
+
+    for (const savt::core::ComponentGroup& group : graph.groups) {
+        ComponentSceneGroupLayout groupLayout;
+        groupLayout.groupId = group.id;
+        for (const std::size_t nodeId : group.nodeIds) {
+            const auto rectIt = nodeRects.find(nodeId);
+            if (rectIt == nodeRects.end()) {
+                continue;
+            }
+            groupLayout.visibleNodeIds.push_back(nodeId);
+            expandGroupBounds(groupLayout, rectIt->second, options.groupPadding);
+        }
+        std::sort(groupLayout.visibleNodeIds.begin(), groupLayout.visibleNodeIds.end());
+        result.groups.push_back(std::move(groupLayout));
+    }
+
+    result.width = std::max(currentX - options.columnGap + options.marginX, options.baseNodeWidth + options.marginX * 2.0);
     result.height = std::max(maxBottom + options.marginY, options.minSceneHeight);
     return result;
 }

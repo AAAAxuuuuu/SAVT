@@ -11,6 +11,7 @@ qt_add_qml_module(savt_desktop
         qml/components/AppTheme.qml
         qml/components/TopControlBar.qml
         qml/components/L2GraphView.qml
+        qml/components/L3ComponentView.qml
         qml/components/RightInspector.qml
         qml/components/SurfaceCard.qml
         qml/components/TagChip.qml

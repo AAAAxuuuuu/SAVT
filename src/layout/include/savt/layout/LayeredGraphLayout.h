@@ -2,6 +2,7 @@
 
 #include "savt/core/ArchitectureGraph.h"
 #include "savt/core/CapabilityGraph.h"
+#include "savt/core/ComponentGraph.h"
 
 #include <cstddef>
 #include <string>
@@ -80,6 +81,53 @@ struct CapabilitySceneLayoutResult {
     std::vector<std::string> diagnostics;
 };
 
+struct ComponentSceneLayoutOptions {
+    double baseNodeWidth = 232.0;
+    double baseNodeHeight = 110.0;
+    double columnGap = 92.0;
+    double rowGap = 26.0;
+    double marginX = 32.0;
+    double marginY = 24.0;
+    double minSceneHeight = 320.0;
+    double groupPadding = 16.0;
+};
+
+struct ComponentSceneNodeLayout {
+    std::size_t nodeId = 0;
+    std::size_t stageIndex = 0;
+    std::size_t orderInStage = 0;
+    double x = 0.0;
+    double y = 0.0;
+    double width = 0.0;
+    double height = 0.0;
+};
+
+struct ComponentSceneEdgeLayout {
+    std::size_t edgeId = 0;
+    std::size_t fromId = 0;
+    std::size_t toId = 0;
+    std::vector<ScenePoint> routePoints;
+};
+
+struct ComponentSceneGroupLayout {
+    std::size_t groupId = 0;
+    bool hasBounds = false;
+    double x = 0.0;
+    double y = 0.0;
+    double width = 0.0;
+    double height = 0.0;
+    std::vector<std::size_t> visibleNodeIds;
+};
+
+struct ComponentSceneLayoutResult {
+    double width = 0.0;
+    double height = 0.0;
+    std::vector<ComponentSceneNodeLayout> nodes;
+    std::vector<ComponentSceneEdgeLayout> edges;
+    std::vector<ComponentSceneGroupLayout> groups;
+    std::vector<std::string> diagnostics;
+};
+
 class LayeredGraphLayout {
 public:
     LayoutResult layoutModules(
@@ -90,6 +138,10 @@ public:
     CapabilitySceneLayoutResult layoutCapabilityScene(
         const savt::core::CapabilityGraph& graph,
         const CapabilitySceneLayoutOptions& options = {}) const;
+
+    ComponentSceneLayoutResult layoutComponentScene(
+        const savt::core::ComponentGraph& graph,
+        const ComponentSceneLayoutOptions& options = {}) const;
 };
 
 std::string formatLayoutResult(

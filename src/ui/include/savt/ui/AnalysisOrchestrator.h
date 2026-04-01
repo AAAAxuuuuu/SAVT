@@ -25,6 +25,7 @@ struct PendingAnalysisResult {
     QString astPreviewSummary;
     QString astPreviewText;
     CapabilitySceneData capabilityScene;
+    QVariantMap componentSceneCatalog;
     QVariantMap systemContextData;
     QVariantList systemContextCards;
     bool canceled = false;

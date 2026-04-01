@@ -5,6 +5,7 @@
 #include "savt/core/ArchitectureGraph.h"
 #include "savt/core/ArchitectureOverview.h"
 #include "savt/core/CapabilityGraph.h"
+#include "savt/core/ComponentGraph.h"
 #include "savt/layout/LayeredGraphLayout.h"
 #include "savt/ui/SceneMapper.h"
 
@@ -527,6 +528,203 @@ void testCapabilitySceneMapperPublishesSingleScenePayload() {
            "scene payload edges should expose routed path points from the layout layer");
     expect(firstEdge.value("evidence").toMap().value("rules").toList().size() == 1,
            "scene payload edges should expose nested evidence rules");
+}
+
+void testComponentSceneMapperPublishesCapabilityDrilldownPayload() {
+    savt::core::ArchitectureOverview overview;
+
+    savt::core::OverviewNode entryNode;
+    entryNode.id = 1;
+    entryNode.kind = savt::core::OverviewNodeKind::EntryPointModule;
+    entryNode.name = "DesktopShell";
+    entryNode.role = "ui";
+    entryNode.summary = "负责触发能力域内部的主流程。";
+    entryNode.topSymbols = {"main", "openWorkbench"};
+    entryNode.filePaths = {"apps/desktop/main.cpp", "apps/desktop/WorkbenchWindow.cpp"};
+    entryNode.fileCount = 2;
+    entryNode.sourceFileCount = 2;
+    entryNode.outgoingDependencyCount = 1;
+    entryNode.stageIndex = 0;
+    entryNode.stageName = "入口阶段";
+    entryNode.folderKey = "apps/desktop";
+    entryNode.reachableFromEntry = true;
+    overview.nodes.push_back(entryNode);
+
+    savt::core::OverviewNode componentNode;
+    componentNode.id = 2;
+    componentNode.kind = savt::core::OverviewNodeKind::Module;
+    componentNode.name = "AnalysisFlow";
+    componentNode.role = "analysis";
+    componentNode.summary = "组织项目扫描和结构归并。";
+    componentNode.topSymbols = {"AnalysisPipeline", "runAnalysis"};
+    componentNode.filePaths = {"src/analyzer/AnalysisFlow.cpp", "src/analyzer/Planner.cpp"};
+    componentNode.fileCount = 2;
+    componentNode.sourceFileCount = 2;
+    componentNode.incomingDependencyCount = 1;
+    componentNode.outgoingDependencyCount = 1;
+    componentNode.stageIndex = 1;
+    componentNode.stageName = "编排阶段";
+    componentNode.folderKey = "src/analyzer";
+    componentNode.reachableFromEntry = true;
+    overview.nodes.push_back(componentNode);
+
+    savt::core::OverviewNode supportNode;
+    supportNode.id = 3;
+    supportNode.kind = savt::core::OverviewNodeKind::Module;
+    supportNode.name = "SnapshotStore";
+    supportNode.role = "storage";
+    supportNode.summary = "保存组件图和证据快照。";
+    supportNode.topSymbols = {"SnapshotStore", "persistSnapshot"};
+    supportNode.filePaths = {"src/storage/SnapshotStore.cpp"};
+    supportNode.fileCount = 1;
+    supportNode.sourceFileCount = 1;
+    supportNode.incomingDependencyCount = 1;
+    supportNode.stageIndex = 2;
+    supportNode.stageName = "支撑阶段";
+    supportNode.folderKey = "src/storage";
+    supportNode.reachableFromEntry = true;
+    overview.nodes.push_back(supportNode);
+
+    overview.edges.push_back({1, 2, savt::core::OverviewEdgeKind::DependsOn, 3});
+    overview.edges.push_back({2, 3, savt::core::OverviewEdgeKind::DependsOn, 2});
+
+    savt::core::CapabilityGraph capabilityGraph;
+    savt::core::CapabilityNode capabilityNode;
+    capabilityNode.id = 100;
+    capabilityNode.kind = savt::core::CapabilityNodeKind::Capability;
+    capabilityNode.name = "Analysis Workbench";
+    capabilityNode.summary = "将分析流程拆成入口、编排和支撑组件。";
+    capabilityNode.overviewNodeIds = {1, 2, 3};
+    capabilityNode.moduleNames = {"DesktopShell", "AnalysisFlow", "SnapshotStore"};
+    capabilityGraph.nodes.push_back(capabilityNode);
+
+    const auto componentGraph =
+        savt::core::buildComponentGraphForCapability(overview, capabilityGraph, 100);
+    expect(componentGraph.capabilityId == 100,
+           "component graph should remember the originating capability id");
+    expect(componentGraph.nodes.size() == 3,
+           "component graph should publish one node per overview module inside the selected capability");
+    expect(componentGraph.edges.size() == 2,
+           "component graph should keep internal overview dependencies as L3 component edges");
+    expect(componentGraph.groups.size() == 3,
+           "component graph should create one stage group per distinct internal stage");
+
+    const auto desktopShellIt = std::find_if(
+        componentGraph.nodes.begin(), componentGraph.nodes.end(), [](const savt::core::ComponentNode& node) {
+            return node.name == "DesktopShell";
+        });
+    const auto snapshotStoreIt = std::find_if(
+        componentGraph.nodes.begin(), componentGraph.nodes.end(), [](const savt::core::ComponentNode& node) {
+            return node.name == "SnapshotStore";
+        });
+    expect(desktopShellIt != componentGraph.nodes.end() &&
+               desktopShellIt->kind == savt::core::ComponentNodeKind::Entry,
+           "entry overview modules should become entry components in the L3 graph");
+    expect(snapshotStoreIt != componentGraph.nodes.end() &&
+               snapshotStoreIt->kind == savt::core::ComponentNodeKind::Support,
+           "support-oriented overview roles should become support components in the L3 graph");
+    expect(!desktopShellIt->evidence.facts.empty() &&
+               !snapshotStoreIt->evidence.rules.empty(),
+           "component nodes should carry evidence packages for the inspector");
+
+    const auto activatesEdgeIt = std::find_if(
+        componentGraph.edges.begin(), componentGraph.edges.end(), [&](const savt::core::ComponentEdge& edge) {
+            return edge.kind == savt::core::ComponentEdgeKind::Activates;
+        });
+    const auto usesSupportEdgeIt = std::find_if(
+        componentGraph.edges.begin(), componentGraph.edges.end(), [&](const savt::core::ComponentEdge& edge) {
+            return edge.kind == savt::core::ComponentEdgeKind::UsesSupport;
+        });
+    expect(activatesEdgeIt != componentGraph.edges.end() &&
+               activatesEdgeIt->weight == 3,
+           "entry-driven internal dependencies should remain activates edges with the original aggregated weight");
+    expect(usesSupportEdgeIt != componentGraph.edges.end() &&
+               usesSupportEdgeIt->weight == 2,
+           "dependencies landing on support components should remain uses_support edges with the original aggregated weight");
+    expect(!activatesEdgeIt->evidence.conclusions.empty() &&
+               !usesSupportEdgeIt->evidence.facts.empty(),
+           "component edges should expose nested evidence for the inspector");
+
+    savt::layout::LayeredGraphLayout layoutEngine;
+    const auto sceneLayout = layoutEngine.layoutComponentScene(componentGraph);
+    const auto sceneData = savt::ui::SceneMapper::buildComponentSceneData(componentGraph, sceneLayout);
+    const QVariantMap sceneMap = savt::ui::SceneMapper::toVariantMap(sceneData);
+
+    expect(sceneMap.value("title").toString() == "Analysis Workbench",
+           "component scene payload should expose the selected capability title");
+    expect(sceneMap.value("nodes").toList().size() == 3,
+           "component scene payload should publish every L3 node");
+    expect(sceneMap.value("edges").toList().size() == 2,
+           "component scene payload should publish every internal L3 edge");
+    expect(sceneMap.value("groups").toList().size() == 3,
+           "component scene payload should publish every stage group");
+
+    const QVariantMap firstNode = sceneMap.value("nodes").toList().front().toMap();
+    expect(firstNode.contains("stageGroupId"),
+           "component scene nodes should expose their stage group identity");
+    expect(firstNode.value("evidence").toMap().value("conclusions").toList().size() >= 1,
+           "component scene nodes should forward evidence conclusions into the UI payload");
+
+    const QVariantMap firstEdge = sceneMap.value("edges").toList().front().toMap();
+    expect(firstEdge.value("routePointCount").toULongLong() >= 2,
+           "component scene edges should expose routed path points");
+    expect(firstEdge.value("evidence").toMap().value("rules").toList().size() >= 1,
+           "component scene edges should forward evidence rules into the UI payload");
+}
+
+void testSingleModuleCapabilityFallsBackToFileLevelL3Expansion() {
+    savt::core::AnalysisReport report;
+    report.rootPath = "synthetic";
+    report.primaryEngine = "tree-sitter";
+    report.precisionLevel = "syntax";
+
+    report.nodes = {
+        {1, savt::core::SymbolKind::Module, "src/analyzer", "src/analyzer", "module:analyzer", "", 0, savt::core::FactSource::Inferred},
+        {2, savt::core::SymbolKind::File, "AnalysisController.cpp", "src/analyzer/AnalysisController.cpp", "file:controller", "", 0, savt::core::FactSource::Inferred},
+        {3, savt::core::SymbolKind::File, "SceneMapper.cpp", "src/analyzer/SceneMapper.cpp", "file:scene", "", 0, savt::core::FactSource::Inferred},
+        {4, savt::core::SymbolKind::Class, "AnalysisController", "AnalysisController", "type:AnalysisController", "src/analyzer/AnalysisController.cpp", 10, savt::core::FactSource::Inferred},
+        {5, savt::core::SymbolKind::Method, "runAnalysis", "AnalysisController::runAnalysis", "fn:runAnalysis", "src/analyzer/AnalysisController.cpp", 26, savt::core::FactSource::Inferred},
+        {6, savt::core::SymbolKind::Class, "SceneMapper", "SceneMapper", "type:SceneMapper", "src/analyzer/SceneMapper.cpp", 8, savt::core::FactSource::Inferred},
+        {7, savt::core::SymbolKind::Method, "buildScene", "SceneMapper::buildScene", "fn:buildScene", "src/analyzer/SceneMapper.cpp", 24, savt::core::FactSource::Inferred}
+    };
+
+    report.edges = {
+        {1, 2, savt::core::EdgeKind::Contains, 1, 1, savt::core::FactSource::Inferred},
+        {1, 3, savt::core::EdgeKind::Contains, 1, 1, savt::core::FactSource::Inferred},
+        {5, 7, savt::core::EdgeKind::Calls, 2, 1, savt::core::FactSource::Inferred},
+        {4, 6, savt::core::EdgeKind::DependsOn, 1, 1, savt::core::FactSource::Inferred}
+    };
+
+    const auto overview = savt::core::buildArchitectureOverview(report);
+    expect(overview.nodes.size() == 1,
+           "synthetic single-module fixture should build exactly one overview node");
+
+    const auto capabilityGraph = savt::core::buildCapabilityGraph(report, overview);
+    expect(capabilityGraph.nodes.size() == 1,
+           "single-module fixture should still collapse into one L2 capability");
+
+    const auto componentGraph = savt::core::buildComponentGraphForCapability(
+        report, overview, capabilityGraph, capabilityGraph.nodes.front().id);
+    expect(componentGraph.nodes.size() >= 2,
+           "single-module capability should expand into multiple file-level L3 components");
+    expect(componentGraph.edges.size() >= 1,
+           "file-level L3 fallback should preserve internal handoff edges between derived components");
+    expect(std::any_of(componentGraph.diagnostics.begin(), componentGraph.diagnostics.end(), [](const std::string& diagnostic) {
+               return diagnostic.find("file-level component clusters") != std::string::npos;
+           }),
+           "single-module fallback should report that file-level component clusters were used");
+
+    const auto controllerNodeIt = std::find_if(
+        componentGraph.nodes.begin(), componentGraph.nodes.end(), [](const savt::core::ComponentNode& node) {
+            return node.name.find("AnalysisController") != std::string::npos;
+        });
+    const auto sceneMapperNodeIt = std::find_if(
+        componentGraph.nodes.begin(), componentGraph.nodes.end(), [](const savt::core::ComponentNode& node) {
+            return node.name.find("SceneMapper") != std::string::npos;
+        });
+    expect(controllerNodeIt != componentGraph.nodes.end() &&
+               sceneMapperNodeIt != componentGraph.nodes.end(),
+           "file-level fallback should expose clusters named after the internal files or symbols");
 }
 
 void testAnalysisReportSerializesFactSources() {
@@ -1293,6 +1491,8 @@ int main() {
     testDependencyAndPrimaryEntryClassification();
     testCrossArtifactOverviewAndCapabilityGraph();
     testCapabilitySceneMapperPublishesSingleScenePayload();
+    testComponentSceneMapperPublishesCapabilityDrilldownPayload();
+    testSingleModuleCapabilityFallsBackToFileLevelL3Expansion();
     testAnalysisReportSerializesFactSources();
     testCollectSourceFilesSkipsToolchainDirectoriesUnderTools();
     testLargeMixedOverviewAvoidsModuleScopedCapabilityExplosion();

@@ -1,6 +1,7 @@
 #include "savt/ui/AnalysisOrchestrator.h"
 
 #include "savt/analyzer/CppProjectAnalyzer.h"
+#include "savt/core/ComponentGraph.h"
 #include "savt/ui/AnalysisTextFormatter.h"
 #include "savt/ui/AstPreviewService.h"
 #include "savt/ui/ReportService.h"
@@ -52,6 +53,7 @@ void clearPendingPresentation(PendingAnalysisResult& result) {
     result.astPreviewSummary = preview.summary;
     result.astPreviewText = preview.text;
     result.capabilityScene = {};
+    result.componentSceneCatalog.clear();
     result.systemContextData.clear();
     result.systemContextCards.clear();
 }
@@ -82,6 +84,7 @@ void populatePendingPresentation(
     const core::ArchitectureOverview& overview,
     const core::CapabilityGraph& capabilityGraph,
     const layout::CapabilitySceneLayoutResult& capabilitySceneLayout,
+    const QVariantMap& componentSceneCatalog,
     const layout::LayoutResult& layoutResult,
     PendingAnalysisResult& result) {
     promise.setProgressValueAndText(96, QStringLiteral("整理 AST 预览..."));
@@ -111,6 +114,7 @@ void populatePendingPresentation(
     result.statusMessage =
         ReportService::buildStatusMessage(report, overview, capabilityGraph, layoutResult);
     result.capabilityScene = sceneData;
+    result.componentSceneCatalog = componentSceneCatalog;
     result.analysisReport = formatCapabilityReportMarkdown(report, capabilityGraph);
     result.systemContextReport = formatSystemContextReportMarkdown(capabilityGraph);
     result.systemContextData =
@@ -209,6 +213,26 @@ void AnalysisOrchestrator::run(
             return;
         }
 
+        promise.setProgressValueAndText(94, QStringLiteral("生成 L3 组件视图..."));
+        QVariantMap componentSceneCatalog;
+        for (const core::CapabilityNode& capabilityNode : capabilityGraph.nodes) {
+            const auto componentGraph =
+                core::buildComponentGraphForCapability(report, overview, capabilityGraph, capabilityNode.id);
+            const auto componentLayout =
+                layoutEngine.layoutComponentScene(componentGraph);
+            const auto componentScene =
+                SceneMapper::buildComponentSceneData(componentGraph, componentLayout);
+            componentSceneCatalog.insert(
+                QString::number(static_cast<qulonglong>(capabilityNode.id)),
+                SceneMapper::toVariantMap(componentScene));
+        }
+        if (shouldAbortAnalysis(promise, result, QStringLiteral("生成 L3 组件视图"))) {
+            if (output) {
+                *output = std::move(result);
+            }
+            return;
+        }
+
         populatePendingPresentation(
             promise,
             cleanedPath,
@@ -216,6 +240,7 @@ void AnalysisOrchestrator::run(
             overview,
             capabilityGraph,
             capabilitySceneLayout,
+            componentSceneCatalog,
             layoutResult,
             result);
         if (shouldAbortAnalysis(promise, result, QStringLiteral("整理分析结果"))) {

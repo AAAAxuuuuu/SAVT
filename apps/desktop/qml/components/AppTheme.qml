@@ -30,10 +30,12 @@ QtObject {
     function nodeFill(kind, selected) {
         if (selected)
             return "#214d77"
-        if (kind === "entry")
+        if (kind === "entry" || kind === "entry_component")
             return "#e0f2ec"
         if (kind === "infrastructure")
             return "#fff2db"
+        if (kind === "support_component")
+            return "#f4efe4"
         return "#eef4f9"
     }
 
@@ -42,27 +44,31 @@ QtObject {
             return "#163754"
         if (pinned)
             return "#c0892e"
-        if (kind === "entry")
+        if (kind === "entry" || kind === "entry_component")
             return "#8bb8ad"
         if (kind === "infrastructure")
             return "#d1a24f"
+        if (kind === "support_component")
+            return "#b79c6e"
         return "#9bb2c7"
     }
 
     function nodeAccent(kind, selected) {
         if (selected)
             return "#d8e5f0"
-        if (kind === "entry")
+        if (kind === "entry" || kind === "entry_component")
             return "#2f7f70"
         if (kind === "infrastructure")
             return "#b87818"
+        if (kind === "support_component")
+            return "#8d6f34"
         return "#35608b"
     }
 
     function edgeColor(kind) {
         if (kind === "activates")
             return "#2f6aa0"
-        if (kind === "uses_infrastructure")
+        if (kind === "uses_infrastructure" || kind === "uses_support")
             return "#bf8b2d"
         return "#71879c"
     }

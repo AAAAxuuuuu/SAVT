@@ -209,39 +209,39 @@ Item {
 
                             TagChip {
                                 visible: window.selectedInspectorKind() === "node"
-                                text: window.selectedCapabilityNode ? window.displayNodeKind(window.selectedCapabilityNode.kind) : ""
+                                text: window.selectedInspectorNodeKindLabel()
                                 fillColor: "#ffffff"
                                 borderColor: root.theme.borderSubtle
                                 textColor: root.theme.inkNormal
                             }
 
                             TagChip {
-                                visible: window.selectedInspectorKind() === "node" && !!window.selectedCapabilityNode && (window.selectedCapabilityNode.role || "").length > 0
-                                text: window.selectedCapabilityNode ? window.selectedCapabilityNode.role : ""
+                                visible: window.selectedInspectorKind() === "node" && window.selectedInspectorNodeRoleLabel().length > 0
+                                text: window.selectedInspectorNodeRoleLabel()
                                 fillColor: "#ffffff"
                                 borderColor: root.theme.borderSubtle
                                 textColor: root.theme.inkNormal
                             }
 
                             TagChip {
-                                visible: window.selectedInspectorKind() === "node" && !!window.selectedCapabilityNode
-                                text: window.selectedCapabilityNode ? ("文件 " + (window.selectedCapabilityNode.fileCount || 0)) : ""
+                                visible: window.selectedInspectorKind() === "node"
+                                text: window.selectedInspectorNodeFileCountLabel()
                                 fillColor: "#ffffff"
                                 borderColor: root.theme.borderSubtle
                                 textColor: root.theme.inkNormal
                             }
 
                             TagChip {
-                                visible: window.selectedInspectorKind() === "edge" && !!window.selectedCapabilityEdge
-                                text: window.selectedCapabilityEdge ? ("权重 " + (window.selectedCapabilityEdge.weight || 0)) : ""
+                                visible: window.selectedInspectorKind() === "edge"
+                                text: window.selectedInspectorEdgeWeightLabel()
                                 fillColor: "#ffffff"
                                 borderColor: root.theme.borderSubtle
                                 textColor: root.theme.inkNormal
                             }
 
                             TagChip {
-                                visible: window.selectedInspectorKind() === "edge" && !!window.selectedCapabilityEdge
-                                text: window.selectedCapabilityEdge ? window.selectedCapabilityEdge.kind : ""
+                                visible: window.selectedInspectorKind() === "edge"
+                                text: window.selectedInspectorEdgeKindLabel()
                                 fillColor: "#ffffff"
                                 borderColor: root.theme.borderSubtle
                                 textColor: root.theme.inkNormal
@@ -261,7 +261,7 @@ Item {
                                     compact: true
                                     tone: "ghost"
                                     text: "查看 " + (modelData.name || "节点")
-                                    onClicked: window.selectCapabilityNode(modelData)
+                                    onClicked: window.selectInspectorEndpointNode(modelData)
                                 }
                             }
                         }
@@ -537,7 +537,7 @@ Item {
                                         compact: true
                                         tone: "ghost"
                                         text: "查看证据"
-                                        onClicked: window.selectCapabilityEdge(modelData)
+                                        onClicked: window.selectInspectorRelationshipEdge(modelData)
                                     }
                                 }
                             }
@@ -593,7 +593,7 @@ Item {
                                 enabled: window.selectedInspectorKind() === "node"
                                          && analysisController.aiAvailable
                                          && !analysisController.aiBusy
-                                onClicked: analysisController.requestAiExplanation(window.selectedCapabilityNode)
+                                onClicked: analysisController.requestAiExplanation(window.selectedInspectorNodeData())
                             }
 
                             AppButton {
@@ -638,7 +638,7 @@ Item {
                                             return analysisController.aiSetupMessage
                                         if (window.selectedInspectorKind() !== "node")
                                             return "AI 解读只针对模块节点开放。要解释关系，请先查看上面的事实、规则和结论。"
-                                        if (window.selectedCapabilityNode === null)
+                                        if (window.selectedInspectorNodeData() === null)
                                             return "AI 已就绪。先在图里选中一个模块，再生成 AI 解读。"
                                         return analysisController.aiStatusMessage.length > 0
                                                ? analysisController.aiStatusMessage
@@ -793,7 +793,7 @@ Item {
                             Layout.fillWidth: true
                             tone: "accent"
                             text: "复制当前模块上下文"
-                            enabled: window.selectedInspectorKind() === "node" && window.selectedCapabilityNode !== null
+                            enabled: window.selectedInspectorSupportsCodeContext()
                             onClicked: {
                                 if (window.selectedCapabilityNode)
                                     analysisController.copyCodeContextToClipboard(window.selectedCapabilityNode.id)

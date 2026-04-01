@@ -32,6 +32,7 @@ class AnalysisController : public QObject {
     Q_PROPERTY(QString astPreviewSummary READ astPreviewSummary NOTIFY astPreviewSummaryChanged)
     Q_PROPERTY(QString astPreviewText READ astPreviewText NOTIFY astPreviewTextChanged)
     Q_PROPERTY(QVariantMap capabilityScene READ capabilityScene NOTIFY capabilitySceneChanged)
+    Q_PROPERTY(QVariantMap componentSceneCatalog READ componentSceneCatalog NOTIFY componentSceneCatalogChanged)
     Q_PROPERTY(QVariantList capabilityNodeItems READ capabilityNodeItems NOTIFY capabilityNodeItemsChanged)
     Q_PROPERTY(QVariantList capabilityEdgeItems READ capabilityEdgeItems NOTIFY capabilityEdgeItemsChanged)
     Q_PROPERTY(QVariantList capabilityGroupItems READ capabilityGroupItems NOTIFY capabilityGroupItemsChanged)
@@ -74,6 +75,7 @@ public:
     QString astPreviewSummary() const;
     QString astPreviewText() const;
     QVariantMap capabilityScene() const;
+    QVariantMap componentSceneCatalog() const;
     QVariantList capabilityNodeItems() const;
     QVariantList capabilityEdgeItems() const;
     QVariantList capabilityGroupItems() const;
@@ -122,6 +124,7 @@ signals:
     void astPreviewSummaryChanged();
     void astPreviewTextChanged();
     void capabilitySceneChanged();
+    void componentSceneCatalogChanged();
     void capabilityNodeItemsChanged();
     void capabilityEdgeItemsChanged();
     void capabilityGroupItemsChanged();
@@ -161,6 +164,7 @@ private:
     void setAstPreviewSummary(QString value);
     void setAstPreviewText(QString value);
     void setCapabilityScene(CapabilitySceneData value);
+    void setComponentSceneCatalog(QVariantMap value);
     void setAnalyzing(bool value);
     void setStopRequested(bool value);
     void setAnalysisProgress(double value);
@@ -198,6 +202,7 @@ private:
     QString m_astPreviewSummary;
     QString m_astPreviewText;
     CapabilitySceneData m_capabilityScene;
+    QVariantMap m_componentSceneCatalog;
     bool m_analyzing = false;
     bool m_stopRequested = false;
     double m_analysisProgress = 0.0;
