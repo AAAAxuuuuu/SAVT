@@ -17,8 +17,6 @@ Item {
 
     function openAskPanel() {
         root.uiState.askPanelOpen = true
-        root.uiState.contextTrayExpanded = true
-        root.uiState.contextTab = "ai"
     }
 
     function closeAskPanel() {
@@ -354,21 +352,6 @@ Item {
                         }
                     }
 
-                    AskSavtPanel {
-                        id: askSavtPanel
-                        visible: root.uiState.askPanelOpen
-                        z: 20
-                        width: Math.min(560, Math.max(400, centralWorkspace.width * 0.42))
-                        height: Math.min(520, Math.max(360, centralWorkspace.height * 0.56))
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        anchors.rightMargin: 14
-                        anchors.bottomMargin: (bottomTray.visible ? bottomTray.implicitHeight : 0) + 14
-                        theme: root.theme
-                        uiState: root.uiState
-                        analysisController: root.analysisController
-                        onCloseRequested: root.closeAskPanel()
-                    }
                 }
 
                 InspectorPanel {

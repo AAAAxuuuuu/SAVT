@@ -137,4 +137,11 @@ ApplicationWindow {
         analysisController: window.controller
         uiState: uiState
     }
+
+    AskSavtWindow {
+        theme: appTheme
+        uiState: uiState
+        analysisController: window.controller
+        ownerWindow: window
+    }
 }

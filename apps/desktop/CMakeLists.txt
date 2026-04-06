@@ -35,6 +35,7 @@ qt_add_qml_module(savt_desktop
         qml/report/ReportSummarySection.qml
         qml/shell/AppShell.qml
         qml/shell/AppTopBar.qml
+        qml/shell/AskSavtWindow.qml
         qml/shell/BreadcrumbBar.qml
         qml/shell/SideNavTree.qml
         qml/shell/WorkspaceHeader.qml

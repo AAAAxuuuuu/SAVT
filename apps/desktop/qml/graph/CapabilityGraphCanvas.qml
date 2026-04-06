@@ -1,6 +1,4 @@
 import QtQuick
-import QtQuick.Controls
-import "../common"
 
 Item {
     id: root
@@ -24,7 +22,7 @@ Item {
                (edge.fromId === selectionState.selectedCapabilityNode.id || edge.toId === selectionState.selectedCapabilityNode.id)
     }
 
-    function drawEdge(ctx, edge) {
+    function drawEdge(ctx, edge, edgeCanvas) {
         var points = edgeRoutePoints(edge)
         if (!points || points.length < 2)
             return
@@ -32,16 +30,23 @@ Item {
         var emphasized = edgeTouchesSelection(edge)
         var hasSelection = (selectionState.selectedCapabilityNode && selectionState.selectedCapabilityNode.id !== undefined) ||
                            (selectionState.selectedCapabilityEdge && selectionState.selectedCapabilityEdge.id !== undefined)
+        var cornerRadius = emphasized ? 16 : 12
+        var lineWidth = emphasized ? 3.1 : 1.55
+        var strokeAlpha = hasSelection ? (emphasized ? 0.94 : 0.14) : 0.6
+        var haloAlpha = hasSelection ? (emphasized ? 0.26 : 0.06) : 0.16
 
         ctx.beginPath()
+        edgeCanvas.drawRoundedOrthogonalPath(ctx, points, cornerRadius)
+        ctx.strokeStyle = "#FFFFFF"
+        ctx.lineWidth = lineWidth + (emphasized ? 4.0 : 2.6)
+        ctx.globalAlpha = haloAlpha
+        ctx.stroke()
+
+        ctx.beginPath()
+        edgeCanvas.drawRoundedOrthogonalPath(ctx, points, cornerRadius)
         ctx.strokeStyle = theme.edgeColor(edge.kind)
-        ctx.lineWidth = emphasized ? 3.0 : 1.4
-        ctx.globalAlpha = hasSelection ? (emphasized ? 0.92 : 0.12) : 0.52
-        ctx.moveTo(points[0].x, points[0].y)
-
-        for (var i = 1; i < points.length; ++i)
-            ctx.lineTo(points[i].x, points[i].y)
-
+        ctx.lineWidth = lineWidth
+        ctx.globalAlpha = strokeAlpha
         ctx.stroke()
     }
 
@@ -61,7 +66,7 @@ Item {
                    root.selectionState.selectedCapabilityNode.id === node.id
         }
         nodeKindLabelProvider: function(kind) { return root.selectionState.displayNodeKind(kind) }
-        edgePainter: function(ctx, edge) { root.drawEdge(ctx, edge) }
+        edgePainter: function(ctx, edge, edgeCanvas) { root.drawEdge(ctx, edge, edgeCanvas) }
         minSceneWidth: 820
         minSceneHeight: 420
         gridStep: 48

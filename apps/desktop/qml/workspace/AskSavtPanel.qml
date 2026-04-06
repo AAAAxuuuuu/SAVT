@@ -11,6 +11,14 @@ Item {
     required property QtObject analysisController
 
     property string promptText: ""
+    property bool allowInternalDrag: true
+    property real preferredX: 0
+    property real preferredY: 0
+    property real viewportPadding: 14
+    property real bottomSafeMargin: 14
+    property bool manuallyPositioned: false
+    property real dragGrabX: 0
+    property real dragGrabY: 0
 
     signal closeRequested()
 
@@ -35,6 +43,139 @@ Item {
         return "当前项目"
     }
 
+    function maximumX() {
+        if (!root.allowInternalDrag)
+            return 0
+        if (!root.parent)
+            return root.viewportPadding
+        return Math.max(root.viewportPadding, root.parent.width - root.width - root.viewportPadding)
+    }
+
+    function maximumY() {
+        if (!root.allowInternalDrag)
+            return 0
+        if (!root.parent)
+            return root.viewportPadding
+        return Math.max(root.viewportPadding, root.parent.height - root.height - root.bottomSafeMargin)
+    }
+
+    function clampPosition() {
+        if (!root.allowInternalDrag)
+            return
+        if (!root.parent)
+            return
+        root.x = Math.max(root.viewportPadding, Math.min(root.x, root.maximumX()))
+        root.y = Math.max(root.viewportPadding, Math.min(root.y, root.maximumY()))
+    }
+
+    function syncToPreferredPosition() {
+        if (!root.allowInternalDrag)
+            return
+        if (!root.parent)
+            return
+        root.x = Math.max(root.viewportPadding, Math.min(root.preferredX, root.maximumX()))
+        root.y = Math.max(root.viewportPadding, Math.min(root.preferredY, root.maximumY()))
+    }
+
+    onVisibleChanged: {
+        if (!root.allowInternalDrag)
+            return
+        if (!visible)
+            return
+        if (root.manuallyPositioned)
+            root.clampPosition()
+        else
+            root.syncToPreferredPosition()
+    }
+
+    onPreferredXChanged: {
+        if (!root.allowInternalDrag)
+            return
+        if (!root.visible)
+            return
+        if (root.manuallyPositioned)
+            root.clampPosition()
+        else
+            root.syncToPreferredPosition()
+    }
+
+    onPreferredYChanged: {
+        if (!root.allowInternalDrag)
+            return
+        if (!root.visible)
+            return
+        if (root.manuallyPositioned)
+            root.clampPosition()
+        else
+            root.syncToPreferredPosition()
+    }
+
+    onWidthChanged: {
+        if (!root.allowInternalDrag)
+            return
+        if (!root.visible)
+            return
+        if (root.manuallyPositioned)
+            root.clampPosition()
+        else
+            root.syncToPreferredPosition()
+    }
+
+    onHeightChanged: {
+        if (!root.allowInternalDrag)
+            return
+        if (!root.visible)
+            return
+        if (root.manuallyPositioned)
+            root.clampPosition()
+        else
+            root.syncToPreferredPosition()
+    }
+
+    onBottomSafeMarginChanged: {
+        if (!root.allowInternalDrag)
+            return
+        if (!root.visible)
+            return
+        if (root.manuallyPositioned)
+            root.clampPosition()
+        else
+            root.syncToPreferredPosition()
+    }
+
+    Component.onCompleted: {
+        if (!root.allowInternalDrag)
+            return
+        if (root.visible)
+            Qt.callLater(root.syncToPreferredPosition)
+    }
+
+    Connections {
+        target: root.parent || null
+
+        function onWidthChanged() {
+            if (!root.allowInternalDrag)
+                return
+            if (!root.visible)
+                return
+            if (root.manuallyPositioned)
+                root.clampPosition()
+            else
+                root.syncToPreferredPosition()
+        }
+
+        function onHeightChanged() {
+            if (!root.allowInternalDrag)
+                return
+            if (!root.visible)
+                return
+            if (root.manuallyPositioned)
+                root.clampPosition()
+            else
+                root.syncToPreferredPosition()
+        }
+    }
+
     AppCard {
         anchors.fill: parent
         fillColor: root.theme.aiWash
@@ -49,6 +190,7 @@ Item {
 
             RowLayout {
                 Layout.fillWidth: true
+                spacing: 10
 
                 ColumnLayout {
                     Layout.fillWidth: true
@@ -71,6 +213,73 @@ Item {
                         color: root.theme.inkMuted
                         font.family: root.theme.textFontFamily
                         font.pixelSize: 12
+                    }
+                }
+
+                Item {
+                    id: dragHandle
+                    visible: root.allowInternalDrag
+                    Layout.preferredWidth: 120
+                    Layout.preferredHeight: 30
+                    Layout.alignment: Qt.AlignTop
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: height / 2
+                        color: Qt.rgba(1, 1, 1, 0.84)
+                        border.color: dragArea.containsMouse ? root.theme.focusRing : root.theme.borderSubtle
+                        border.width: 1
+                    }
+
+                    Row {
+                        anchors.centerIn: parent
+                        spacing: 6
+
+                        Repeater {
+                            model: 3
+
+                            Rectangle {
+                                width: 4
+                                height: 4
+                                radius: 2
+                                color: root.theme.inkMuted
+                            }
+                        }
+
+                        Label {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "Drag"
+                            color: root.theme.inkMuted
+                            font.family: root.theme.textFontFamily
+                            font.pixelSize: 11
+                            font.weight: Font.DemiBold
+                        }
+                    }
+
+                    MouseArea {
+                        id: dragArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+
+                        onPressed: function(mouse) {
+                            root.manuallyPositioned = true
+                            var pointInRoot = dragHandle.mapToItem(root, mouse.x, mouse.y)
+                            root.dragGrabX = pointInRoot.x
+                            root.dragGrabY = pointInRoot.y
+                        }
+
+                        onPositionChanged: function(mouse) {
+                            if (!pressed || !root.parent)
+                                return
+                            var pointInParent = dragHandle.mapToItem(root.parent, mouse.x, mouse.y)
+                            root.x = pointInParent.x - root.dragGrabX
+                            root.y = pointInParent.y - root.dragGrabY
+                            root.clampPosition()
+                        }
+
+                        onReleased: root.clampPosition()
+                        onCanceled: root.clampPosition()
                     }
                 }
 
