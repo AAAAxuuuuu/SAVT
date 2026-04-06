@@ -29,3 +29,6 @@ ui_*.h
 
 # 本地工具目录
 tools/
+
+# third-party dependencies / reference repositories
+third_party/

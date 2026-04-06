@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "savt/core/ArchitectureGraph.h"
 #include "savt/core/CapabilityGraph.h"
@@ -27,16 +27,18 @@ struct LayoutResult {
 };
 
 struct CapabilitySceneLayoutOptions {
-    double baseNodeWidth = 248.0;
-    double baseNodeHeight = 116.0;
-    double columnGap = 108.0;
-    double rowGap = 30.0;
-    double marginX = 40.0;
-    double marginY = 28.0;
-    double minSceneHeight = 360.0;
-    double groupPadding = 18.0;
-    double collaboratorScaleDivisor = 8.0;
-    double maxImportanceBoost = 0.4;
+    double baseNodeWidth = 272.0;
+    double baseNodeHeight = 132.0;
+    double columnGap = 84.0;
+    double rowGap = 34.0;
+    double marginX = 28.0;
+    double marginY = 56.0;
+    double minSceneHeight = 380.0;
+    double groupPadding = 36.0;
+    double edgeStub = 22.0;
+    double sameLaneRailOffset = 30.0;
+    double collaboratorScaleDivisor = 10.0;
+    double maxImportanceBoost = 0.26;
 };
 
 struct ScenePoint {
@@ -82,14 +84,14 @@ struct CapabilitySceneLayoutResult {
 };
 
 struct ComponentSceneLayoutOptions {
-    double baseNodeWidth = 232.0;
-    double baseNodeHeight = 110.0;
-    double columnGap = 92.0;
-    double rowGap = 26.0;
-    double marginX = 32.0;
-    double marginY = 24.0;
-    double minSceneHeight = 320.0;
-    double groupPadding = 16.0;
+    double baseNodeWidth = 252.0;
+    double baseNodeHeight = 124.0;
+    double columnGap = 80.0;
+    double rowGap = 32.0;
+    double marginX = 28.0;
+    double marginY = 52.0;
+    double minSceneHeight = 336.0;
+    double groupPadding = 34.0;
 };
 
 struct ComponentSceneNodeLayout {

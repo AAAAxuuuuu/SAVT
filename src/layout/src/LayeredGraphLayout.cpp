@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
@@ -22,6 +23,12 @@ struct SceneRect {
     double y = 0.0;
     double width = 0.0;
     double height = 0.0;
+};
+
+struct CapabilityNodePlacement {
+    SceneRect rect;
+    std::size_t laneIndex = 0;
+    std::size_t orderInLane = 0;
 };
 
 int laneIndexForNode(const savt::core::CapabilityNode& node) {
@@ -46,6 +53,88 @@ double importanceScaleForNode(
         std::min(1.0, static_cast<double>(node.collaboratorCount) /
                           options.collaboratorScaleDivisor);
     return 1.0 + normalized * options.maxImportanceBoost;
+}
+
+double rectLeft(const SceneRect& rect) {
+    return rect.x;
+}
+
+double rectRight(const SceneRect& rect) {
+    return rect.x + rect.width;
+}
+
+double rectMidY(const SceneRect& rect) {
+    return rect.y + rect.height * 0.5;
+}
+
+void appendRoutePoint(
+    std::vector<ScenePoint>& points,
+    const double x,
+    const double y) {
+    if (!points.empty()) {
+        const ScenePoint& last = points.back();
+        if (std::abs(last.x - x) < 0.5 && std::abs(last.y - y) < 0.5) {
+            return;
+        }
+    }
+    points.push_back(ScenePoint{x, y});
+}
+
+std::vector<ScenePoint> capabilityEdgeRoute(
+    const CapabilityNodePlacement& fromPlacement,
+    const CapabilityNodePlacement& toPlacement,
+    const CapabilitySceneLayoutOptions& options) {
+    std::vector<ScenePoint> points;
+    const double fromMidY = rectMidY(fromPlacement.rect);
+    const double toMidY = rectMidY(toPlacement.rect);
+
+    if (fromPlacement.rect.x == toPlacement.rect.x &&
+        fromPlacement.rect.y == toPlacement.rect.y &&
+        fromPlacement.rect.width == toPlacement.rect.width &&
+        fromPlacement.rect.height == toPlacement.rect.height) {
+        const double startX = rectRight(fromPlacement.rect);
+        const double railX = startX + options.sameLaneRailOffset;
+        const double loopY = fromMidY + std::max(18.0, fromPlacement.rect.height * 0.28);
+        appendRoutePoint(points, startX, fromMidY);
+        appendRoutePoint(points, railX, fromMidY);
+        appendRoutePoint(points, railX, loopY);
+        appendRoutePoint(points, startX, loopY);
+        return points;
+    }
+
+    if (toPlacement.laneIndex < fromPlacement.laneIndex) {
+        const double startX = rectLeft(fromPlacement.rect);
+        const double railX = startX - options.edgeStub;
+        const double endX = rectRight(toPlacement.rect);
+        appendRoutePoint(points, startX, fromMidY);
+        appendRoutePoint(points, railX, fromMidY);
+        appendRoutePoint(points, railX, toMidY);
+        appendRoutePoint(points, endX, toMidY);
+        return points;
+    }
+
+    if (toPlacement.laneIndex > fromPlacement.laneIndex) {
+        const double startX = rectRight(fromPlacement.rect);
+        const double railX = startX + options.edgeStub;
+        const double endX = rectLeft(toPlacement.rect);
+        appendRoutePoint(points, startX, fromMidY);
+        appendRoutePoint(points, railX, fromMidY);
+        appendRoutePoint(points, railX, toMidY);
+        appendRoutePoint(points, endX, toMidY);
+        return points;
+    }
+
+    const bool useLeftRail = toPlacement.orderInLane < fromPlacement.orderInLane;
+    const double startX = useLeftRail ? rectLeft(fromPlacement.rect) : rectRight(fromPlacement.rect);
+    const double endX = useLeftRail ? rectLeft(toPlacement.rect) : rectRight(toPlacement.rect);
+    const double railX = useLeftRail
+                             ? std::min(rectLeft(fromPlacement.rect), rectLeft(toPlacement.rect)) - options.sameLaneRailOffset
+                             : std::max(rectRight(fromPlacement.rect), rectRight(toPlacement.rect)) + options.sameLaneRailOffset;
+    appendRoutePoint(points, startX, fromMidY);
+    appendRoutePoint(points, railX, fromMidY);
+    appendRoutePoint(points, railX, toMidY);
+    appendRoutePoint(points, endX, toMidY);
+    return points;
 }
 
 void expandGroupBounds(
@@ -263,7 +352,7 @@ CapabilitySceneLayoutResult LayeredGraphLayout::layoutCapabilityScene(
         });
     }
 
-    std::unordered_map<std::size_t, SceneRect> nodeRects;
+    std::unordered_map<std::size_t, CapabilityNodePlacement> nodePlacements;
     double maxBottom = options.marginY;
     double currentX = options.marginX;
 
@@ -293,7 +382,10 @@ CapabilitySceneLayoutResult LayeredGraphLayout::layoutCapabilityScene(
                 nodeWidth,
                 nodeHeight,
                 importanceScale});
-            nodeRects.emplace(node.id, SceneRect{x, y, nodeWidth, nodeHeight});
+            nodePlacements.emplace(node.id, CapabilityNodePlacement{
+                                                SceneRect{x, y, nodeWidth, nodeHeight},
+                                                laneIndex,
+                                                order});
             maxBottom = std::max(maxBottom, y + nodeHeight);
             currentY += nodeHeight + options.rowGap;
         }
@@ -310,21 +402,18 @@ CapabilitySceneLayoutResult LayeredGraphLayout::layoutCapabilityScene(
             continue;
         }
 
-        const auto fromRectIt = nodeRects.find(edge.fromId);
-        const auto toRectIt = nodeRects.find(edge.toId);
-        if (fromRectIt == nodeRects.end() || toRectIt == nodeRects.end()) {
+        const auto fromPlacementIt = nodePlacements.find(edge.fromId);
+        const auto toPlacementIt = nodePlacements.find(edge.toId);
+        if (fromPlacementIt == nodePlacements.end() || toPlacementIt == nodePlacements.end()) {
             continue;
         }
 
-        const SceneRect& fromRect = fromRectIt->second;
-        const SceneRect& toRect = toRectIt->second;
         CapabilitySceneEdgeLayout edgeLayout;
         edgeLayout.edgeId = edge.id;
         edgeLayout.fromId = edge.fromId;
         edgeLayout.toId = edge.toId;
-        edgeLayout.routePoints = {
-            ScenePoint{fromRect.x + fromRect.width, fromRect.y + fromRect.height * 0.5},
-            ScenePoint{toRect.x, toRect.y + toRect.height * 0.5}};
+        edgeLayout.routePoints =
+            capabilityEdgeRoute(fromPlacementIt->second, toPlacementIt->second, options);
         result.edges.push_back(std::move(edgeLayout));
     }
 
@@ -332,12 +421,12 @@ CapabilitySceneLayoutResult LayeredGraphLayout::layoutCapabilityScene(
         CapabilitySceneGroupLayout groupLayout;
         groupLayout.groupId = group.id;
         for (const std::size_t nodeId : group.nodeIds) {
-            const auto rectIt = nodeRects.find(nodeId);
-            if (rectIt == nodeRects.end()) {
+            const auto placementIt = nodePlacements.find(nodeId);
+            if (placementIt == nodePlacements.end()) {
                 continue;
             }
             groupLayout.visibleNodeIds.push_back(nodeId);
-            expandGroupBounds(groupLayout, rectIt->second, options.groupPadding);
+            expandGroupBounds(groupLayout, placementIt->second.rect, options.groupPadding);
         }
         std::sort(groupLayout.visibleNodeIds.begin(), groupLayout.visibleNodeIds.end());
         result.groups.push_back(std::move(groupLayout));

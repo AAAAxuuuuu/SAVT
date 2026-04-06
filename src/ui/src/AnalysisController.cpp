@@ -31,6 +31,51 @@ QStringList toQStringList(const QVariant& value) {
     return items;
 }
 
+QVariantMap findNodeById(const QVariantList& nodeItems, const qulonglong nodeId) {
+    for (const QVariant& item : nodeItems) {
+        const QVariantMap node = item.toMap();
+        if (node.value(QStringLiteral("id")).toULongLong() == nodeId) {
+            return node;
+        }
+    }
+    return {};
+}
+
+QVariantMap findNodeById(
+    const QVariantMap& componentSceneCatalog,
+    const qulonglong nodeId) {
+    for (auto it = componentSceneCatalog.constBegin();
+         it != componentSceneCatalog.constEnd();
+         ++it) {
+        const QVariantMap sceneMap = it.value().toMap();
+        const QVariantMap targetNode =
+            findNodeById(sceneMap.value(QStringLiteral("nodes")).toList(), nodeId);
+        if (!targetNode.isEmpty()) {
+            return targetNode;
+        }
+    }
+    return {};
+}
+
+QString copyContextKindLabel(const QString& kind) {
+    if (kind == QStringLiteral("entry")) {
+        return QStringLiteral("发起入口（Entry）");
+    }
+    if (kind == QStringLiteral("entry_component")) {
+        return QStringLiteral("入口组件（Entry Component）");
+    }
+    if (kind == QStringLiteral("infrastructure")) {
+        return QStringLiteral("后台支撑（Infrastructure）");
+    }
+    if (kind == QStringLiteral("support_component")) {
+        return QStringLiteral("支撑组件（Support Component）");
+    }
+    if (kind == QStringLiteral("service")) {
+        return QStringLiteral("服务模块（Service）");
+    }
+    return QStringLiteral("核心模块（Core）");
+}
+
 }  // namespace
 
 AnalysisController::AnalysisController(QObject* parent)
@@ -235,23 +280,18 @@ void AnalysisController::analyzeProjectUrl(const QUrl& projectRootUrl) {
 }
 
 void AnalysisController::copyCodeContextToClipboard(const qulonglong nodeId) {
-    QVariantMap targetNode;
-    bool found = false;
-    for (const QVariant& item : m_capabilityScene.nodeItems) {
-        QVariantMap node = item.toMap();
-        if (node.value(QStringLiteral("id")).toULongLong() == nodeId) {
-            targetNode = node;
-            found = true;
-            break;
-        }
+    QVariantMap targetNode = findNodeById(m_capabilityScene.nodeItems, nodeId);
+    if (targetNode.isEmpty()) {
+        targetNode = findNodeById(m_componentSceneCatalog, nodeId);
     }
-    if (!found) {
+    if (targetNode.isEmpty()) {
         return;
     }
 
     const QString name = targetNode.value(QStringLiteral("name")).toString();
     const QString responsibility =
         targetNode.value(QStringLiteral("responsibility")).toString();
+    const QString summary = targetNode.value(QStringLiteral("summary")).toString();
     const QString kind = targetNode.value(QStringLiteral("kind")).toString();
     const QStringList exampleFiles =
         toQStringList(targetNode.value(QStringLiteral("exampleFiles")));
@@ -260,18 +300,24 @@ void AnalysisController::copyCodeContextToClipboard(const qulonglong nodeId) {
     const QStringList collaborators =
         toQStringList(targetNode.value(QStringLiteral("collaboratorNames")));
 
-    const QString kindLabel =
-        (kind == QStringLiteral("entry"))
-            ? QStringLiteral("发起入口（Entry）")
-            : (kind == QStringLiteral("infrastructure"))
-                  ? QStringLiteral("后台支撑（Infrastructure）")
-                  : QStringLiteral("核心能力（Capability）");
+    const QString kindLabel = copyContextKindLabel(kind);
+    const QString primaryDescription =
+        !responsibility.trimmed().isEmpty()
+            ? responsibility.trimmed()
+            : (!summary.trimmed().isEmpty()
+                   ? summary.trimmed()
+                   : QStringLiteral("当前对象还缺少稳定的职责说明。"));
 
     QString prompt = QStringLiteral(
                          "我现在需要修改【%1】模块（架构角色：%2）的代码。以下是由静态分析引擎提取的架构上下文，请先阅读理解，稍后我会给出具体指令。\n\n")
                          .arg(name, kindLabel);
 
-    prompt += QStringLiteral("### 🎯 模块核心职责\n%1\n\n").arg(responsibility);
+    prompt +=
+        QStringLiteral("### 🎯 模块核心职责\n%1\n\n").arg(primaryDescription);
+
+    if (!summary.trimmed().isEmpty() && summary.trimmed() != responsibility.trimmed()) {
+        prompt += QStringLiteral("### 🧭 补充说明\n%1\n\n").arg(summary.trimmed());
+    }
 
     if (!exampleFiles.isEmpty()) {
         prompt += QStringLiteral("### 📁 核心关联文件\n");
