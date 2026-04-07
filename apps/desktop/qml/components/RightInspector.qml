@@ -564,7 +564,7 @@ Item {
                                 spacing: 4
 
                                 Label {
-                                    text: "AI 辅读图"
+                                    text: "AI 新手导览"
                                     color: root.theme.inkStrong
                                     font.family: root.theme.displayFontFamily
                                     font.pixelSize: 17
@@ -573,7 +573,7 @@ Item {
 
                                 Label {
                                     Layout.fillWidth: true
-                                    text: analysisController.aiStatusMessage
+                                    text: "先把当前模块翻成更好懂的人话，再告诉你建议从哪里看起。"
                                     wrapMode: Text.WordWrap
                                     maximumLineCount: 3
                                     elide: Text.ElideRight
@@ -589,7 +589,7 @@ Item {
                                 compact: true
                                 text: analysisController.aiBusy
                                       ? "解读中..."
-                                      : (analysisController.aiAvailable ? "生成解释" : "AI 未就绪")
+                                      : (analysisController.aiAvailable ? "生成导览" : "AI 未就绪")
                                 enabled: window.selectedInspectorKind() === "node"
                                          && analysisController.aiAvailable
                                          && !analysisController.aiBusy
@@ -661,7 +661,7 @@ Item {
 
                             Label {
                                 Layout.fillWidth: true
-                                text: "正在基于当前节点的静态证据生成补充说明。"
+                                text: "正在基于当前节点证据整理新手导览。"
                                 wrapMode: Text.WordWrap
                                 color: root.theme.accentStrong
                                 font.family: root.theme.textFontFamily
@@ -679,13 +679,81 @@ Item {
                             Label {
                                 Layout.fillWidth: true
                                 visible: analysisController.aiSummary.length > 0
-                                text: analysisController.aiSummary
-                                wrapMode: Text.WordWrap
-                                maximumLineCount: 3
-                                elide: Text.ElideRight
-                                color: root.theme.inkStrong
+                                text: "先用人话解释"
+                                color: root.theme.inkNormal
                                 font.family: root.theme.textFontFamily
                                 font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                visible: analysisController.aiSummary.length > 0
+                                radius: 18
+                                color: "#ffffff"
+                                border.color: "#c7d9eb"
+
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 14
+                                    spacing: 8
+
+                                    Label {
+                                        Layout.fillWidth: true
+                                        text: analysisController.aiSummary
+                                        wrapMode: Text.WordWrap
+                                        color: root.theme.inkStrong
+                                        font.family: root.theme.textFontFamily
+                                        font.pixelSize: 12
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                visible: analysisController.aiNextActions.length > 0
+                                radius: 18
+                                color: "#ffffff"
+                                border.color: root.theme.borderSubtle
+
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 14
+                                    spacing: 8
+
+                                    Label {
+                                        text: "建议先看"
+                                        color: root.theme.inkNormal
+                                        font.family: root.theme.textFontFamily
+                                        font.pixelSize: 12
+                                        font.weight: Font.DemiBold
+                                    }
+
+                                    Repeater {
+                                        model: analysisController.aiNextActions
+
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            implicitHeight: nextActionLabel.implicitHeight + 16
+                                            radius: 14
+                                            color: "#f7fafc"
+                                            border.color: root.theme.borderSubtle
+
+                                            Label {
+                                                id: nextActionLabel
+                                                anchors.left: parent.left
+                                                anchors.right: parent.right
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                anchors.margins: 10
+                                                text: "- " + modelData
+                                                wrapMode: Text.WordWrap
+                                                color: root.theme.inkNormal
+                                                font.family: root.theme.textFontFamily
+                                                font.pixelSize: 12
+                                            }
+                                        }
+                                    }
+                                }
                             }
 
                             Rectangle {
@@ -701,7 +769,7 @@ Item {
                                     spacing: 8
 
                                     Label {
-                                        text: "详细职责"
+                                        text: "这部分在做什么"
                                         color: root.theme.inkNormal
                                         font.family: root.theme.textFontFamily
                                         font.pixelSize: 12
@@ -712,8 +780,6 @@ Item {
                                         Layout.fillWidth: true
                                         text: analysisController.aiResponsibility
                                         wrapMode: Text.WordWrap
-                                        maximumLineCount: 3
-                                        elide: Text.ElideRight
                                         color: root.theme.inkNormal
                                         font.family: root.theme.textFontFamily
                                         font.pixelSize: 12
@@ -721,19 +787,79 @@ Item {
                                 }
                             }
 
-                            Flow {
+                            ColumnLayout {
                                 Layout.fillWidth: true
                                 spacing: 8
                                 visible: analysisController.aiCollaborators.length > 0
 
-                                Repeater {
-                                    model: analysisController.aiCollaborators
+                                Label {
+                                    text: "会和谁配合"
+                                    color: root.theme.inkNormal
+                                    font.family: root.theme.textFontFamily
+                                    font.pixelSize: 12
+                                    font.weight: Font.DemiBold
+                                }
 
-                                    TagChip {
-                                        text: modelData
-                                        fillColor: "#ffffff"
-                                        borderColor: root.theme.borderSubtle
-                                        textColor: root.theme.inkNormal
+                                Flow {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Repeater {
+                                        model: analysisController.aiCollaborators
+
+                                        TagChip {
+                                            text: modelData
+                                            fillColor: "#ffffff"
+                                            borderColor: root.theme.borderSubtle
+                                            textColor: root.theme.inkNormal
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                visible: analysisController.aiEvidence.length > 0
+                                radius: 18
+                                color: "#ffffff"
+                                border.color: root.theme.borderSubtle
+
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 14
+                                    spacing: 8
+
+                                    Label {
+                                        text: "术语 / 补充线索"
+                                        color: root.theme.inkNormal
+                                        font.family: root.theme.textFontFamily
+                                        font.pixelSize: 12
+                                        font.weight: Font.DemiBold
+                                    }
+
+                                    Repeater {
+                                        model: analysisController.aiEvidence
+
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            implicitHeight: evidenceLabel.implicitHeight + 16
+                                            radius: 14
+                                            color: "#f7fafc"
+                                            border.color: root.theme.borderSubtle
+
+                                            Label {
+                                                id: evidenceLabel
+                                                anchors.left: parent.left
+                                                anchors.right: parent.right
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                anchors.margins: 10
+                                                text: modelData
+                                                wrapMode: Text.WordWrap
+                                                color: root.theme.inkNormal
+                                                font.family: root.theme.textFontFamily
+                                                font.pixelSize: 12
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -745,14 +871,27 @@ Item {
                                 color: "#fbf3e2"
                                 border.color: "#ddc28e"
 
-                                Label {
+                                ColumnLayout {
                                     anchors.fill: parent
                                     anchors.margins: 14
-                                    text: analysisController.aiUncertainty
-                                    wrapMode: Text.WordWrap
-                                    color: "#7a5823"
-                                    font.family: root.theme.textFontFamily
-                                    font.pixelSize: 12
+                                    spacing: 8
+
+                                    Label {
+                                        text: "暂时拿不准的地方"
+                                        color: "#7a5823"
+                                        font.family: root.theme.textFontFamily
+                                        font.pixelSize: 12
+                                        font.weight: Font.DemiBold
+                                    }
+
+                                    Label {
+                                        Layout.fillWidth: true
+                                        text: analysisController.aiUncertainty
+                                        wrapMode: Text.WordWrap
+                                        color: "#7a5823"
+                                        font.family: root.theme.textFontFamily
+                                        font.pixelSize: 12
+                                    }
                                 }
                             }
                         }

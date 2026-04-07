@@ -1,4 +1,5 @@
 #include "savt/ui/AnalysisController.h"
+#include "savt/ui/AiService.h"
 #include "savt/ui/AstPreviewService.h"
 #include "savt/ui/IncrementalAnalysisPipeline.h"
 #include "savt/ui/ReportService.h"
@@ -191,6 +192,48 @@ void testAnalysisControllerStartsFromStableDefaultState() {
            "analysis controller should initialize the AST preview through AstPreviewService");
 }
 
+void testAiServiceClassifiesCapabilityAndComponentScopes() {
+    QVariantMap capabilityNode;
+    capabilityNode.insert(QStringLiteral("name"), QStringLiteral("Analyzer Pipeline"));
+    capabilityNode.insert(QStringLiteral("kind"), QStringLiteral("capability"));
+    expect(savt::ui::AiService::classifyNodeScope(capabilityNode) == QStringLiteral("capability_map"),
+           "capability scene nodes should be routed through the L2 AI scope");
+
+    QVariantMap componentNode = capabilityNode;
+    componentNode.insert(QStringLiteral("capabilityId"), 11);
+    componentNode.insert(QStringLiteral("kind"), QStringLiteral("service"));
+    expect(savt::ui::AiService::classifyNodeScope(componentNode) == QStringLiteral("component_node"),
+           "component scene nodes should be routed through the L3 AI scope");
+}
+
+void testAiServiceParseReplyUsesScopeSpecificStatusMessages() {
+    const QByteArray response = R"JSON({
+        "choices": [
+            {
+                "message": {
+                    "content": "{\"summary\":\"摘要\",\"plain_summary\":\"给新手看的摘要。\",\"responsibility\":\"解释当前焦点\",\"why_it_matters\":\"它会影响后续阅读顺序\",\"collaborators\":[\"A\"],\"evidence\":[\"证据 1\"],\"where_to_start\":[\"先看入口\"],\"next_actions\":[\"再核对依赖\"],\"uncertainty\":\"当前结论基于静态证据\"}"
+                }
+            }
+        ]
+    })JSON";
+
+    const savt::ui::AiReplyState capabilityState =
+        savt::ui::AiService::parseReply(response, QStringLiteral("capability_map"), false, {});
+    expect(capabilityState.hasResult,
+           "capability-scope AI reply should parse successfully");
+    expect(capabilityState.statusMessage.contains(QStringLiteral("能力导览")),
+           "capability-scope AI reply should use the L2 status message");
+    expect(capabilityState.nextActions.size() == 2,
+           "capability-scope AI reply should merge where-to-start and next actions");
+
+    const savt::ui::AiReplyState reportState =
+        savt::ui::AiService::parseReply(response, QStringLiteral("engineering_report"), false, {});
+    expect(reportState.hasResult,
+           "report-scope AI reply should parse successfully");
+    expect(reportState.statusMessage.contains(QStringLiteral("报告导览")),
+           "report-scope AI reply should use the L4 status message");
+}
+
 void testIncrementalAnalysisPipelineReusesStableLayers() {
     namespace fs = std::filesystem;
 
@@ -276,6 +319,8 @@ int main(int argc, char** argv) {
     testAstPreviewServiceBuildsItemsAndParsesCppPreview();
     testReportServiceBuildsReadableSystemContextPayload();
     testAnalysisControllerStartsFromStableDefaultState();
+    testAiServiceClassifiesCapabilityAndComponentScopes();
+    testAiServiceParseReplyUsesScopeSpecificStatusMessages();
     testIncrementalAnalysisPipelineReusesStableLayers();
     testIncrementalAnalysisPipelineInvalidatesChangedSourceFiles();
     std::cout << "[PASS] savt_ui_tests\n";

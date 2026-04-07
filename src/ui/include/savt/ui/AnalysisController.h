@@ -110,6 +110,7 @@ public:
     Q_INVOKABLE void clearAiExplanation();
     Q_INVOKABLE void requestAiExplanation(const QVariantMap& nodeData, const QString& userTask = QString());
     Q_INVOKABLE void requestProjectAiExplanation(const QString& userTask = QString());
+    Q_INVOKABLE void requestReportAiExplanation(const QString& userTask = QString());
     Q_INVOKABLE void copyCodeContextToClipboard(qulonglong nodeId);
     Q_INVOKABLE void copyTextToClipboard(const QString& text);
 

@@ -65,6 +65,7 @@ ApplicationWindow {
         function clearAiExplanation() {}
         function requestAiExplanation(nodeData, userTask) {}
         function requestProjectAiExplanation(userTask) {}
+        function requestReportAiExplanation(userTask) {}
         function copyCodeContextToClipboard(nodeId) {}
         function copyTextToClipboard(text) {}
     }

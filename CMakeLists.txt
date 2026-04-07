@@ -121,6 +121,17 @@ endif()
 option(SAVT_ENABLE_CLANG_TOOLING "Build the Clang/LibTooling semantic analysis backend" OFF)
 option(SAVT_FETCH_THIRD_PARTY "Automatically fetch required third-party sources when missing" ON)
 
+# SAVT does not use Vulkan directly. QtGui/QtQuick may probe for optional Vulkan
+# headers during package discovery, which produces noisy "Could NOT find
+# WrapVulkanHeaders" messages on machines without a Vulkan SDK. Disable that
+# optional package probe unless a caller explicitly opts back in.
+if(NOT DEFINED CMAKE_DISABLE_FIND_PACKAGE_WrapVulkanHeaders)
+    set(CMAKE_DISABLE_FIND_PACKAGE_WrapVulkanHeaders ON)
+endif()
+if(NOT DEFINED CMAKE_DISABLE_FIND_PACKAGE_WrapVulkan)
+    set(CMAKE_DISABLE_FIND_PACKAGE_WrapVulkan ON)
+endif()
+
 set(SAVT_TREE_SITTER_GIT_REPOSITORY "https://github.com/tree-sitter/tree-sitter.git")
 set(SAVT_TREE_SITTER_GIT_TAG "cb01ffcc3f27b0be8930132d941f162a3a854211")
 set(SAVT_TREE_SITTER_CPP_GIT_REPOSITORY "https://github.com/tree-sitter/tree-sitter-cpp.git")

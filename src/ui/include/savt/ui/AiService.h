@@ -22,6 +22,9 @@ struct AiRequestContext {
     QString statusMessage;
     QString analysisPhase;
     QString userTask;
+    QString selectedAstFilePath;
+    QString astPreviewTitle;
+    QString astPreviewSummary;
 };
 
 struct AiPreparedRequest {
@@ -50,12 +53,19 @@ struct AiReplyState {
 class AiService {
 public:
     static AiAvailabilityState inspectAvailability();
+    static QString classifyNodeScope(const QVariantMap& nodeData);
 
     static AiPreparedRequest prepareNodeRequest(
         const AiRequestContext& context,
         const QVariantMap& nodeData);
 
     static AiPreparedRequest prepareProjectRequest(
+        const AiRequestContext& context,
+        const QVariantMap& systemContextData,
+        const QVariantList& systemContextCards,
+        const QVariantList& capabilityNodeItems);
+
+    static AiPreparedRequest prepareReportRequest(
         const AiRequestContext& context,
         const QVariantMap& systemContextData,
         const QVariantList& systemContextCards,

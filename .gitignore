@@ -32,3 +32,6 @@ tools/
 
 # third-party dependencies / reference repositories
 third_party/
+
+# skills
+.codex/

@@ -35,11 +35,18 @@ Item {
         return sections.join("\n\n")
     }
 
+    function isReportFocus() {
+        var pageId = root.uiState.navigation.pageId || ""
+        return pageId.indexOf("report.") === 0 || pageId === "levels.l4"
+    }
+
     function focusLabel() {
         if (root.uiState.inspector.kind === "node")
             return root.uiState.inspector.title
         if (root.uiState.inspector.kind === "edge")
             return "当前关系"
+        if (root.isReportFocus())
+            return "当前报告"
         return "当前项目"
     }
 
@@ -375,6 +382,16 @@ Item {
                     text: root.analysisController.aiBusy ? "生成中..." : "解释当前项目"
                     enabled: root.analysisController.aiAvailable && !root.analysisController.aiBusy
                     onClicked: root.analysisController.requestProjectAiExplanation(root.promptText)
+                }
+
+                AppButton {
+                    theme: root.theme
+                    compact: true
+                    tone: "ghost"
+                    visible: root.isReportFocus()
+                    text: root.analysisController.aiBusy ? "生成中..." : "解释当前报告"
+                    enabled: root.analysisController.aiAvailable && !root.analysisController.aiBusy
+                    onClicked: root.analysisController.requestReportAiExplanation(root.promptText)
                 }
 
                 AppButton {

@@ -376,7 +376,15 @@ void AnalysisController::requestAiExplanation(
     const QString& userTask) {
     const AiPreparedRequest prepared = AiService::prepareNodeRequest(
         AiRequestContext{
-            m_projectRootPath, m_analysisReport, m_statusMessage, m_analysisPhase, userTask},
+            m_projectRootPath,
+            m_analysisReport,
+            m_statusMessage,
+            m_analysisPhase,
+            userTask,
+            m_selectedAstFilePath,
+            m_astPreviewTitle,
+            m_astPreviewSummary
+        },
         nodeData);
     applyAiAvailability(prepared.availability);
     if (!prepared.ready) {
@@ -406,7 +414,51 @@ void AnalysisController::requestAiExplanation(
 void AnalysisController::requestProjectAiExplanation(const QString& userTask) {
     const AiPreparedRequest prepared = AiService::prepareProjectRequest(
         AiRequestContext{
-            m_projectRootPath, m_analysisReport, m_statusMessage, m_analysisPhase, userTask},
+            m_projectRootPath,
+            m_analysisReport,
+            m_statusMessage,
+            m_analysisPhase,
+            userTask,
+            m_selectedAstFilePath,
+            m_astPreviewTitle,
+            m_astPreviewSummary
+        },
+        m_systemContextData,
+        m_systemContextCards,
+        m_capabilityScene.nodeItems);
+    applyAiAvailability(prepared.availability);
+    if (!prepared.ready) {
+        setAiStatusMessage(prepared.failureStatusMessage);
+        return;
+    }
+
+    cancelActiveAiReply();
+    resetAiState(false);
+    setAiScope(prepared.scope);
+    setAiNodeName(prepared.targetName);
+    setAiBusy(true);
+    setAiStatusMessage(prepared.pendingStatusMessage);
+    AiService::logRequest(prepared, prepared.targetName);
+    m_aiReply = m_aiNetworkManager->post(prepared.networkRequest, prepared.payload);
+    connect(
+        m_aiReply,
+        &QNetworkReply::finished,
+        this,
+        [this, reply = m_aiReply]() { finishAiReply(reply); });
+}
+
+void AnalysisController::requestReportAiExplanation(const QString& userTask) {
+    const AiPreparedRequest prepared = AiService::prepareReportRequest(
+        AiRequestContext{
+            m_projectRootPath,
+            m_analysisReport,
+            m_statusMessage,
+            m_analysisPhase,
+            userTask,
+            m_selectedAstFilePath,
+            m_astPreviewTitle,
+            m_astPreviewSummary
+        },
         m_systemContextData,
         m_systemContextCards,
         m_capabilityScene.nodeItems);

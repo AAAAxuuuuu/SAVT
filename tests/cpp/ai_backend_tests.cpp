@@ -1,4 +1,4 @@
-﻿#include "savt/ai/DeepSeekClient.h"
+#include "savt/ai/DeepSeekClient.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -32,6 +32,8 @@ void testPromptGuardrails() {
            "system prompt should force Chinese output for the tool");
     expect(containsText(prompt, QStringLiteral("Do not invent")),
            "system prompt should forbid fabricated architecture facts");
+    expect(containsText(prompt, QStringLiteral("audience is beginner")),
+           "system prompt should explain how to adapt output for beginners");
 }
 
 void testOfficialConfigParsing() {
@@ -102,11 +104,15 @@ savt::ai::ArchitectureAssistantRequest buildSampleRequest() {
     request.projectRootPath = QStringLiteral("G:/SAVT");
     request.analyzerPrecision = QStringLiteral("semantic_preferred");
     request.analysisSummary = QStringLiteral("Capability graph preserves module-level detail.");
+    request.uiScope = QStringLiteral("l3_module_guide");
+    request.learningStage = QStringLiteral("L3");
+    request.audience = QStringLiteral("beginner");
+    request.explanationGoal = QStringLiteral("Help a beginner understand what this module does.");
     request.nodeName = QStringLiteral("App Backend Algorithm");
     request.nodeKind = QStringLiteral("capability");
     request.nodeRole = QStringLiteral("analysis");
     request.nodeSummary = QStringLiteral("Extracts and computes architecture facts from source code.");
-    request.userTask = QStringLiteral("Explain what this module does for the architecture reading UI.");
+    request.userTask = QStringLiteral("Explain this module to a beginner and suggest what to read first.");
     request.moduleNames = {QStringLiteral("App/backend/algorithm")};
     request.exampleFiles = {QStringLiteral("App/backend/algorithm/AlgorithmLibrary.cpp")};
     request.topSymbols = {QStringLiteral("AlgorithmLibrary"), QStringLiteral("IncomingEdge")};
@@ -141,6 +147,18 @@ void testRequestPayloadAndHeaders() {
            "user prompt should include the selected node name");
     expect(containsText(userPrompt, QStringLiteral("AlgorithmLibrary.cpp")),
            "user prompt should include example file evidence");
+    expect(containsText(userPrompt, QStringLiteral("Learning stage: L3")),
+           "user prompt should include the target learning stage");
+    expect(containsText(userPrompt, QStringLiteral("Audience: beginner")),
+           "user prompt should include the target audience");
+    expect(containsText(userPrompt, QStringLiteral("Goal: Help a beginner understand what this module does.")),
+           "user prompt should include the explanation goal");
+    expect(containsText(userPrompt, QStringLiteral("\"guide\"")),
+           "user prompt evidence package should include guide metadata");
+    expect(containsText(userPrompt, QStringLiteral("\"uiScope\": \"l3_module_guide\"")),
+           "user prompt evidence package should serialize the UI scope");
+    expect(containsText(userPrompt, QStringLiteral("plain_summary")),
+           "user prompt should advertise the beginner-friendly optional fields");
     expect(containsText(userPrompt, QStringLiteral("Return exactly one JSON object")),
            "user prompt should enforce the response contract");
 
@@ -172,7 +190,7 @@ void testResponseParsing() {
             {
                 "message": {
                     "role": "assistant",
-                    "content": "{\"summary\":\"这是核心算法模块\",\"responsibility\":\"负责整理和计算项目里的图结构证据\",\"collaborators\":[\"App Backend Facade\",\"App Backend Graph\"],\"evidence\":[\"代表文件：App/backend/algorithm/AlgorithmLibrary.cpp\",\"关键符号：AlgorithmLibrary\"],\"uncertainty\":\"目前看不到完整语义调用链，所以只给出保守判断\",\"next_actions\":[\"检查 AlgorithmLibrary.cpp\",\"核对 Facade 到 Algorithm 的边\"]}"
+                    "content": "{\"summary\":\"这是核心算法模块\",\"plain_summary\":\"这是项目里负责整理架构信息的一块逻辑。你可以先把它理解成把代码事实整理成可读结果的地方。\",\"responsibility\":\"负责整理和计算项目里的图结构证据\",\"why_it_matters\":\"如果你想知道系统如何从代码里提炼出结构图，这里是关键入口之一\",\"collaborators\":[\"App Backend Facade\",\"App Backend Graph\"],\"evidence\":[\"代表文件：App/backend/algorithm/AlgorithmLibrary.cpp\",\"关键符号：AlgorithmLibrary\"],\"where_to_start\":[\"先看 AlgorithmLibrary.cpp\",\"再看它和 Facade 的连接处\"],\"glossary\":[\"图结构证据: 指分析器整理出来的节点和关系信息\"],\"uncertainty\":\"目前看不到完整语义调用链，所以只给出保守判断\",\"next_actions\":[\"核对 Facade 到 Algorithm 的边\"]}"
                 }
             }
         ]
@@ -185,11 +203,12 @@ void testResponseParsing() {
     expect(parsed, "chat completions response should parse successfully");
     expect(errorMessage.isEmpty(), "successful response parse should not return an error");
     expect(insight.summary == QStringLiteral("这是核心算法模块"), "summary should be extracted from the model response");
-    expect(insight.responsibility.contains(QStringLiteral("图结构证据")), "responsibility should be extracted from the model response");
-    expect(insight.collaborators.size() == 2, "collaborators list should be parsed");
-    expect(insight.evidence.size() == 2, "evidence list should be parsed");
-    expect(insight.nextActions.size() == 2, "next actions list should be parsed");
-    expect(rawContent.contains(QStringLiteral("summary")), "raw content should preserve the model JSON body");
+    expect(insight.plainSummary.contains(QStringLiteral("整理架构信息")), "plain summary should be extracted for beginner output");
+    expect(insight.whyItMatters.contains(QStringLiteral("关键入口")), "why_it_matters should be extracted from the model response");
+    expect(insight.whereToStart.size() == 2, "where_to_start list should be parsed");
+    expect(insight.glossary.size() == 1, "glossary list should be parsed");
+    expect(insight.nextActions.size() == 1, "next actions list should be parsed");
+    expect(rawContent.contains(QStringLiteral("plain_summary")), "raw content should preserve the extended model JSON body");
 }
 
 void testResponsesApiStyleResponseParsing() {
@@ -201,7 +220,7 @@ void testResponsesApiStyleResponseParsing() {
                 "content": [
                     {
                         "type": "output_text",
-                        "text": "{\"summary\":\"兼容网关输出摘要\",\"responsibility\":\"把第三方 output_text 包装层还原为 SAVT Insight JSON\",\"collaborators\":[\"Compatibility Gateway\"],\"evidence\":[\"output[0].content[0].text\"],\"uncertainty\":\"这是兼容回归测试\",\"next_actions\":[\"保持 output_text 兼容\"]}"
+                        "text": "{\"summary\":\"兼容网关输出摘要\",\"plain_summary\":\"这是兼容层返回的新手摘要。\",\"responsibility\":\"把第三方 output_text 包装层还原为 SAVT Insight JSON\",\"collaborators\":[\"Compatibility Gateway\"],\"evidence\":[\"output[0].content[0].text\"],\"uncertainty\":\"这是兼容回归测试\",\"next_actions\":[\"保持 output_text 兼容\"]}"
                     }
                 ]
             }
@@ -215,6 +234,7 @@ void testResponsesApiStyleResponseParsing() {
     expect(parsed, "responses-api style output should parse successfully");
     expect(errorMessage.isEmpty(), "responses-api style parse should not return an error");
     expect(insight.summary.contains(QStringLiteral("兼容网关")), "summary should be parsed from output_text content");
+    expect(insight.plainSummary.contains(QStringLiteral("新手摘要")), "plain summary should be parsed from output_text content");
     expect(insight.nextActions.size() == 1, "responses-api style parse should preserve next actions");
     expect(rawContent.contains(QStringLiteral("responsibility")), "raw content should preserve output_text JSON body");
 }

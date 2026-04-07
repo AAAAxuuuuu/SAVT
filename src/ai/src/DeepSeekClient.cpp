@@ -1,4 +1,4 @@
-﻿#include "savt/ai/DeepSeekClient.h"
+#include "savt/ai/DeepSeekClient.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -322,9 +322,13 @@ QString extractFirstJsonObject(QString text) {
 
 bool looksLikeInsightObject(const QJsonObject &object) {
   return object.contains(QStringLiteral("summary")) ||
+         object.contains(QStringLiteral("plain_summary")) ||
          object.contains(QStringLiteral("responsibility")) ||
+         object.contains(QStringLiteral("why_it_matters")) ||
          object.contains(QStringLiteral("collaborators")) ||
          object.contains(QStringLiteral("evidence")) ||
+         object.contains(QStringLiteral("where_to_start")) ||
+         object.contains(QStringLiteral("glossary")) ||
          object.contains(QStringLiteral("uncertainty")) ||
          object.contains(QStringLiteral("next_actions"));
 }
@@ -514,9 +518,18 @@ QJsonObject buildEvidenceObject(const ArchitectureAssistantRequest &request) {
   projectObject.insert(QStringLiteral("diagnostics"),
                        toJsonArray(deduplicatedList(request.diagnostics)));
 
+  QJsonObject guideObject;
+  guideObject.insert(QStringLiteral("uiScope"), request.uiScope);
+  guideObject.insert(QStringLiteral("learningStage"), request.learningStage);
+  guideObject.insert(QStringLiteral("audience"), request.audience);
+  guideObject.insert(QStringLiteral("explanationGoal"),
+                     request.explanationGoal);
+  guideObject.insert(QStringLiteral("userTask"), request.userTask.trimmed());
+
   QJsonObject evidence;
   evidence.insert(QStringLiteral("project"), projectObject);
   evidence.insert(QStringLiteral("node"), nodeObject);
+  evidence.insert(QStringLiteral("guide"), guideObject);
   evidence.insert(QStringLiteral("userTask"), request.userTask.trimmed());
   return evidence;
 }
@@ -527,13 +540,21 @@ QString responseContractText() {
       "The JSON object must contain these keys: "
       "\"summary\", \"responsibility\", \"collaborators\", \"evidence\", "
       "\"uncertainty\", \"next_actions\". "
+      "It may also contain these beginner-friendly keys when useful: "
+      "\"plain_summary\", \"why_it_matters\", \"where_to_start\", \"glossary\". "
       "\"summary\": 2-4 sentences covering the node's core purpose, its role "
       "in the overall project, and any notable behaviors or patterns. "
+      "\"plain_summary\": 2-3 short sentences in plain Simplified Chinese for "
+      "readers who are new to the project and may not understand architecture "
+      "jargon. "
       "\"responsibility\": 2-4 sentences describing what this node concretely "
       "owns and does, what decisions it makes, and explicitly what it does NOT "
       "handle. "
-      "\"collaborators\", \"evidence\", and \"next_actions\" must be arrays of "
-      "short strings. "
+      "\"why_it_matters\": 1-2 sentences explaining why this part matters in "
+      "the user's reading or modification flow. "
+      "\"collaborators\", \"evidence\", \"where_to_start\", \"glossary\", "
+      "and \"next_actions\" must be arrays of short strings. "
+      "\"glossary\" items should use the format \"term: explanation\". "
       "\"uncertainty\": one sentence on confidence level; omit hedging "
       "language if the evidence is strong. "
       "If the evidence is insufficient, say so in \"uncertainty\" and keep all "
@@ -557,9 +578,11 @@ QString DeepSeekConfig::providerLabel() const {
 }
 
 bool ArchitectureAssistantInsight::isEmpty() const {
-  return summary.trimmed().isEmpty() && responsibility.trimmed().isEmpty() &&
+  return summary.trimmed().isEmpty() && plainSummary.trimmed().isEmpty() &&
+         responsibility.trimmed().isEmpty() && whyItMatters.trimmed().isEmpty() &&
          uncertainty.trimmed().isEmpty() && collaborators.isEmpty() &&
-         evidence.isEmpty() && nextActions.isEmpty();
+         evidence.isEmpty() && whereToStart.isEmpty() && glossary.isEmpty() &&
+         nextActions.isEmpty();
 }
 
 QString defaultDeepSeekConfigPath() {
@@ -745,6 +768,10 @@ QString deepSeekSavtSystemPrompt() {
       "explain what is missing. "
       "Prefer precise, evidence-backed statements suitable for a desktop "
       "architecture reading tool. "
+      "Adapt the explanation to the supplied audience and learning stage. "
+      "If the audience is beginner, use plain Simplified Chinese first, explain "
+      "technical jargon when it appears, and tell the reader where to start "
+      "reading next. "
       "For 'summary' and 'responsibility', write 2-4 sentences each; for list "
       "field items, keep each entry concise. "
       "Reply in Simplified Chinese. "
@@ -758,6 +785,20 @@ QString deepSeekSavtUserPrompt(const ArchitectureAssistantRequest &request) {
   prompt += QStringLiteral(
       "Task: explain the selected SAVT architecture node for the UI.\n");
   prompt += QStringLiteral("Scope: only use the supplied evidence package.\n");
+  if (!request.uiScope.trimmed().isEmpty()) {
+    prompt += QStringLiteral("UI scope: %1\n").arg(request.uiScope.trimmed());
+  }
+  if (!request.learningStage.trimmed().isEmpty()) {
+    prompt +=
+        QStringLiteral("Learning stage: %1\n").arg(request.learningStage.trimmed());
+  }
+  if (!request.audience.trimmed().isEmpty()) {
+    prompt += QStringLiteral("Audience: %1\n").arg(request.audience.trimmed());
+  }
+  if (!request.explanationGoal.trimmed().isEmpty()) {
+    prompt += QStringLiteral("Goal: %1\n")
+                  .arg(request.explanationGoal.trimmed());
+  }
   prompt += responseContractText();
   prompt += QStringLiteral("\nEvidence package:\n");
   prompt += QString::fromUtf8(evidenceDocument.toJson(QJsonDocument::Indented));
@@ -828,13 +869,20 @@ bool parseArchitectureAssistantInsightJson(
   ArchitectureAssistantInsight insight;
   insight.summary =
       object.value(QStringLiteral("summary")).toString().trimmed();
+  insight.plainSummary =
+      object.value(QStringLiteral("plain_summary")).toString().trimmed();
   insight.responsibility =
       object.value(QStringLiteral("responsibility")).toString().trimmed();
+  insight.whyItMatters =
+      object.value(QStringLiteral("why_it_matters")).toString().trimmed();
   insight.uncertainty =
       object.value(QStringLiteral("uncertainty")).toString().trimmed();
   insight.collaborators =
       parseStringList(object.value(QStringLiteral("collaborators")));
   insight.evidence = parseStringList(object.value(QStringLiteral("evidence")));
+  insight.whereToStart =
+      parseStringList(object.value(QStringLiteral("where_to_start")));
+  insight.glossary = parseStringList(object.value(QStringLiteral("glossary")));
   insight.nextActions =
       parseStringList(object.value(QStringLiteral("next_actions")));
 

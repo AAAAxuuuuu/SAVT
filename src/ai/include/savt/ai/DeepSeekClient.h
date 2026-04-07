@@ -33,6 +33,10 @@ struct ArchitectureAssistantRequest {
     QString projectRootPath;
     QString analyzerPrecision;
     QString analysisSummary;
+    QString uiScope;
+    QString learningStage;
+    QString audience;
+    QString explanationGoal;
     QString nodeName;
     QString nodeKind;
     QString nodeRole;
@@ -47,10 +51,14 @@ struct ArchitectureAssistantRequest {
 
 struct ArchitectureAssistantInsight {
     QString summary;
+    QString plainSummary;
     QString responsibility;
+    QString whyItMatters;
     QString uncertainty;
     QStringList collaborators;
     QStringList evidence;
+    QStringList whereToStart;
+    QStringList glossary;
     QStringList nextActions;
 
     bool isEmpty() const;
