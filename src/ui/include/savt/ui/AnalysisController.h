@@ -7,9 +7,16 @@
 #include <QVariantList>
 #include <QVariantMap>
 
+#include "savt/core/ArchitectureGraph.h"
+#include "savt/core/ArchitectureOverview.h"
+#include "savt/core/CapabilityGraph.h"
+#include "savt/core/ComponentGraph.h"
+#include "savt/layout/LayeredGraphLayout.h"
 #include "savt/ui/SceneMapper.h"
 
 #include <memory>
+#include <unordered_map>
+#include <unordered_set>
 
 class QNetworkAccessManager;
 class QNetworkReply;
@@ -106,6 +113,7 @@ public:
     Q_INVOKABLE void stopAnalysis();
     Q_INVOKABLE void analyzeProject(const QString& projectRootPath);
     Q_INVOKABLE void analyzeProjectUrl(const QUrl& projectRootUrl);
+    Q_INVOKABLE void ensureComponentSceneForCapability(qulonglong capabilityId);
     Q_INVOKABLE void refreshAiAvailability();
     Q_INVOKABLE void clearAiExplanation();
     Q_INVOKABLE void requestAiExplanation(const QVariantMap& nodeData, const QString& userTask = QString());
@@ -156,6 +164,10 @@ private:
     void beginAnalysis(const QString& cleanedPath);
     void finishAnalysis();
     void clearVisualizationState();
+    void scheduleBackgroundCapabilityAnnotation();
+    void scheduleBackgroundComponentAnnotation(qulonglong capabilityId);
+    void refreshCapabilityPresentation();
+    void refreshComponentSceneForCapability(qulonglong capabilityId);
     void setProjectRootPathInternal(QString value, bool emitSignal);
     void setSelectedAstFilePathInternal(QString value, bool emitSignal);
     void setStatusMessage(QString value);
@@ -204,6 +216,15 @@ private:
     QString m_astPreviewText;
     CapabilitySceneData m_capabilityScene;
     QVariantMap m_componentSceneCatalog;
+    savt::core::AnalysisReport m_lastReport;
+    savt::core::ArchitectureOverview m_lastOverview;
+    savt::core::CapabilityGraph m_lastCapabilityGraph;
+    savt::layout::CapabilitySceneLayoutResult m_lastCapabilitySceneLayout;
+    std::unordered_map<std::size_t, savt::core::ComponentGraph> m_componentGraphs;
+    std::unordered_map<std::size_t, savt::layout::ComponentSceneLayoutResult> m_componentLayouts;
+    std::unordered_set<std::size_t> m_pendingComponentAiAnnotations;
+    std::unordered_set<std::size_t> m_completedComponentAiAnnotations;
+    qulonglong m_analysisRevision = 0;
     bool m_analyzing = false;
     bool m_stopRequested = false;
     double m_analysisProgress = 0.0;

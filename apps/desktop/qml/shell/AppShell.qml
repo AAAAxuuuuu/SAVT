@@ -24,11 +24,37 @@ Item {
     }
 
     function navigateTo(pageId) {
+        if ((pageId === "project.componentWorkbench" || pageId === "levels.l3")
+                && root.uiState.selection.selectedCapabilityNode
+                && root.uiState.selection.selectedCapabilityNode.id !== undefined) {
+            root.analysisController.ensureComponentSceneForCapability(
+                        root.uiState.selection.selectedCapabilityNode.id)
+        }
         root.uiState.navigation.navigateTo(pageId)
     }
 
     function openLevel(levelId) {
         root.uiState.navigation.openLevel(levelId)
+    }
+
+    function isAdvancedPage(pageId) {
+        var currentId = pageId || ""
+        return currentId === "project.compare"
+                || currentId.indexOf("report.") === 0
+                || currentId.indexOf("levels.") === 0
+    }
+
+    function advancedNavItems() {
+        return [
+            {"id": "project.compare", "label": "高级对比", "hint": "承接快照差异和焦点对象对照"},
+            {"id": "report.engineering", "label": "工程分析报告", "hint": "汇总摘要、证据与原始 Markdown"},
+            {"id": "report.recommendations", "label": "深入阅读建议", "hint": "围绕当前结果组织下一步动作"},
+            {"id": "report.promptPack", "label": "AI 提示词包", "hint": "把分析结果转成可复制提示词"},
+            {"id": "levels.l1", "label": "L1 系统上下文", "hint": "专业直达的系统上下文视角"},
+            {"id": "levels.l2", "label": "L2 能力视图", "hint": "业务能力地图和能力关系"},
+            {"id": "levels.l3", "label": "L3 组件视图", "hint": "能力域下钻后的组件工作台"},
+            {"id": "levels.l4", "label": "L4 全景报告", "hint": "完整工程分析报告"}
+        ]
     }
 
     function syncLayoutForPage() {
@@ -80,37 +106,28 @@ Item {
     }
 
     function sideNavSections() {
-        return [
+        var sections = [
             {
-                "title": "项目",
+                "title": "主入口",
                 "items": [
-                    {"id": "project.overview", "label": "总览", "hint": "前门认知入口和推荐阅读路径"},
-                    {"id": "project.capabilityMap", "label": "能力地图", "hint": "用能力图理解项目结构"},
-                    {"id": "project.componentWorkbench", "label": "组件工作台", "hint": root.uiState.selection.selectedCapabilityNode ? ("继续展开 " + root.uiState.selection.selectedCapabilityNode.name) : "从能力域继续下钻到组件级"},
-                    {"id": "project.compare", "label": "对比", "hint": "承接快照差异和归属比较"}
-                ]
-            },
-            {
-                "title": "报告",
-                "items": [
-                    {"id": "report.engineering", "label": "工程分析报告", "hint": "汇总摘要、证据与原始 Markdown"},
-                    {"id": "report.recommendations", "label": "改造建议", "hint": "围绕当前结果组织下一步动作"},
-                    {"id": "report.promptPack", "label": "AI 提示词包", "hint": "把分析结果转成可复制提示词"}
-                ]
-            },
-            {
-                "title": "视图层级",
-                "items": [
-                    {"id": "levels.l1", "label": "L1 系统上下文", "hint": "专业直达的系统上下文视角"},
-                    {"id": "levels.l2", "label": "L2 能力视图", "hint": "业务能力地图和能力关系"},
-                    {"id": "levels.l3", "label": "L3 组件视图", "hint": "能力域下钻后的组件工作台"},
-                    {"id": "levels.l4", "label": "L4 全景报告", "hint": "完整工程分析报告"}
+                    {"id": "project.overview", "label": "首页", "hint": "先回答项目是什么，再决定先看哪里"},
+                    {"id": "project.capabilityMap", "label": "地图", "hint": "用能力地图理解项目的整体结构"},
+                    {"id": "project.componentWorkbench", "label": "细节", "hint": root.uiState.selection.selectedCapabilityNode ? ("继续展开 " + root.uiState.selection.selectedCapabilityNode.name) : "从能力域继续下钻到组件级"}
                 ]
             }
         ]
+        if (root.isAdvancedPage(root.currentPageId)) {
+            sections.push({
+                              "title": "高级",
+                              "items": root.advancedNavItems()
+                          })
+        }
+        return sections
     }
 
     function currentEyebrow() {
+        if (root.isAdvancedPage(root.currentPageId))
+            return "高级"
         if (root.currentPageId.indexOf("project.") === 0)
             return "项目"
         if (root.currentPageId.indexOf("report.") === 0)
@@ -128,11 +145,11 @@ Item {
                    ? ("组件工作台 · " + root.uiState.selection.selectedCapabilityNode.name)
                    : "组件工作台"
         if (root.currentPageId === "project.compare")
-            return "对照工作台"
+            return "高级对比"
         if (root.currentPageId === "report.engineering")
             return "工程分析报告"
         if (root.currentPageId === "report.recommendations")
-            return "改造建议"
+            return "深入阅读建议"
         if (root.currentPageId === "report.promptPack")
             return "AI 提示词包"
         if (root.currentPageId === "levels.l1")
@@ -162,7 +179,7 @@ Item {
         if (root.currentPageId === "report.recommendations")
             return root.analysisController.aiSummary.length > 0
                    ? root.analysisController.aiSummary
-                   : "围绕当前分析结果组织改造建议、下一步动作和回跳入口。"
+                   : "围绕当前分析结果组织深入阅读建议、下一步动作和回跳入口。"
         if (root.currentPageId === "report.promptPack")
             return "把分析结果转成可复制的 AI 提示词，减少上下文整理成本。"
         if (root.currentPageId === "levels.l1")
@@ -178,7 +195,7 @@ Item {
 
     function currentBreadcrumbs() {
         if (root.currentPageId === "project.overview")
-            return [{"label": "项目", "pageId": "project.overview"}, {"label": "总览"}]
+            return [{"label": "项目", "pageId": "project.overview"}, {"label": "首页"}]
         if (root.currentPageId === "project.capabilityMap")
             return [{"label": "项目", "pageId": "project.overview"}, {"label": "能力地图"}]
         if (root.currentPageId === "project.componentWorkbench")
@@ -188,16 +205,10 @@ Item {
                 {"label": root.uiState.selection.selectedCapabilityNode ? root.uiState.selection.selectedCapabilityNode.name : "组件工作台"}
             ]
         if (root.currentPageId === "project.compare")
-            return [{"label": "项目", "pageId": "project.overview"}, {"label": "对比"}]
+            return [{"label": "高级"}, {"label": root.currentTitle()}]
         if (root.currentPageId.indexOf("report.") === 0)
-            return [
-                {"label": "报告", "pageId": "report.engineering"},
-                {"label": root.currentTitle()}
-            ]
-        return [
-            {"label": "视图层级", "pageId": "levels.l1"},
-            {"label": root.currentTitle()}
-        ]
+            return [{"label": "高级"}, {"label": root.currentTitle()}]
+        return [{"label": "高级"}, {"label": root.currentTitle()}]
     }
 
     function pageComponentFor(pageId) {

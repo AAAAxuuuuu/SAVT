@@ -1,4 +1,4 @@
-#include "savt/core/ComponentGraph.h"
+﻿#include "savt/core/ComponentGraph.h"
 
 #include <algorithm>
 #include <cctype>
@@ -11,6 +11,8 @@ namespace savt::core {
 namespace {
 
 using EvidencePackage = CapabilityNode::EvidencePackage;
+
+void applyVibeCoderHeuristics(ComponentNode& node);
 
 std::string joinStrings(const std::vector<std::string>& values, const std::size_t limit) {
     if (values.empty()) {
@@ -38,6 +40,63 @@ std::vector<std::string> deduplicateSorted(std::vector<std::string> values, cons
         values.resize(limit);
     }
     return values;
+}
+
+std::string collapseSpaces(std::string value) {
+    std::string output;
+    output.reserve(value.size());
+    bool previousWasSpace = true;
+    for (const unsigned char character : value) {
+        if (std::isspace(character)) {
+            if (!previousWasSpace) {
+                output.push_back(' ');
+            }
+            previousWasSpace = true;
+            continue;
+        }
+        output.push_back(static_cast<char>(character));
+        previousWasSpace = false;
+    }
+    if (!output.empty() && output.back() == ' ') {
+        output.pop_back();
+    }
+    return output;
+}
+
+std::string humanizeIdentifier(std::string value) {
+    std::string spaced;
+    spaced.reserve(value.size() * 2);
+    char previousCharacter = '\0';
+    for (const char character : value) {
+        if (character == '/' || character == '\\' || character == '_' ||
+            character == '-' || character == '.') {
+            if (!spaced.empty() && spaced.back() != ' ') {
+                spaced.push_back(' ');
+            }
+            previousCharacter = ' ';
+            continue;
+        }
+
+        const bool currentIsUpper =
+            std::isupper(static_cast<unsigned char>(character)) != 0;
+        const bool previousIsLowerOrDigit =
+            std::islower(static_cast<unsigned char>(previousCharacter)) != 0 ||
+            std::isdigit(static_cast<unsigned char>(previousCharacter)) != 0;
+        if (!spaced.empty() && currentIsUpper && previousIsLowerOrDigit &&
+            spaced.back() != ' ') {
+            spaced.push_back(' ');
+        }
+
+        spaced.push_back(character);
+        previousCharacter = character;
+    }
+
+    return collapseSpaces(spaced);
+}
+
+std::string lastPathSegment(const std::string& path) {
+    const std::size_t separator = path.find_last_of("/\\");
+    return separator == std::string::npos ? path : path.substr(separator + 1);
 }
 
 ComponentNodeKind classifyComponentKind(const OverviewNode& node) {
@@ -327,6 +386,133 @@ bool looksSupportLike(const std::string& evidenceText) {
          "tool", "snapshot"});
 }
 
+void applyVibeCoderHeuristics(ComponentNode& node) {
+    auto fileStemFromPath = [](const std::string& path) {
+        std::string fileName = lastPathSegment(path);
+        const std::size_t extensionSeparator = fileName.find_last_of('.');
+        if (extensionSeparator != std::string::npos) {
+            fileName = fileName.substr(0, extensionSeparator);
+        }
+        return fileName;
+    };
+
+    auto firstContext = [&]() {
+        if (!node.folderHint.empty()) {
+            return humanizeIdentifier(node.folderHint);
+        }
+        if (!node.exampleFiles.empty()) {
+            return humanizeIdentifier(fileStemFromPath(node.exampleFiles.front()));
+        }
+        return humanizeIdentifier(node.name);
+    };
+
+    std::string evidence = node.name + " " + node.role + " " + node.stageName;
+    for (const std::string& file : node.exampleFiles) {
+        evidence += " " + file;
+    }
+    for (const std::string& symbol : node.topSymbols) {
+        evidence += " " + symbol;
+    }
+    evidence = toLower(evidence);
+
+    const std::string context = collapseSpaces(firstContext());
+    const bool summaryLooksMechanical =
+        node.summary.empty() ||
+        node.summary.find("代表文件") != std::string::npos ||
+        node.summary.find("+ more") != std::string::npos ||
+        node.summary.find('/') != std::string::npos ||
+        node.summary.find('\\') != std::string::npos ||
+        node.responsibility.find("围绕") != std::string::npos;
+
+    auto replaceNodeText = [&](std::string label,
+                               std::string responsibility,
+                               const bool mentionFiles = true) {
+        label = collapseSpaces(std::move(label));
+        responsibility = collapseSpaces(std::move(responsibility));
+        if (!label.empty()) {
+            node.name = label;
+        }
+        if (!responsibility.empty()) {
+            node.responsibility = responsibility;
+        }
+
+        std::ostringstream summary;
+        summary << node.responsibility;
+        if (mentionFiles && !node.exampleFiles.empty()) {
+            summary << " 可以先从 " << joinStrings(node.exampleFiles, 2) << " 看起。";
+        } else if (node.kind == ComponentNodeKind::Entry) {
+            summary << " 这通常是继续理解该能力块时最适合先看的位置。";
+        }
+        node.summary = summary.str();
+    };
+
+    if (node.kind == ComponentNodeKind::Entry ||
+        containsAnyToken(evidence, {"main", "app", "shell", "window", "entry"})) {
+        replaceNodeText(
+            context.empty() ? "入口协调" : context + " 入口协调",
+            "负责接住当前能力块的入口动作，把用户或系统发起的请求交给后续模块继续处理。它更像流程起点，不负责把所有细节都做完。",
+            false);
+        return;
+    }
+
+    if (containsAnyToken(evidence, {"qml", "ui", "view", "page", "window", "widget"})) {
+        replaceNodeText(
+            context.empty() ? "界面交互" : context + " 界面",
+            "负责展示界面、接收用户操作，并把这些操作转换成后续处理需要的信息。它主要解决人机交互，不负责底层解析和数据计算。");
+        return;
+    }
+
+    if (containsAnyToken(evidence, {"parser", "tree-sitter", "treesitter", "ast", "analyzer", "parse"})) {
+        replaceNodeText(
+            context.empty() ? "结构解析" : context + " 解析与结构提取",
+            "负责把源码或输入内容整理成结构化结果，供后续分析、映射或展示继续使用。它产出的是可继续加工的中间结构，而不是最终界面结果。");
+        return;
+    }
+
+    if (containsAnyToken(evidence, {"graph", "node", "edge", "layout", "scene"})) {
+        replaceNodeText(
+            context.empty() ? "图结构整理" : context + " 图结构整理",
+            "负责组织节点、连线或布局信息，让后续页面和分析流程能够读取统一的结构数据。它更像结构搬运和整理层，不直接决定业务结论。");
+        return;
+    }
+
+    if (containsAnyToken(evidence, {"report", "markdown", "export", "summary"})) {
+        replaceNodeText(
+            context.empty() ? "结果输出" : context + " 结果输出",
+            "负责把分析结果整理成报告、说明文字或可复制的输出内容，帮助用户更快阅读和继续提问。它主要负责表达结果，而不是生成底层分析事实。");
+        return;
+    }
+
+    if (containsAnyToken(evidence, {"ai", "deepseek", "prompt", "model", "assistant"})) {
+        replaceNodeText(
+            context.empty() ? "AI 解释接入" : context + " AI 解释接入",
+            "负责把已有分析结果交给大模型生成解释、总结或下一步建议。它依赖前面的结构化证据，本身不负责底层源码解析。");
+        return;
+    }
+
+    if (node.kind == ComponentNodeKind::Support || looksSupportLike(evidence)) {
+        replaceNodeText(
+            context.empty() ? "共享支撑" : context + " 共享支撑",
+            "负责提供配置、缓存、通用工具或共享数据支撑，帮助主流程更稳定地工作。它通常服务于别的模块，而不是直接面向最终操作。");
+        return;
+    }
+
+    if (containsAnyToken(evidence, {"test", "tests", "spec", "benchmark"})) {
+        replaceNodeText(
+            context.empty() ? "验证与回归" : context + " 验证与回归",
+            "负责验证关键流程是否正常、结果是否稳定，帮助团队发现回归和行为变化。它主要承担校验职责，而不是业务主流程。");
+        return;
+    }
+
+    if (!summaryLooksMechanical) {
+        return;
+    }
+
+    replaceNodeText(
+        context.empty() ? "内部处理单元" : context + " 内部处理单元",
+        "负责承担该能力块中的一段内部处理工作，把上游信息继续整理、计算或转交给下游模块。它是能力块内部的执行拼图之一。");
+}
+
 std::string resolveRawNodeFilePath(const SymbolNode& node) {
     if (node.kind == SymbolKind::File) {
         return node.qualifiedName;
@@ -339,9 +525,9 @@ std::pair<std::size_t, std::string> componentStageForKind(
     const OverviewNode& fallbackOverview) {
     switch (kind) {
     case ComponentNodeKind::Entry:
-        return {0, "入口阶段"};
+        return {0, "鍏ュ彛闃舵"};
     case ComponentNodeKind::Support:
-        return {2, "支撑阶段"};
+        return {2, "鏀拺闃舵"};
     case ComponentNodeKind::Component:
         break;
     }
@@ -349,7 +535,7 @@ std::pair<std::size_t, std::string> componentStageForKind(
     if (!fallbackOverview.stageName.empty()) {
         return {1, fallbackOverview.stageName};
     }
-    return {1, "内部阶段"};
+    return {1, "鍐呴儴闃舵"};
 }
 
 void assignStageGroups(ComponentGraph& graph) {
@@ -396,6 +582,7 @@ void finalizeComponentGraph(
         auto collaborators = collaboratorSets[node.id];
         collaborators = deduplicateSorted(std::move(collaborators), 8);
         node.collaboratorNames = std::move(collaborators);
+        applyVibeCoderHeuristics(node);
         node.visualPriority = componentVisualPriority(node);
         node.evidence = buildNodeEvidence(node, graph);
     }
@@ -757,7 +944,7 @@ ComponentGraph buildSingleOverviewFallbackComponentGraph(
             node.responsibility = "承担当前能力域中的一部分内部实现职责。";
         }
         node.summary =
-            node.responsibility + " 代表文件: " + joinStrings(node.exampleFiles, 3) + ".";
+            node.responsibility + " 浠ｈ〃鏂囦欢: " + joinStrings(node.exampleFiles, 3) + ".";
         graph.nodes.push_back(std::move(node));
     }
 

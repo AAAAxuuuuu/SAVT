@@ -56,7 +56,7 @@ ScrollView {
             "这是什么：" + (root.uiState.inspector.subtitle || "当前对象缺少摘要说明。"),
             "为什么重要：" + (root.uiState.inspector.importanceSummary || "等待更多结构证据。"),
             "关键文件：" + root.joinedText((root.uiState.inspector.sourceFiles || []).slice(0, 3), "当前对象还没有关键文件线索。"),
-            "下一步：" + (root.uiState.inspector.nextStepSummary || "可以继续展开详情、查看证据或打开 Ask SAVT。")
+            "下一步：" + (root.uiState.inspector.nextStepSummary || "可以继续展开详情、查看证据或打开 AI 导览。")
         ]
     }
 
@@ -149,7 +149,7 @@ ScrollView {
             {
                 "title": "下一步",
                 "left": root.hasProject ? "继续进入能力地图或报告，把项目层理解收紧到一个能力域。" : "先选择项目并开始分析。",
-                "right": root.hasFocus ? (root.uiState.inspector.nextStepSummary || "打开详情或 Ask SAVT。") : "先从主画布选择对象"
+                "right": root.hasFocus ? (root.uiState.inspector.nextStepSummary || "打开详情或 AI 导览。") : "先从主画布选择对象"
             }
         ]
     }
@@ -364,15 +364,15 @@ ScrollView {
             theme: root.theme
             title: root.hasFocus ? "当前对照已经可用" : "先补齐一个焦点对象"
             summary: root.hasFocus
-                     ? "继续进入能力地图、组件工作台或 Ask SAVT，把刚刚对齐出的重点转成下一步动作。"
+                     ? "继续进入能力地图、组件工作台或 AI 导览，把刚刚对齐出的重点转成下一步动作。"
                      : "对照页已经准备好项目侧基线。只要在主画布中再选一个对象，右侧这条对照链就会立即完整。"
             chips: [
                 {"text": "项目快照", "fillColor": "#FFFFFF", "borderColor": root.theme.borderSubtle, "textColor": root.theme.inkNormal},
                 {"text": root.hasFocus ? "当前焦点已联动" : "等待主画布选择", "fillColor": "#FFFFFF", "borderColor": root.theme.borderSubtle, "textColor": root.theme.inkNormal},
                 {"text": root.compareMode === "summary" ? "摘要对照" : "证据对照", "fillColor": "#FFFFFF", "borderColor": root.theme.borderSubtle, "textColor": root.theme.inkNormal}
             ]
-            primaryText: root.hasFocus ? "打开 Ask SAVT" : "进入能力地图"
-            secondaryText: "查看工程报告"
+            primaryText: root.hasFocus ? "打开 AI 导览" : "进入能力地图"
+            secondaryText: "查看高级报告"
             secondaryVisible: true
             onPrimaryRequested: {
                 if (root.hasFocus)

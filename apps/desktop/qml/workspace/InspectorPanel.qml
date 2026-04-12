@@ -222,7 +222,7 @@ Item {
 
                         Label {
                             Layout.fillWidth: true
-                            text: "右侧面板只保留摘要、证据线索和下一步动作；长内容继续放到底部托盘或 AI 面板。"
+                            text: "右侧面板只保留摘要、证据线索和下一步动作；长内容继续放到底部托盘或 AI 导览面板。"
                             wrapMode: Text.WordWrap
                             color: root.theme.inkMuted
                             font.family: root.theme.textFontFamily
@@ -254,7 +254,7 @@ Item {
                             theme: root.theme
                             compact: true
                             tone: "ai"
-                            text: "打开 Ask SAVT"
+                            text: "打开 AI 导览"
                             onClicked: root.askRequested()
                         }
                     }
@@ -284,7 +284,7 @@ Item {
                         theme: root.theme
                         compact: true
                         tone: "ai"
-                        text: "Ask SAVT"
+                        text: "AI 导览"
                         onClicked: root.askRequested()
                     }
 

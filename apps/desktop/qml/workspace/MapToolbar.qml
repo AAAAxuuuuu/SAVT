@@ -124,7 +124,7 @@ Item {
                     theme: root.theme
                     compact: true
                     tone: "ai"
-                    text: "Ask SAVT 解读当前能力"
+                    text: "生成当前能力解读"
                     enabled: !!root.selectionState.selectedCapabilityNode
                     onClicked: root.askRequested()
                 }

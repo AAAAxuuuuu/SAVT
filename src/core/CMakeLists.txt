@@ -1,6 +1,8 @@
 add_library(savt_core STATIC
     src/ArchitectureGraph.cpp
+    src/ArchitectureAggregation.cpp
     src/ArchitectureOverview.cpp
+    src/ArchitectureRuleEngine.cpp
     src/CapabilityGraph.cpp
     src/ComponentGraph.cpp
     src/ProjectAnalysisConfig.cpp

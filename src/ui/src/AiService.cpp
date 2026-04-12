@@ -157,6 +157,20 @@ QString extractApiErrorMessage(const QByteArray& bytes) {
         .trimmed();
 }
 
+QString publicScopeLabel(const QString& scope) {
+    if (scope == QStringLiteral("system_context")) {
+        return QStringLiteral("项目导览");
+    }
+    if (scope == QStringLiteral("engineering_report")) {
+        return QStringLiteral("深入阅读建议");
+    }
+    if (scope == QStringLiteral("capability_map") ||
+        scope == QStringLiteral("component_node")) {
+        return QStringLiteral("模块解读");
+    }
+    return QStringLiteral("模块解读");
+}
+
 ai::ArchitectureAssistantRequest buildCapabilityRequest(
     const AiRequestContext& context,
     const QVariantMap& nodeData) {
@@ -304,7 +318,7 @@ ai::ArchitectureAssistantRequest buildProjectRequest(
     request.nodeName = systemContextData.value(QStringLiteral("title")).toString().trimmed();
     if (request.nodeName.isEmpty()) {
         request.nodeName =
-            QStringLiteral("%1 / 系统上下文").arg(request.projectName);
+            QStringLiteral("%1 / 项目导览").arg(request.projectName);
     }
     request.nodeKind = QStringLiteral("system_context");
     request.nodeRole = QStringLiteral("project_context");
@@ -382,8 +396,8 @@ ai::ArchitectureAssistantRequest buildReportRequest(
     request.learningStage = QStringLiteral("L4");
     request.audience = QStringLiteral("beginner");
     request.explanationGoal = QStringLiteral(
-        "Help a beginner connect the engineering report to concrete next steps, important modules, and the best reading order.");
-    request.nodeName = QStringLiteral("%1 / 工程分析报告").arg(request.projectName);
+        "Help a beginner connect the current findings to concrete next steps, important modules, and the best reading order.");
+    request.nodeName = QStringLiteral("%1 / 深入阅读建议").arg(request.projectName);
     request.nodeKind = QStringLiteral("engineering_report");
     request.nodeRole = QStringLiteral("report_context");
 
@@ -528,8 +542,8 @@ AiPreparedRequest AiService::prepareNodeRequest(
     prepared.ready = true;
     prepared.pendingStatusMessage =
         prepared.scope == QStringLiteral("capability_map")
-            ? QStringLiteral("正在向 AI 模型请求当前能力域的解读...")
-            : QStringLiteral("正在向 AI 模型请求当前组件的解读...");
+            ? QStringLiteral("正在生成当前模块的解读...")
+            : QStringLiteral("正在生成当前模块的解读...");
     prepared.assistantRequest =
         prepared.scope == QStringLiteral("capability_map")
             ? buildCapabilityRequest(context, nodeData)
@@ -552,14 +566,14 @@ AiPreparedRequest AiService::prepareProjectRequest(
 
     if (systemContextData.isEmpty() || capabilityNodeItems.isEmpty()) {
         prepared.failureStatusMessage =
-            QStringLiteral("先完成一次项目分析，再生成项目级系统上下文解读。");
+            QStringLiteral("先完成一次项目分析，再生成项目导览。");
         return prepared;
     }
 
     prepared.targetName =
         systemContextData.value(QStringLiteral("title")).toString().trimmed();
     if (prepared.targetName.isEmpty()) {
-        prepared.targetName = QStringLiteral("%1 / 系统上下文")
+        prepared.targetName = QStringLiteral("%1 / 项目导览")
                                   .arg(projectNameFromRootPath(context.projectRootPath));
     }
     if (!prepared.availability.available) {
@@ -577,7 +591,7 @@ AiPreparedRequest AiService::prepareProjectRequest(
 
     prepared.ready = true;
     prepared.pendingStatusMessage =
-        QStringLiteral("正在向 AI 模型请求项目级系统上下文解读...");
+        QStringLiteral("正在生成项目导览...");
     prepared.assistantRequest = buildProjectRequest(
         context, systemContextData, systemContextCards, capabilityNodeItems);
     prepared.networkRequest =
@@ -598,11 +612,11 @@ AiPreparedRequest AiService::prepareReportRequest(
 
     if (context.analysisReport.trimmed().isEmpty()) {
         prepared.failureStatusMessage =
-            QStringLiteral("先完成一次项目分析，再生成工程报告级 AI 导览。");
+            QStringLiteral("先完成一次项目分析，再生成深入阅读建议。");
         return prepared;
     }
 
-    prepared.targetName = QStringLiteral("%1 / 工程分析报告")
+    prepared.targetName = QStringLiteral("%1 / 深入阅读建议")
                               .arg(projectNameFromRootPath(context.projectRootPath));
     if (!prepared.availability.available) {
         prepared.failureStatusMessage = prepared.availability.setupMessage;
@@ -619,7 +633,7 @@ AiPreparedRequest AiService::prepareReportRequest(
 
     prepared.ready = true;
     prepared.pendingStatusMessage =
-        QStringLiteral("正在向 AI 模型请求工程报告级解读...");
+        QStringLiteral("正在生成深入阅读建议...");
     prepared.assistantRequest = buildReportRequest(
         context, systemContextData, systemContextCards, capabilityNodeItems);
     prepared.networkRequest =
@@ -678,19 +692,8 @@ AiReplyState AiService::parseReply(
         mergeQStringLists(insight.evidence, insight.glossary));
     state.nextActions = toVariantStringList(
         mergeQStringLists(insight.whereToStart, insight.nextActions));
-    if (scope == QStringLiteral("system_context")) {
-        state.statusMessage =
-            QStringLiteral("AI 已基于当前项目证据生成新手向项目导览。");
-    } else if (scope == QStringLiteral("capability_map")) {
-        state.statusMessage =
-            QStringLiteral("AI 已基于当前能力域证据生成新手向能力导览。");
-    } else if (scope == QStringLiteral("engineering_report")) {
-        state.statusMessage =
-            QStringLiteral("AI 已基于当前工程报告证据生成新手向报告导览。");
-    } else {
-        state.statusMessage =
-            QStringLiteral("AI 已基于当前节点证据生成新手向模块导览。");
-    }
+    state.statusMessage = QStringLiteral("AI 已基于当前证据生成%1。")
+                              .arg(publicScopeLabel(scope));
     return state;
 }
 

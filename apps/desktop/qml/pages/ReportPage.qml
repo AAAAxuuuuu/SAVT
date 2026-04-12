@@ -35,7 +35,7 @@ ScrollView {
 
     function reportTitle() {
         if (root.mode === "recommendations")
-            return "改造动作摘要"
+            return "深入阅读建议"
         if (root.mode === "promptPack")
             return "提示词工作台"
         return "报告工作流总览"
@@ -45,10 +45,10 @@ ScrollView {
         if (root.mode === "recommendations")
             return root.analysisController.aiSummary.length > 0
                    ? root.analysisController.aiSummary
-                   : "围绕当前分析结果，把可执行的改造建议、下一步动作和回跳入口组织到同一页。"
+                   : "围绕当前分析结果，把可执行的深入阅读建议、下一步动作和回跳入口组织到同一页。"
         if (root.mode === "promptPack")
             return "把当前分析结果转成可复制的 AI 提示词模板，便于继续交给外部代理或团队成员。"
-        return "报告页不再只是静态 Markdown 贴片，而是能继续回到能力地图、对照工作台和 Ask SAVT 的操作页面。"
+        return "报告页不再只是静态 Markdown 贴片，而是能继续回到能力地图、高级对比和 AI 导览的操作页面。"
     }
 
     ColumnLayout {

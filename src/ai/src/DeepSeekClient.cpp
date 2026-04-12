@@ -1,4 +1,4 @@
-#include "savt/ai/DeepSeekClient.h"
+﻿#include "savt/ai/DeepSeekClient.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -835,6 +835,85 @@ QByteArray buildDeepSeekChatCompletionsPayload(
   return QJsonDocument(payload).toJson(QJsonDocument::Compact);
 }
 
+
+bool extractDeepSeekChatCompletionsText(
+    const QByteArray &responseBytes,
+    QString *outText,
+    QString *errorMessage) {
+  if (!outText) {
+    if (errorMessage) {
+      *errorMessage =
+          QStringLiteral("DeepSeek text output pointer was null.");
+    }
+    return false;
+  }
+
+  QJsonParseError parseError;
+  const QJsonDocument document =
+      QJsonDocument::fromJson(responseBytes, &parseError);
+  if (parseError.error != QJsonParseError::NoError) {
+    if (errorMessage) {
+      *errorMessage =
+          QStringLiteral("Failed to parse DeepSeek response JSON: %1")
+              .arg(parseError.errorString());
+    }
+    return false;
+  }
+  if (!document.isObject()) {
+    if (errorMessage) {
+      *errorMessage =
+          QStringLiteral("DeepSeek response must be a JSON object.");
+    }
+    return false;
+  }
+
+  const QJsonObject rootObject = document.object();
+  const QString apiErrorMessage =
+      extractResponseErrorMessage(rootObject.value(QStringLiteral("error")));
+  if (!apiErrorMessage.isEmpty()) {
+    if (errorMessage) {
+      *errorMessage = apiErrorMessage;
+    }
+    return false;
+  }
+
+  QString content = extractAssistantTextFromObject(rootObject);
+  if (content.isEmpty()) {
+    const QString topLevelMessage =
+        extractResponseErrorMessage(rootObject.value(QStringLiteral("message")));
+    if (!topLevelMessage.isEmpty() &&
+        !topLevelMessage.startsWith(QLatin1Char('{')) &&
+        !topLevelMessage.startsWith(QLatin1Char('['))) {
+      if (errorMessage) {
+        *errorMessage = topLevelMessage;
+      }
+      return false;
+    }
+    content = topLevelMessage;
+  }
+
+  content = stripCodeFence(content).trimmed();
+  if (content.isEmpty()) {
+    if (errorMessage) {
+      const QString keysPreview = topLevelKeysPreview(rootObject);
+      const QString preview = responsePreviewText(responseBytes);
+      *errorMessage = keysPreview.isEmpty()
+                          ? QStringLiteral("AI response did not contain a parseable message body.")
+                          : QStringLiteral("AI response shape is not yet supported. Top-level keys: %1.")
+                                .arg(keysPreview);
+      if (!preview.isEmpty()) {
+        *errorMessage += QStringLiteral("\nResponse preview: %1").arg(preview);
+      }
+    }
+    return false;
+  }
+
+  *outText = content;
+  if (errorMessage) {
+    errorMessage->clear();
+  }
+  return true;
+}
 bool parseArchitectureAssistantInsightJson(
     const QByteArray &jsonBytes, ArchitectureAssistantInsight *outInsight,
     QString *errorMessage) {
@@ -996,3 +1075,4 @@ bool parseDeepSeekChatCompletionsResponse(
 }
 
 } // namespace savt::ai
+

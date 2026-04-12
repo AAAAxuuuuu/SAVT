@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <QByteArray>
 #include <QNetworkRequest>
@@ -75,6 +75,10 @@ QNetworkRequest buildDeepSeekChatCompletionsRequest(const DeepSeekConfig& config
 QByteArray buildDeepSeekChatCompletionsPayload(
     const DeepSeekConfig& config,
     const ArchitectureAssistantRequest& request);
+bool extractDeepSeekChatCompletionsText(
+    const QByteArray& responseBytes,
+    QString* outText,
+    QString* errorMessage = nullptr);
 bool parseArchitectureAssistantInsightJson(
     const QByteArray& jsonBytes,
     ArchitectureAssistantInsight* outInsight,
@@ -86,3 +90,4 @@ bool parseDeepSeekChatCompletionsResponse(
     QString* rawContent = nullptr);
 
 }  // namespace savt::ai
+

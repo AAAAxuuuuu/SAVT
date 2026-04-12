@@ -1,7 +1,11 @@
 #include "savt/ui/IncrementalAnalysisPipeline.h"
 
+#include "savt/core/ArchitectureAggregation.h"
 #include "savt/core/ComponentGraph.h"
 #include "savt/core/ProjectAnalysisConfig.h"
+
+#include <QDebug>
+#include <QElapsedTimer>
 
 #include <array>
 #include <cstdint>
@@ -19,17 +23,15 @@ namespace {
 
 constexpr std::uint64_t kFnvOffsetBasis = 14695981039346656037ull;
 constexpr std::uint64_t kFnvPrime = 1099511628211ull;
-constexpr std::string_view kIncrementalAnalysisCacheVersion = "phase10-v1";
+constexpr std::string_view kIncrementalAnalysisCacheVersion = "phase12-v1";
 
 struct CachedScanEntry {
     savt::analyzer::ProjectScanManifest manifest;
-    std::vector<std::string> fileHashes;
     std::string contentFingerprint;
 };
 
 struct CachedAggregateEntry {
-    savt::core::ArchitectureOverview overview;
-    savt::core::CapabilityGraph capabilityGraph;
+    savt::core::ArchitectureAggregation aggregation;
 };
 
 struct CachedLayoutEntry {
@@ -205,37 +207,12 @@ std::string buildCacheKey(
 }
 
 CachedScanEntry buildScanEntry(
-    const savt::analyzer::ProjectScanManifest& manifest,
-    const savt::analyzer::AnalyzerOptions& options,
-    std::vector<std::string>& diagnostics,
-    bool& canceled) {
+    const savt::analyzer::ProjectScanManifest& manifest) {
     CachedScanEntry entry;
     entry.manifest = manifest;
-
-    std::uint64_t contentFingerprint = kFnvOffsetBasis;
-    hashString(contentFingerprint, normalizePath(manifest.rootPath));
-    entry.fileHashes.reserve(manifest.sourceFiles.size());
-
-    for (const std::filesystem::path& filePath : manifest.sourceFiles) {
-        if (isCancellationRequested(options)) {
-            canceled = true;
-            diagnostics.push_back(
-                "Incremental cache canceled while refreshing file content fingerprints.");
-            break;
-        }
-
-        std::error_code errorCode;
-        const std::filesystem::path relativeFilePath =
-            std::filesystem::relative(filePath, manifest.rootPath, errorCode);
-        const std::string relativePath =
-            errorCode ? normalizePath(filePath) : relativeFilePath.generic_string();
-        const std::string fileHash = hashFileContents(filePath);
-        entry.fileHashes.push_back(fileHash);
-        hashString(contentFingerprint, relativePath);
-        hashString(contentFingerprint, fileHash);
-    }
-
-    entry.contentFingerprint = hashToHex(contentFingerprint);
+    // Reuse the scan metadata fingerprint so the first analysis pass does not
+    // reread every source file only to seed the incremental cache.
+    entry.contentFingerprint = manifest.metadataFingerprint;
     return entry;
 }
 
@@ -248,9 +225,20 @@ void appendCacheDiagnostics(
         cacheDiagnostics.end());
 }
 
+void logPhaseTiming(
+    const char* phaseName,
+    const qint64 elapsedMs,
+    const bool cacheHit) {
+    qInfo().noquote()
+        << QStringLiteral("[analysis][phase] %1 elapsed_ms=%2 cache_hit=%3")
+               .arg(QString::fromUtf8(phaseName),
+                    QString::number(elapsedMs),
+                    cacheHit ? QStringLiteral("true") : QStringLiteral("false"));
+}
+
 }  // namespace
 
-IncrementalAnalysisArtifacts IncrementalAnalysisPipeline::analyze(
+AnalysisArtifacts IncrementalAnalysisPipeline::analyze(
     const std::filesystem::path& rootPath,
     const savt::analyzer::AnalyzerOptions& options,
     IncrementalProgressCallback progress) {
@@ -260,8 +248,10 @@ IncrementalAnalysisArtifacts IncrementalAnalysisPipeline::analyze(
     const std::string compilationDatabaseSignature =
         buildCompilationDatabaseSignature(normalizedRoot, options);
 
-    IncrementalAnalysisArtifacts result;
+    AnalysisArtifacts result;
     savt::analyzer::CppProjectAnalyzer analyzer;
+    QElapsedTimer scanTimer;
+    scanTimer.start();
 
     publishProgress(progress, 5, "扫描项目目录...");
     const savt::analyzer::ProjectScanManifest manifest =
@@ -293,22 +283,16 @@ IncrementalAnalysisArtifacts IncrementalAnalysisPipeline::analyze(
     }
 
     if (!result.scanLayer.hit) {
-        bool canceled = false;
-        scanEntry = buildScanEntry(manifest, options, result.cacheDiagnostics, canceled);
-        if (canceled) {
-            result.canceled = true;
-            result.canceledPhase = "计算缓存指纹";
-            return result;
-        }
-
+        scanEntry = buildScanEntry(manifest);
         std::lock_guard<std::mutex> lock(cacheMutex());
         scanCache()[result.scanLayer.key] = scanEntry;
     }
 
     result.cacheDiagnostics.push_back(
         result.scanLayer.hit
-            ? "Incremental cache scan hit: reused unchanged source manifest and file fingerprints."
-            : "Incremental cache scan miss: refreshed source manifest and file fingerprints.");
+            ? "Incremental cache scan hit: reused unchanged source manifest and metadata fingerprint."
+            : "Incremental cache scan miss: refreshed source manifest and metadata fingerprint.");
+    logPhaseTiming("scan", scanTimer.elapsed(), result.scanLayer.hit);
 
     result.parseLayer.key = buildCacheKey(
         normalizedRoot,
@@ -319,6 +303,8 @@ IncrementalAnalysisArtifacts IncrementalAnalysisPipeline::analyze(
             compilationDatabaseSignature,
             scanEntry.contentFingerprint
         });
+    QElapsedTimer parseTimer;
+    parseTimer.start();
 
     publishProgress(
         progress,
@@ -342,6 +328,7 @@ IncrementalAnalysisArtifacts IncrementalAnalysisPipeline::analyze(
         result.parseLayer.hit
             ? "Incremental cache parse hit: reused cached analysis report."
             : "Incremental cache parse miss: rebuilt analysis report from source.");
+    logPhaseTiming("parse", parseTimer.elapsed(), result.parseLayer.hit);
     if (isCancellationRequested(options)) {
         result.canceled = true;
         result.canceledPhase = "解析源码并构建关系图";
@@ -352,6 +339,8 @@ IncrementalAnalysisArtifacts IncrementalAnalysisPipeline::analyze(
         normalizedRoot,
         {"aggregate"},
         {result.parseLayer.key});
+    QElapsedTimer aggregateTimer;
+    aggregateTimer.start();
     publishProgress(
         progress,
         75,
@@ -360,23 +349,27 @@ IncrementalAnalysisArtifacts IncrementalAnalysisPipeline::analyze(
         std::lock_guard<std::mutex> lock(cacheMutex());
         const auto cached = aggregateCache().find(result.aggregateLayer.key);
         if (cached != aggregateCache().end()) {
-            result.overview = cached->second.overview;
-            result.capabilityGraph = cached->second.capabilityGraph;
+            result.overview = cached->second.aggregation.overview;
+            result.capabilityGraph = cached->second.aggregation.capabilityGraph;
+            result.ruleReport = cached->second.aggregation.ruleReport;
             result.aggregateLayer.hit = true;
         }
     }
 
     if (!result.aggregateLayer.hit) {
-        result.overview = savt::core::buildArchitectureOverview(result.report);
-        result.capabilityGraph = savt::core::buildCapabilityGraph(result.report, result.overview);
+        const savt::core::ArchitectureAggregation aggregation =
+            savt::core::buildArchitectureAggregation(result.report);
+        result.overview = aggregation.overview;
+        result.capabilityGraph = aggregation.capabilityGraph;
+        result.ruleReport = aggregation.ruleReport;
         std::lock_guard<std::mutex> lock(cacheMutex());
-        aggregateCache()[result.aggregateLayer.key] =
-            CachedAggregateEntry{result.overview, result.capabilityGraph};
+        aggregateCache()[result.aggregateLayer.key] = CachedAggregateEntry{aggregation};
     }
     result.cacheDiagnostics.push_back(
         result.aggregateLayer.hit
-            ? "Incremental cache aggregate hit: reused overview and capability graph."
-            : "Incremental cache aggregate miss: rebuilt overview and capability graph.");
+            ? "Incremental cache aggregate hit: reused overview, capability graph, and architecture rules."
+            : "Incremental cache aggregate miss: rebuilt overview, capability graph, and architecture rules.");
+    logPhaseTiming("aggregate", aggregateTimer.elapsed(), result.aggregateLayer.hit);
     if (isCancellationRequested(options)) {
         result.canceled = true;
         result.canceledPhase = "提炼架构总览";
@@ -387,6 +380,8 @@ IncrementalAnalysisArtifacts IncrementalAnalysisPipeline::analyze(
         normalizedRoot,
         {"layout"},
         {result.aggregateLayer.key});
+    QElapsedTimer layoutTimer;
+    layoutTimer.start();
     publishProgress(
         progress,
         92,
@@ -407,7 +402,6 @@ IncrementalAnalysisArtifacts IncrementalAnalysisPipeline::analyze(
         savt::layout::LayeredGraphLayout layoutEngine;
         result.capabilitySceneLayout = layoutEngine.layoutCapabilityScene(result.capabilityGraph);
         result.moduleLayout = layoutEngine.layoutModules(result.report);
-
         publishProgress(progress, 94, "生成 L3 组件视图...");
         for (const savt::core::CapabilityNode& capabilityNode : result.capabilityGraph.nodes) {
             if (isCancellationRequested(options)) {
@@ -425,7 +419,6 @@ IncrementalAnalysisArtifacts IncrementalAnalysisPipeline::analyze(
             result.componentGraphs.emplace(capabilityNode.id, std::move(componentGraph));
             result.componentLayouts.emplace(capabilityNode.id, std::move(componentLayout));
         }
-
         std::lock_guard<std::mutex> lock(cacheMutex());
         layoutCache()[result.layoutLayer.key] = CachedLayoutEntry{
             result.capabilitySceneLayout,
@@ -437,6 +430,7 @@ IncrementalAnalysisArtifacts IncrementalAnalysisPipeline::analyze(
         result.layoutLayer.hit
             ? "Incremental cache layout hit: reused capability and component scene layouts."
             : "Incremental cache layout miss: recomputed capability and component scene layouts.");
+    logPhaseTiming("layout", layoutTimer.elapsed(), result.layoutLayer.hit);
 
     appendCacheDiagnostics(result.report, result.cacheDiagnostics);
     return result;

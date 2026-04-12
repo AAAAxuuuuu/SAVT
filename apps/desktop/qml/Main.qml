@@ -34,12 +34,34 @@ ApplicationWindow {
             "headline": "",
             "projectName": "",
             "purposeSummary": "",
+            "projectKindSummary": "",
             "entrySummary": "",
             "inputSummary": "",
             "outputSummary": "",
             "technologySummary": "",
             "containerSummary": "",
-            "containerNames": []
+            "containerNames": [],
+            "topModules": [],
+            "ruleFindings": [],
+            "readingOrder": [],
+            "riskSignals": [],
+            "precisionSummary": "",
+            "semanticReadiness": ({
+                "modeKey": "",
+                "modeLabel": "",
+                "badgeTone": "info",
+                "headline": "",
+                "summary": "",
+                "reason": "",
+                "impact": "",
+                "action": "",
+                "confidenceSummary": "",
+                "statusCode": "",
+                "compilationDatabasePath": "",
+                "semanticRequested": false,
+                "semanticEnabled": false,
+                "needsAttention": false
+            })
         })
         property var systemContextCards: []
         property bool aiAvailable: false

@@ -113,7 +113,7 @@ Item {
                 theme: root.theme
                 compact: true
                 tone: "ghost"
-                text: "对比"
+                text: "高级对比"
                 enabled: root.controllerReady
                 onClicked: root.compareRequested()
             }
@@ -161,7 +161,7 @@ Item {
                 theme: root.theme
                 compact: true
                 tone: "ai"
-                text: root.uiState.askPanelOpen ? "收起 Ask SAVT" : "Ask SAVT"
+                text: root.uiState.askPanelOpen ? "收起 AI 导览" : "AI 导览"
                 enabled: root.controllerReady
                 onClicked: root.uiState.askPanelOpen = !root.uiState.askPanelOpen
             }

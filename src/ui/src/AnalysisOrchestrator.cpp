@@ -1,16 +1,15 @@
 #include "savt/ui/AnalysisOrchestrator.h"
 
-#include "savt/ui/AnalysisTextFormatter.h"
 #include "savt/ui/AstPreviewService.h"
 #include "savt/ui/IncrementalAnalysisPipeline.h"
-#include "savt/ui/ReportService.h"
-#include "savt/ui/SceneMapper.h"
+#include "savt/ui/WorkspaceProjectionBuilder.h"
 
 #include <QDir>
 #include <QFileInfo>
 
 #include <filesystem>
 #include <stdexcept>
+#include <utility>
 
 namespace savt::ui {
 
@@ -19,15 +18,13 @@ namespace {
 void clearPendingPresentation(PendingAnalysisResult& result) {
     result.astFileItems.clear();
     result.selectedAstFilePath.clear();
-    result.astPreviewTitle = QStringLiteral("AST 预览");
-    result.astPreviewSummary = QStringLiteral(
-        "完成项目分析后，会在这里展示所选源码文件的 Tree-sitter AST。");
-    result.astPreviewText = QStringLiteral(
-        "当前还没有可预览的源码文件。\n\n先执行一次项目分析，然后从文件下拉框里选择想查看的 C++ 源文件。\n界面会展示该文件的语法树层级、节点范围和基础统计信息。");
+
     const auto preview = AstPreviewService::buildEmptyPreview();
     result.astPreviewTitle = preview.title;
     result.astPreviewSummary = preview.summary;
     result.astPreviewText = preview.text;
+
+    result.capabilitySceneLayout = {};
     result.capabilityScene = {};
     result.componentSceneCatalog.clear();
     result.systemContextData.clear();
@@ -44,59 +41,36 @@ bool shouldAbortAnalysis(
 
     result.canceled = true;
     result.statusMessage = phaseLabel.isEmpty()
-                               ? QStringLiteral("已停止当前分析。你可以重新开始。")
-                               : QStringLiteral("已在“%1”阶段停止当前分析。你可以重新开始。")
+                               ? QStringLiteral("Analysis stopped. You can restart it at any time.")
+                               : QStringLiteral("Analysis stopped during \"%1\". You can restart it at any time.")
                                      .arg(phaseLabel);
     result.analysisReport = QStringLiteral(
-        "本次分析已手动停止。\n\n为了避免把未完成的中间结果展示成最终结论，当前界面不会保留这次分析的半成品。\n你可以直接再次开始分析。");
+        "The current analysis was canceled before completion.\n\n"
+        "To avoid presenting partial output as a final result, the UI does not keep half-finished artifacts from this run.");
     clearPendingPresentation(result);
     return true;
 }
 
 void populatePendingPresentation(
-    QPromise<void>& promise,
-    const QString& cleanedPath,
-    const core::AnalysisReport& report,
-    const core::ArchitectureOverview& overview,
-    const core::CapabilityGraph& capabilityGraph,
-    const layout::CapabilitySceneLayoutResult& capabilitySceneLayout,
-    const QVariantMap& componentSceneCatalog,
-    const layout::LayoutResult& layoutResult,
+    const AnalysisArtifacts& artifacts,
+    WorkspaceProjection projection,
     PendingAnalysisResult& result) {
-    promise.setProgressValueAndText(96, QStringLiteral("整理 AST 预览..."));
-    if (promise.isCanceled()) {
-        return;
-    }
-
-    result.astFileItems = AstPreviewService::buildAstFileItems(report);
-    result.selectedAstFilePath =
-        AstPreviewService::chooseDefaultAstFilePath(result.astFileItems);
-    const auto astPreview =
-        AstPreviewService::buildPreview(cleanedPath, result.selectedAstFilePath);
-    result.astPreviewTitle = astPreview.title;
-    result.astPreviewSummary = astPreview.summary;
-    result.astPreviewText = astPreview.text;
-    if (promise.isCanceled()) {
-        return;
-    }
-
-    promise.setProgressValueAndText(98, QStringLiteral("整理可视化数据..."));
-    const auto sceneData =
-        SceneMapper::buildCapabilitySceneData(capabilityGraph, capabilitySceneLayout);
-    if (promise.isCanceled()) {
-        return;
-    }
-
-    result.statusMessage =
-        ReportService::buildStatusMessage(report, overview, capabilityGraph, layoutResult);
-    result.capabilityScene = sceneData;
-    result.componentSceneCatalog = componentSceneCatalog;
-    result.analysisReport = formatCapabilityReportMarkdown(report, capabilityGraph);
-    result.systemContextReport = formatSystemContextReportMarkdown(capabilityGraph);
-    result.systemContextData =
-        ReportService::buildSystemContextData(report, overview, capabilityGraph, cleanedPath);
-    result.systemContextCards =
-        ReportService::buildSystemContextCards(report, overview, capabilityGraph);
+    result.report = artifacts.report;
+    result.overview = artifacts.overview;
+    result.capabilityGraph = artifacts.capabilityGraph;
+    result.statusMessage = std::move(projection.statusMessage);
+    result.analysisReport = std::move(projection.analysisReport);
+    result.systemContextReport = std::move(projection.systemContextReport);
+    result.astFileItems = std::move(projection.astFileItems);
+    result.selectedAstFilePath = std::move(projection.selectedAstFilePath);
+    result.astPreviewTitle = std::move(projection.astPreviewTitle);
+    result.astPreviewSummary = std::move(projection.astPreviewSummary);
+    result.astPreviewText = std::move(projection.astPreviewText);
+    result.capabilitySceneLayout = std::move(projection.capabilitySceneLayout);
+    result.capabilityScene = std::move(projection.capabilityScene);
+    result.componentSceneCatalog = std::move(projection.componentSceneCatalog);
+    result.systemContextData = std::move(projection.systemContextData);
+    result.systemContextCards = std::move(projection.systemContextCards);
 }
 
 }  // namespace
@@ -126,8 +100,8 @@ void AnalysisOrchestrator::run(
 
     try {
         promise.setProgressRange(0, 100);
-        promise.setProgressValueAndText(5, QStringLiteral("扫描项目目录..."));
-        if (shouldAbortAnalysis(promise, result, QStringLiteral("扫描项目目录"))) {
+        promise.setProgressValueAndText(5, QStringLiteral("Scanning project files..."));
+        if (shouldAbortAnalysis(promise, result, QStringLiteral("Scanning project files"))) {
             if (output) {
                 *output = std::move(result);
             }
@@ -135,16 +109,18 @@ void AnalysisOrchestrator::run(
         }
 
         analyzer::AnalyzerOptions options;
-        options.precision = analyzer::AnalyzerPrecision::SemanticPreferred;
+        // Keep the first pass fast so users can get the project map before
+        // deciding whether a slower semantic run is worth it.
+        options.precision = analyzer::AnalyzerPrecision::SyntaxOnly;
         options.cancellationRequested = [&promise]() { return promise.isCanceled(); };
+
         const auto artifacts = IncrementalAnalysisPipeline::analyze(
             std::filesystem::path(cleanedPath.toStdString()),
             options,
             [&promise](const int progressValue, const std::string& label) {
-                promise.setProgressValueAndText(
-                    progressValue,
-                    QString::fromStdString(label));
+                promise.setProgressValueAndText(progressValue, QString::fromStdString(label));
             });
+
         if (artifacts.canceled ||
             shouldAbortAnalysis(
                 promise,
@@ -156,56 +132,49 @@ void AnalysisOrchestrator::run(
             return;
         }
 
-        QVariantMap componentSceneCatalog;
-        for (const core::CapabilityNode& capabilityNode : artifacts.capabilityGraph.nodes) {
-            const auto graphIt = artifacts.componentGraphs.find(capabilityNode.id);
-            const auto layoutIt = artifacts.componentLayouts.find(capabilityNode.id);
-            if (graphIt == artifacts.componentGraphs.end() ||
-                layoutIt == artifacts.componentLayouts.end()) {
-                continue;
-            }
-            const auto componentScene =
-                SceneMapper::buildComponentSceneData(graphIt->second, layoutIt->second);
-            componentSceneCatalog.insert(
-                QString::number(static_cast<qulonglong>(capabilityNode.id)),
-                SceneMapper::toVariantMap(componentScene));
-        }
-        if (shouldAbortAnalysis(promise, result, QStringLiteral("生成 L3 组件视图"))) {
+        promise.setProgressValueAndText(96, QStringLiteral("Organizing workspace guide..."));
+        if (shouldAbortAnalysis(
+                promise,
+                result,
+                QStringLiteral("Organizing workspace guide"))) {
             if (output) {
                 *output = std::move(result);
             }
             return;
         }
+
+        auto projection = WorkspaceProjectionBuilder::build(cleanedPath, artifacts);
 
         populatePendingPresentation(
-            promise,
-            cleanedPath,
-            artifacts.report,
-            artifacts.overview,
-            artifacts.capabilityGraph,
-            artifacts.capabilitySceneLayout,
-            componentSceneCatalog,
-            artifacts.moduleLayout,
+            artifacts,
+            std::move(projection),
             result);
-        if (shouldAbortAnalysis(promise, result, QStringLiteral("整理分析结果"))) {
+
+        if (shouldAbortAnalysis(
+                promise,
+                result,
+                QStringLiteral("Organizing analysis results"))) {
             if (output) {
                 *output = std::move(result);
             }
             return;
         }
 
-        promise.setProgressValueAndText(100, QStringLiteral("分析完成，正在准备界面..."));
+        promise.setProgressValueAndText(100, QStringLiteral("Analysis complete. Preparing UI..."));
     } catch (const std::exception& exception) {
-        result.statusMessage =
-            QStringLiteral("分析失败：%1").arg(QString::fromUtf8(exception.what()));
+        result.statusMessage = QStringLiteral("Analysis failed: %1")
+                                   .arg(QString::fromUtf8(exception.what()));
         result.analysisReport = QStringLiteral(
-                                    "分析过程中发生异常。\n\n错误信息：%1\n\n请检查项目路径、源码文件和当前构建环境是否可用。")
+                                    "The analysis failed with an exception.\n\n"
+                                    "Error: %1\n\n"
+                                    "Please check the project path, source files, and build environment.")
                                     .arg(QString::fromUtf8(exception.what()));
         clearPendingPresentation(result);
     } catch (...) {
-        result.statusMessage = QStringLiteral("分析失败：发生未知异常。");
+        result.statusMessage = QStringLiteral("Analysis failed with an unknown exception.");
         result.analysisReport = QStringLiteral(
-            "分析过程中发生未知异常。\n\n请检查项目路径、源码文件和当前构建环境是否可用。");
+            "The analysis failed with an unknown exception.\n\n"
+            "Please check the project path, source files, and build environment.");
         clearPendingPresentation(result);
     }
 

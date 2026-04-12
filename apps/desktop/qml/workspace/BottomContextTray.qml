@@ -20,7 +20,7 @@ Item {
         if (root.uiState.contextTab === "evidence")
             return "把事实、规则和结论收纳在底部，需要时再展开。"
         if (root.uiState.contextTab === "ai")
-            return "承接 AI 摘要和下一步建议，不和正文抢主视线。"
+            return "承接 AI 导览和下一步阅读建议，不和正文抢主视线。"
         return root.uiState.inspector.title.length > 0
                ? ("当前围绕「" + root.uiState.inspector.title + "」补充关系和上下文。")
                : "优先放补充上下文和关系线索，避免主工作区被次要信息挤占。"
@@ -70,7 +70,7 @@ Item {
                     model: [
                         {"value": "context", "label": "上下文"},
                         {"value": "evidence", "label": "证据"},
-                        {"value": "ai", "label": "AI"}
+                        {"value": "ai", "label": "导览"}
                     ]
                     currentValue: root.uiState.contextTab
                     onActivated: root.uiState.contextTab = value
@@ -246,7 +246,7 @@ Item {
                         spacing: 6
 
                         Label {
-                            text: "AI 摘要"
+                            text: "AI 导览"
                             color: root.theme.inkStrong
                             font.family: root.theme.displayFontFamily
                             font.pixelSize: 14
@@ -257,7 +257,7 @@ Item {
                             Layout.fillWidth: true
                             text: root.analysisController.aiHasResult
                                   ? root.analysisController.aiSummary
-                                  : "还没有 AI 输出，可以从顶部栏或右侧面板打开 Ask SAVT。"
+                                  : "还没有 AI 导览，可以先生成项目导览、模块解读或深入阅读建议。"
                             wrapMode: Text.WordWrap
                             color: root.theme.inkMuted
                             font.family: root.theme.textFontFamily

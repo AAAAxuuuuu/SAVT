@@ -17,7 +17,7 @@ Window {
     minimumWidth: 460
     minimumHeight: 540
     visible: root.uiState.askPanelOpen
-    title: "Ask SAVT"
+    title: "AI 导览"
     transientParent: root.ownerWindow
     modality: Qt.NonModal
     flags: Qt.Window | Qt.WindowTitleHint | Qt.WindowSystemMenuHint | Qt.WindowCloseButtonHint | Qt.WindowMinimizeButtonHint

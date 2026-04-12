@@ -3,6 +3,7 @@
 #include "savt/ui/AiService.h"
 #include "savt/ui/AnalysisOrchestrator.h"
 #include "savt/ui/AstPreviewService.h"
+#include "savt/core/ComponentGraph.h"
 
 #include <QtGui/QClipboard>
 #include <QDir>
@@ -279,6 +280,45 @@ void AnalysisController::analyzeProjectUrl(const QUrl& projectRootUrl) {
     }
 }
 
+void AnalysisController::ensureComponentSceneForCapability(const qulonglong capabilityId) {
+    if (capabilityId == 0 || m_lastCapabilityGraph.nodes.empty()) {
+        return;
+    }
+
+    const QString capabilityKey = QString::number(capabilityId);
+    if (m_componentSceneCatalog.contains(capabilityKey)) {
+        return;
+    }
+
+    const auto capabilityIt = std::find_if(
+        m_lastCapabilityGraph.nodes.begin(),
+        m_lastCapabilityGraph.nodes.end(),
+        [capabilityId](const savt::core::CapabilityNode& node) {
+            return node.id == static_cast<std::size_t>(capabilityId);
+        });
+    if (capabilityIt == m_lastCapabilityGraph.nodes.end()) {
+        return;
+    }
+
+    const QString previousStatusMessage = m_statusMessage;
+    setStatusMessage(QStringLiteral("正在生成组件工作台..."));
+
+    savt::layout::LayeredGraphLayout layoutEngine;
+    auto componentGraph = savt::core::buildComponentGraphForCapability(
+        m_lastReport,
+        m_lastOverview,
+        m_lastCapabilityGraph,
+        static_cast<std::size_t>(capabilityId));
+    auto componentLayout = layoutEngine.layoutComponentScene(componentGraph);
+    const auto componentScene =
+        SceneMapper::buildComponentSceneData(componentGraph, componentLayout);
+
+    QVariantMap updatedCatalog = m_componentSceneCatalog;
+    updatedCatalog.insert(capabilityKey, SceneMapper::toVariantMap(componentScene));
+    setComponentSceneCatalog(std::move(updatedCatalog));
+    setStatusMessage(previousStatusMessage);
+}
+
 void AnalysisController::copyCodeContextToClipboard(const qulonglong nodeId) {
     QVariantMap targetNode = findNodeById(m_capabilityScene.nodeItems, nodeId);
     if (targetNode.isEmpty()) {
@@ -538,6 +578,9 @@ void AnalysisController::finishAnalysis() {
         result->analysisReport.isEmpty()
             ? QStringLiteral("没有可显示的分析报告。")
             : result->analysisReport);
+    m_lastReport = result->report;
+    m_lastOverview = result->overview;
+    m_lastCapabilityGraph = result->capabilityGraph;
     setAstFileItems(result->astFileItems);
     setSelectedAstFilePathInternal(result->selectedAstFilePath, true);
     setAstPreviewTitle(result->astPreviewTitle);
@@ -563,6 +606,9 @@ void AnalysisController::clearVisualizationState() {
     setAstPreviewText(preview.text);
     setCapabilityScene({});
     setComponentSceneCatalog({});
+    m_lastReport = {};
+    m_lastOverview = {};
+    m_lastCapabilityGraph = {};
     setSystemContextData({});
     setSystemContextCards({});
     if (!m_systemContextReport.isEmpty()) {

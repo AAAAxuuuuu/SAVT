@@ -40,6 +40,21 @@ Item {
         return pageId.indexOf("report.") === 0 || pageId === "levels.l4"
     }
 
+    function scopeLabel() {
+        var scope = root.analysisController.aiScope || ""
+        if (scope === "system_context")
+            return "项目导览"
+        if (scope === "engineering_report")
+            return "深入阅读建议"
+        if (scope === "capability_map" || scope === "component_node")
+            return "模块解读"
+        if (root.uiState.inspector.kind === "node")
+            return "模块解读"
+        if (root.isReportFocus())
+            return "深入阅读建议"
+        return "项目导览"
+    }
+
     function focusLabel() {
         if (root.uiState.inspector.kind === "node")
             return root.uiState.inspector.title
@@ -204,7 +219,7 @@ Item {
                     spacing: 4
 
                     Label {
-                        text: "Ask SAVT"
+                        text: "AI 导览"
                         color: root.theme.inkStrong
                         font.family: root.theme.displayFontFamily
                         font.pixelSize: 24
@@ -214,8 +229,10 @@ Item {
                     Label {
                         Layout.fillWidth: true
                         text: root.uiState.inspector.kind === "node"
-                              ? ("当前将围绕「" + root.uiState.inspector.title + "」生成补充解释或改造建议。")
-                              : "可以围绕当前项目或当前选中关系生成补充解释、改造建议和可复制提示词。"
+                              ? ("当前将围绕「" + root.uiState.inspector.title + "」生成模块解读，说明它的职责、重要性和下一步先看哪里。")
+                              : (root.isReportFocus()
+                                 ? "可以把当前分析结果整理成深入阅读建议，帮助你决定接下来先读哪里、先验证什么。"
+                                 : "可以围绕当前项目生成项目导览，先说明项目是什么、建议从哪里开始看。")
                         wrapMode: Text.WordWrap
                         color: root.theme.inkMuted
                         font.family: root.theme.textFontFamily
@@ -326,6 +343,14 @@ Item {
                     borderColor: root.theme.borderSubtle
                     textColor: root.theme.inkNormal
                 }
+
+                AppChip {
+                    text: "输出 " + root.scopeLabel()
+                    compact: true
+                    fillColor: "#FFFFFF"
+                    borderColor: root.theme.borderSubtle
+                    textColor: root.theme.inkNormal
+                }
             }
 
             Flow {
@@ -334,9 +359,9 @@ Item {
 
                 Repeater {
                     model: [
-                        "解释当前对象的职责边界",
-                        "给出下一步改造建议",
-                        "生成可以交给外部代理的提示词"
+                        "解释当前焦点的职责边界",
+                        "说明它为什么值得先看",
+                        "给出下一步阅读顺序"
                     ]
 
                     AppButton {
@@ -357,7 +382,7 @@ Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 108
                 text: root.promptText
-                placeholderText: "补充你想问 SAVT 的问题，例如：解释这条协作链为什么关键，并给出下一步最值得验证的改造切口。"
+                placeholderText: "补充你想问的问题，例如：解释这个模块为什么重要，并告诉我接下来先看哪两个文件。"
                 wrapMode: TextEdit.Wrap
                 font.family: root.theme.textFontFamily
                 font.pixelSize: 13
@@ -379,7 +404,7 @@ Item {
                     theme: root.theme
                     compact: true
                     tone: "ai"
-                    text: root.analysisController.aiBusy ? "生成中..." : "解释当前项目"
+                    text: root.analysisController.aiBusy ? "生成中..." : "生成项目导览"
                     enabled: root.analysisController.aiAvailable && !root.analysisController.aiBusy
                     onClicked: root.analysisController.requestProjectAiExplanation(root.promptText)
                 }
@@ -389,7 +414,7 @@ Item {
                     compact: true
                     tone: "ghost"
                     visible: root.isReportFocus()
-                    text: root.analysisController.aiBusy ? "生成中..." : "解释当前报告"
+                    text: root.analysisController.aiBusy ? "生成中..." : "生成深入阅读建议"
                     enabled: root.analysisController.aiAvailable && !root.analysisController.aiBusy
                     onClicked: root.analysisController.requestReportAiExplanation(root.promptText)
                 }
@@ -398,7 +423,7 @@ Item {
                     theme: root.theme
                     compact: true
                     tone: "accent"
-                    text: root.analysisController.aiBusy ? "生成中..." : "解释当前对象"
+                    text: root.analysisController.aiBusy ? "生成中..." : "生成模块解读"
                     enabled: root.uiState.inspector.kind === "node" &&
                              root.analysisController.aiAvailable &&
                              !root.analysisController.aiBusy
@@ -447,12 +472,22 @@ Item {
                         Label {
                             Layout.fillWidth: true
                             visible: root.analysisController.aiBusy
-                            text: "正在基于当前静态证据生成补充说明。"
+                            text: "正在基于当前静态证据生成导览内容。"
                             wrapMode: Text.WordWrap
                             color: root.theme.aiAccent
                             font.family: root.theme.textFontFamily
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
+                        }
+
+                        Label {
+                            Layout.fillWidth: true
+                            visible: !root.analysisController.aiHasResult && !root.analysisController.aiBusy
+                            text: "还没有 AI 导览，可以先生成项目导览、模块解读或深入阅读建议。"
+                            wrapMode: Text.WordWrap
+                            color: root.theme.inkMuted
+                            font.family: root.theme.textFontFamily
+                            font.pixelSize: 12
                         }
 
                         Label {

@@ -1,18 +1,26 @@
-add_library(savt_ui STATIC
+﻿add_library(savt_ui STATIC
     include/savt/ui/AnalysisController.h
     include/savt/ui/AiService.h
     include/savt/ui/AstPreviewService.h
     include/savt/ui/AnalysisOrchestrator.h
+    include/savt/ui/AnalysisAnnotationService.h
     include/savt/ui/IncrementalAnalysisPipeline.h
+    include/savt/ui/ReadingGuideService.h
     include/savt/ui/ReportService.h
+    include/savt/ui/SemanticReadinessService.h
     include/savt/ui/SceneMapper.h
+    include/savt/ui/WorkspaceProjectionBuilder.h
     src/AiService.cpp
     src/AstPreviewService.cpp
     src/AnalysisController.cpp
     src/IncrementalAnalysisPipeline.cpp
     src/AnalysisOrchestrator.cpp
+    src/AnalysisAnnotationService.cpp
+    src/ReadingGuideService.cpp
     src/ReportService.cpp
+    src/SemanticReadinessService.cpp
     src/SceneMapper.cpp
+    src/WorkspaceProjectionBuilder.cpp
 )
 
 target_include_directories(savt_ui
@@ -63,3 +71,4 @@ set_target_properties(savt_ui_formatters PROPERTIES
     AUTORCC OFF
     FOLDER src
 )
+

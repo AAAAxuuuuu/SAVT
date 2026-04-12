@@ -108,7 +108,7 @@ Item {
                         theme: root.theme
                         compact: true
                         tone: "ai"
-                        text: "Ask SAVT"
+                        text: "AI 导览"
                         onClicked: root.askRequested()
                     }
 

@@ -48,7 +48,7 @@ Item {
             summary: root.uiState.selection.selectedComponentNode
                      ? (root.uiState.selection.selectedComponentNode.summary || root.uiState.inspector.nextStepSummary)
                      : (root.uiState.selection.selectedCapabilityNode
-                        ? "当前已经进入 L3。你可以继续选中内部组件，结合右侧摘要、底部托盘和 Ask SAVT 形成具体改造切口。"
+                        ? "当前已经进入 L3。你可以继续选中内部组件，结合右侧摘要、底部托盘和 AI 导览形成具体改造切口。"
                         : "先在能力地图里选中一个能力域，再进入这里查看其内部组件关系。")
             chips: [
                 {"text": root.uiState.selection.selectedCapabilityNode ? ("能力域 " + root.uiState.selection.selectedCapabilityNode.name) : "等待能力域", "fillColor": "#FFFFFF", "borderColor": root.theme.borderSubtle, "textColor": root.theme.inkNormal},
@@ -57,7 +57,7 @@ Item {
                 {"text": "父能力上下文已保留", "fillColor": "#FFFFFF", "borderColor": root.theme.borderSubtle, "textColor": root.theme.inkNormal}
             ]
             primaryText: root.uiState.selection.selectedCapabilityNode ? "返回能力地图" : "前往能力地图"
-            secondaryText: "查看工程报告"
+            secondaryText: "查看高级报告"
             secondaryVisible: true
             copyVisible: !!root.uiState.selection.selectedComponentNode || !!root.uiState.selection.selectedCapabilityNode
             copyEnabled: copyVisible

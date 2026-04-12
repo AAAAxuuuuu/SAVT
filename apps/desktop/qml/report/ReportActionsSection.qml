@@ -28,10 +28,10 @@ Item {
             anchors.fill: parent
             theme: root.theme
             eyebrow: "动作"
-            title: "改造建议与下一步动作"
+            title: "深入阅读建议与下一步动作"
             subtitle: root.uiState.inspector.nextStepSummary.length > 0
                       ? root.uiState.inspector.nextStepSummary
-                      : "从报告直接回跳到能力地图、对照工作台或 Ask SAVT，把理解尽快转成下一步动作。"
+                      : "从报告直接回跳到能力地图、高级对比或 AI 导览，把理解尽快转成下一步动作。"
 
             Flow {
                 Layout.fillWidth: true
@@ -65,14 +65,14 @@ Item {
                 AppButton {
                     theme: root.theme
                     tone: "ai"
-                    text: "打开 Ask SAVT"
+                    text: "打开 AI 导览"
                     onClicked: root.askRequested()
                 }
 
                 AppButton {
                     theme: root.theme
                     tone: "ghost"
-                    text: "打开对照工作台"
+                    text: "打开高级对比"
                     onClicked: root.compareRequested()
                 }
 

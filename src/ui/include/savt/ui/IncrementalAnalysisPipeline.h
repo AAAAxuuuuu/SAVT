@@ -1,6 +1,7 @@
 #pragma once
 
 #include "savt/analyzer/CppProjectAnalyzer.h"
+#include "savt/core/ArchitectureAggregation.h"
 #include "savt/core/ArchitectureOverview.h"
 #include "savt/core/CapabilityGraph.h"
 #include "savt/core/ComponentGraph.h"
@@ -20,10 +21,11 @@ struct IncrementalCacheLayerState {
     std::string key;
 };
 
-struct IncrementalAnalysisArtifacts {
+struct AnalysisArtifacts {
     savt::core::AnalysisReport report;
     savt::core::ArchitectureOverview overview;
     savt::core::CapabilityGraph capabilityGraph;
+    savt::core::ArchitectureRuleReport ruleReport;
     savt::layout::CapabilitySceneLayoutResult capabilitySceneLayout;
     savt::layout::LayoutResult moduleLayout;
     std::unordered_map<std::size_t, savt::core::ComponentGraph> componentGraphs;
@@ -37,12 +39,14 @@ struct IncrementalAnalysisArtifacts {
     std::string canceledPhase;
 };
 
+using IncrementalAnalysisArtifacts = AnalysisArtifacts;
+
 using IncrementalProgressCallback =
     std::function<void(int value, const std::string& label)>;
 
 class IncrementalAnalysisPipeline {
 public:
-    static IncrementalAnalysisArtifacts analyze(
+    static AnalysisArtifacts analyze(
         const std::filesystem::path& rootPath,
         const savt::analyzer::AnalyzerOptions& options,
         IncrementalProgressCallback progress = {});

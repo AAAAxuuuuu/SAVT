@@ -1,24 +1,23 @@
-﻿#pragma once
+#pragma once
 
 #include "savt/core/ArchitectureGraph.h"
 #include "savt/core/ArchitectureOverview.h"
 #include "savt/core/CapabilityGraph.h"
+#include "savt/core/ComponentGraph.h"
 #include "savt/layout/LayeredGraphLayout.h"
+#include "savt/ui/IncrementalAnalysisPipeline.h"
 #include "savt/ui/SceneMapper.h"
 
-#include <QPromise>
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
 
-#include <memory>
+#include <cstddef>
+#include <unordered_map>
 
 namespace savt::ui {
 
-struct PendingAnalysisResult {
-    savt::core::AnalysisReport report;
-    savt::core::ArchitectureOverview overview;
-    savt::core::CapabilityGraph capabilityGraph;
+struct WorkspaceProjection {
     QString statusMessage;
     QString analysisReport;
     QString systemContextReport;
@@ -32,16 +31,13 @@ struct PendingAnalysisResult {
     QVariantMap componentSceneCatalog;
     QVariantMap systemContextData;
     QVariantList systemContextCards;
-    bool canceled = false;
 };
 
-class AnalysisOrchestrator {
+class WorkspaceProjectionBuilder {
 public:
-    static QString defaultProjectRootPath();
-    static void run(
-        QPromise<void>& promise,
-        const QString& cleanedPath,
-        const std::shared_ptr<PendingAnalysisResult>& output);
+    static WorkspaceProjection build(
+        const QString& projectRootPath,
+        const AnalysisArtifacts& artifacts);
 };
 
 }  // namespace savt::ui
