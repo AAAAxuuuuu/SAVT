@@ -1,8 +1,6 @@
 import QtQuick
 import QtQuick.Controls
-import "theme"
-import "state"
-import "shell"
+import "greenfield"
 
 ApplicationWindow {
     id: window
@@ -83,6 +81,7 @@ ApplicationWindow {
         function stopAnalysis() {}
         function analyzeProject(projectRootPath) {}
         function analyzeProjectUrl(projectRootUrl) {}
+        function ensureComponentSceneForCapability(capabilityId) {}
         function refreshAiAvailability() {}
         function clearAiExplanation() {}
         function requestAiExplanation(nodeData, userTask) {}
@@ -94,77 +93,16 @@ ApplicationWindow {
 
     readonly property var controller: _analysisController ? _analysisController : fallbackController
 
-    width: 1560
+    width: 1600
     height: 940
-    minimumWidth: 1320
-    minimumHeight: 820
+    minimumWidth: 1280
+    minimumHeight: 780
     visible: true
     title: "SAVT"
-    color: appTheme.windowBase
+    color: "#F6F7F9"
 
-    DesignTokens {
-        id: designTokens
-    }
-
-    AppTheme {
-        id: appTheme
-        tokens: designTokens
-    }
-
-    DesktopUiState {
-        id: uiState
-        capabilityScene: window.controller ? window.controller.capabilityScene : ({})
-        componentSceneCatalog: window.controller ? window.controller.componentSceneCatalog : ({})
-    }
-
-    background: Rectangle {
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: appTheme.windowTop }
-            GradientStop { position: 1.0; color: appTheme.windowBase }
-        }
-
-        Rectangle {
-            width: 520
-            height: 520
-            radius: 260
-            x: -160
-            y: -220
-            color: "#DCE7F0"
-            opacity: 0.86
-        }
-
-        Rectangle {
-            width: 420
-            height: 420
-            radius: 210
-            x: parent.width - width * 0.7
-            y: -90
-            color: "#EDF3F8"
-            opacity: 0.8
-        }
-
-        Rectangle {
-            width: 560
-            height: 560
-            radius: 280
-            x: parent.width - width * 0.5
-            y: parent.height - height * 0.56
-            color: "#D8E3ED"
-            opacity: 0.42
-        }
-    }
-
-    AppShell {
+    MainSurface {
         anchors.fill: parent
-        theme: appTheme
         analysisController: window.controller
-        uiState: uiState
-    }
-
-    AskSavtWindow {
-        theme: appTheme
-        uiState: uiState
-        analysisController: window.controller
-        ownerWindow: window
     }
 }
