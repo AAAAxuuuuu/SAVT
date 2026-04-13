@@ -38,15 +38,8 @@ Rectangle {
         anchors.rightMargin: 24
         spacing: 12
 
-        Label {
+        Item {
             Layout.fillWidth: true
-            textFormat: Text.RichText
-            text: "<span style='color:#86868B'>Workspace</span> / <b>" + root.caseState.routeTitle() + "</b>"
-            color: root.tokens.text1
-            font.family: root.tokens.textFontFamily
-            font.pixelSize: 15
-            font.weight: Font.Medium
-            elide: Text.ElideRight
         }
 
         TextField {
