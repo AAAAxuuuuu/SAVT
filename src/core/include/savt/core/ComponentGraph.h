@@ -30,6 +30,7 @@ struct ComponentNode {
     std::size_t capabilityId = 0;
     ComponentNodeKind kind = ComponentNodeKind::Component;
     std::string name;
+    std::string scopeLabel;
     std::string role;
     std::string responsibility;
     std::string summary;

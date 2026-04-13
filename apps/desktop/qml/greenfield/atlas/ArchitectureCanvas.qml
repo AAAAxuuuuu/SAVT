@@ -19,13 +19,31 @@ Item {
     readonly property var nodes: (scene.nodes || [])
     readonly property var edges: (scene.edges || [])
     readonly property var bounds: (scene.bounds || ({}))
-    readonly property real sceneWidth: Math.max(1, bounds.width || 980)
-    readonly property real sceneHeight: Math.max(1, bounds.height || 560)
+    readonly property var overviewMindMapLayout: buildOverviewMindMapLayout()
+    readonly property bool componentOverviewMode: componentMode
+    readonly property var componentOverviewGroups: buildComponentOverviewGroups()
+    readonly property real componentOverviewGapX: 34
+    readonly property real componentOverviewGapY: 26
+    readonly property real componentOverviewSectionGap: 34
+    readonly property real componentOverviewHeaderHeight: 34
+    readonly property real componentOverviewCardWidth: Math.max(220, Math.min(272,
+                                                                               (Math.max(860, width - 220) - 144 - Math.max(0, componentOverviewGroups.length - 1) * componentOverviewGapX) / Math.max(1, componentOverviewGroups.length)))
+    readonly property real componentOverviewCardHeight: 126
+    readonly property real sceneWidth: componentOverviewMode
+                                       ? Math.max(980, 72 * 2 + componentOverviewGroups.length * componentOverviewCardWidth + Math.max(0, componentOverviewGroups.length - 1) * componentOverviewGapX)
+                                       : Math.max(980, overviewMindMapLayout.width || 0, bounds.width || 980)
+    readonly property real sceneHeight: componentOverviewMode
+                                        ? Math.max(560, componentOverviewSceneHeight())
+                                        : Math.max(560, overviewMindMapLayout.height || 0, bounds.height || 560)
     readonly property real baseScale: Math.min(1.0, Math.max(0.38, Math.min((width - 120) / sceneWidth, (height - 100) / sceneHeight)))
     readonly property real effectiveScale: baseScale * zoom
     readonly property real contentX: Math.max(40, (width - sceneWidth * effectiveScale) / 2) + panX
     readonly property real contentY: Math.max(38, (height - sceneHeight * effectiveScale) / 2) + panY
     readonly property var visibleEdges: collectVisibleEdges(edges, selectedNode, hoverNode, showAllEdges)
+    readonly property bool relationshipFocusActive: !!selectedNode && selectedNode.id !== undefined
+    readonly property var focusedIncomingRelations: relationshipFocusItems("incoming")
+    readonly property var focusedOutgoingRelations: relationshipFocusItems("outgoing")
+    readonly property int componentCount: componentMode ? nodes.length : 0
     property real zoom: 1.0
     property real panX: 0
     property real panY: 0
@@ -60,6 +78,40 @@ Item {
         return selectedNode || hoverNode
     }
 
+    function relationshipFocusItems(direction) {
+        if (!relationshipFocusActive)
+            return []
+
+        var output = []
+        for (var index = 0; index < edges.length; ++index) {
+            var edge = edges[index]
+            var matches = direction === "incoming"
+                          ? edge.toId === selectedNode.id
+                          : edge.fromId === selectedNode.id
+            if (!matches)
+                continue
+
+            var otherNodeId = direction === "incoming" ? edge.fromId : edge.toId
+            var node = nodeById(otherNodeId)
+            if (!node)
+                continue
+
+            var rect = nodeRectById(otherNodeId)
+            output.push({
+                "edge": edge,
+                "node": node,
+                "sortY": rect.valid ? rect.y + rect.height / 2 : 0
+            })
+        }
+
+        output.sort(function(left, right) {
+            if (Math.abs(left.sortY - right.sortY) > 0.5)
+                return left.sortY - right.sortY
+            return String(left.node.name || "").localeCompare(String(right.node.name || ""))
+        })
+        return output
+    }
+
     function nodeById(nodeId) {
         for (var index = 0; index < nodes.length; ++index) {
             if (nodes[index].id === nodeId)
@@ -76,24 +128,511 @@ Item {
         return -1
     }
 
+    function overviewRootNode() {
+        if (nodes.length === 0)
+            return null
+
+        var bestNode = nodes[0]
+        var bestScore = -999999
+        for (var index = 0; index < nodes.length; ++index) {
+            var node = nodes[index]
+            var outgoing = 0
+            var incoming = 0
+            for (var edgeIndex = 0; edgeIndex < edges.length; ++edgeIndex) {
+                if (edges[edgeIndex].fromId === node.id)
+                    outgoing += 1
+                if (edges[edgeIndex].toId === node.id)
+                    incoming += 1
+            }
+
+            var score = outgoing * 4 - incoming
+            if (node.reachableFromEntry || node.kind === "entry" || node.kind === "entry_component")
+                score += 64
+            if (String(node.role || "").toLowerCase().indexOf("core") >= 0)
+                score += 3
+
+            if (score > bestScore) {
+                bestScore = score
+                bestNode = node
+            }
+        }
+        return bestNode
+    }
+
+    function sortedNeighborIds(nodeIds) {
+        var copy = nodeIds.slice(0)
+        copy.sort(function(leftId, rightId) {
+            var left = nodeById(leftId) || {}
+            var right = nodeById(rightId) || {}
+            return String(left.name || "").localeCompare(String(right.name || ""))
+        })
+        return copy
+    }
+
+    function isOverviewPrimaryEdge(edge) {
+        return !componentMode && !!edge && !!(overviewMindMapLayout.primaryEdgeIds && overviewMindMapLayout.primaryEdgeIds[edge.id])
+    }
+
+    function buildOverviewMindMapLayout() {
+        if (componentMode || nodes.length === 0)
+            return {"positions": ({}), "primaryEdgeIds": ({}), "secondaryEdgeIds": ({})}
+
+        var rootNode = overviewRootNode()
+        if (!rootNode || rootNode.id === undefined)
+            return {"positions": ({}), "primaryEdgeIds": ({}), "secondaryEdgeIds": ({})}
+
+        var positions = {}
+        var primaryEdgeIds = {}
+        var secondaryEdgeIds = {}
+        var branchSlotByNodeId = {}
+        var outgoingSlotByEdgeId = {}
+        var incomingSlotByEdgeId = {}
+        var outgoingCountByNodeId = {}
+        var incomingCountByNodeId = {}
+        var layerById = {}
+        var layers = []
+        var adjacency = {}
+        var indegree = {}
+        var outdegree = {}
+        var rootId = rootNode.id
+        var layerGap = 220
+        var nodeGap = 220
+        var marginX = 120
+        var marginY = 120
+
+        function ensureNode(nodeId) {
+            if (!adjacency[nodeId])
+                adjacency[nodeId] = []
+            if (indegree[nodeId] === undefined)
+                indegree[nodeId] = 0
+            if (outdegree[nodeId] === undefined)
+                outdegree[nodeId] = 0
+        }
+
+        for (var nodeIndex = 0; nodeIndex < nodes.length; ++nodeIndex)
+            ensureNode(nodes[nodeIndex].id)
+
+        var dedup = {}
+        for (var edgeIndex = 0; edgeIndex < edges.length; ++edgeIndex) {
+            var edge = edges[edgeIndex]
+            ensureNode(edge.fromId)
+            ensureNode(edge.toId)
+            var key = edge.fromId + "->" + edge.toId
+            if (dedup[key])
+                continue
+            dedup[key] = true
+            adjacency[edge.fromId].push(edge.toId)
+            indegree[edge.toId] += 1
+            outdegree[edge.fromId] += 1
+        }
+
+        function sortIdsByName(ids) {
+            ids.sort(function(leftId, rightId) {
+                var left = nodeById(leftId) || {}
+                var right = nodeById(rightId) || {}
+                return String(left.name || "").localeCompare(String(right.name || ""))
+            })
+        }
+
+        var zeroIndegree = []
+        for (var idKey in indegree) {
+            if (!indegree.hasOwnProperty(idKey))
+                continue
+            if (indegree[idKey] === 0)
+                zeroIndegree.push(Number(idKey))
+        }
+
+        sortIdsByName(zeroIndegree)
+
+        var processed = {}
+        while (zeroIndegree.length > 0) {
+            var currentLayer = zeroIndegree.slice(0)
+            zeroIndegree = []
+            sortIdsByName(currentLayer)
+            layers.push(currentLayer)
+            for (var layerIndex = 0; layerIndex < currentLayer.length; ++layerIndex) {
+                var currentId = currentLayer[layerIndex]
+                processed[currentId] = true
+                var neighbors = adjacency[currentId] || []
+                for (var neighborIndex = 0; neighborIndex < neighbors.length; ++neighborIndex) {
+                    var nextId = neighbors[neighborIndex]
+                    indegree[nextId] -= 1
+                    if (indegree[nextId] === 0)
+                        zeroIndegree.push(nextId)
+                }
+            }
+        }
+
+        var remaining = []
+        for (var nodeCheck = 0; nodeCheck < nodes.length; ++nodeCheck) {
+            var nodeId = nodes[nodeCheck].id
+            if (!processed[nodeId])
+                remaining.push(nodeId)
+        }
+        if (remaining.length > 0) {
+            sortIdsByName(remaining)
+            layers.push(remaining)
+        }
+
+        for (layerIndex = 0; layerIndex < layers.length; ++layerIndex) {
+            var layer = layers[layerIndex]
+            layer.sort(function(leftId, rightId) {
+                var leftOut = outdegree[leftId] || 0
+                var rightOut = outdegree[rightId] || 0
+                if (leftOut !== rightOut)
+                    return rightOut - leftOut
+                var left = nodeById(leftId) || {}
+                var right = nodeById(rightId) || {}
+                return String(left.name || "").localeCompare(String(right.name || ""))
+            })
+            for (var order = 0; order < layer.length; ++order)
+                layerById[layer[order]] = layerIndex
+        }
+
+        var maxLayerWidth = 0
+        var maxLayerSize = 0
+        for (layerIndex = 0; layerIndex < layers.length; ++layerIndex) {
+            layer = layers[layerIndex]
+            maxLayerSize = Math.max(maxLayerSize, layer.length)
+            var rowWidth = 0
+            for (order = 0; order < layer.length; ++order) {
+                var node = nodeById(layer[order])
+                rowWidth += nodeWidth(node)
+                if (order > 0)
+                    rowWidth += nodeGap
+            }
+            maxLayerWidth = Math.max(maxLayerWidth, rowWidth)
+        }
+
+        for (layerIndex = 0; layerIndex < layers.length; ++layerIndex) {
+            layer = layers[layerIndex]
+            var rowWidthTotal = 0
+            for (order = 0; order < layer.length; ++order) {
+                node = nodeById(layer[order])
+                rowWidthTotal += nodeWidth(node)
+                if (order > 0)
+                    rowWidthTotal += nodeGap
+            }
+            var startX = marginX + Math.max(0, (maxLayerWidth - rowWidthTotal) / 2)
+            var y = marginY + layerIndex * layerGap
+            var cursorX = startX
+            for (order = 0; order < layer.length; ++order) {
+                node = nodeById(layer[order])
+                positions[layer[order]] = {"x": cursorX, "y": y}
+                cursorX += nodeWidth(node) + nodeGap
+            }
+        }
+
+        var outgoingById = {}
+        var incomingById = {}
+        for (edgeIndex = 0; edgeIndex < edges.length; ++edgeIndex) {
+            edge = edges[edgeIndex]
+            if (!outgoingById[edge.fromId])
+                outgoingById[edge.fromId] = []
+            if (!incomingById[edge.toId])
+                incomingById[edge.toId] = []
+            outgoingById[edge.fromId].push(edge)
+            incomingById[edge.toId].push(edge)
+        }
+
+        function edgePriority(edge) {
+            var fromLayer = layerById[edge.fromId]
+            var toLayer = layerById[edge.toId]
+            if (fromLayer === undefined || toLayer === undefined)
+                return -9999
+            if (toLayer > fromLayer)
+                return 1000 + (toLayer - fromLayer) * 100 + (edge.weight || 0)
+            if (toLayer === fromLayer)
+                return 100 + (edge.weight || 0)
+            return 10 + (edge.weight || 0) - (fromLayer - toLayer) * 8
+        }
+
+        for (edgeIndex = 0; edgeIndex < edges.length; ++edgeIndex) {
+            edge = edges[edgeIndex]
+            var fromLayer = layerById[edge.fromId]
+            var toLayer = layerById[edge.toId]
+            if (fromLayer !== undefined && toLayer !== undefined && fromLayer < toLayer)
+                primaryEdgeIds[edge.id] = true
+        }
+
+        for (nodeIndex = 0; nodeIndex < nodes.length; ++nodeIndex) {
+            var targetNodeId = nodes[nodeIndex].id
+            var incomingEdgesForNode = incomingById[targetNodeId] || []
+            var hasIncomingPrimary = false
+            for (edgeIndex = 0; edgeIndex < incomingEdgesForNode.length; ++edgeIndex) {
+                if (primaryEdgeIds[incomingEdgesForNode[edgeIndex].id]) {
+                    hasIncomingPrimary = true
+                    break
+                }
+            }
+
+            if (hasIncomingPrimary || targetNodeId === rootId || incomingEdgesForNode.length === 0)
+                continue
+
+            var bestIncomingEdge = incomingEdgesForNode[0]
+            var bestIncomingPriority = edgePriority(bestIncomingEdge)
+            for (edgeIndex = 1; edgeIndex < incomingEdgesForNode.length; ++edgeIndex) {
+                var candidateIncoming = incomingEdgesForNode[edgeIndex]
+                var candidateIncomingPriority = edgePriority(candidateIncoming)
+                if (candidateIncomingPriority > bestIncomingPriority) {
+                    bestIncomingEdge = candidateIncoming
+                    bestIncomingPriority = candidateIncomingPriority
+                }
+            }
+            primaryEdgeIds[bestIncomingEdge.id] = true
+        }
+
+        var primaryCount = 0
+        for (var primaryEdgeId in primaryEdgeIds) {
+            if (primaryEdgeIds.hasOwnProperty(primaryEdgeId))
+                primaryCount += 1
+        }
+
+        if (primaryCount === 0) {
+            for (edgeIndex = 0; edgeIndex < edges.length; ++edgeIndex)
+                primaryEdgeIds[edges[edgeIndex].id] = true
+        }
+
+        for (edgeIndex = 0; edgeIndex < edges.length; ++edgeIndex) {
+            edge = edges[edgeIndex]
+            if (!primaryEdgeIds[edge.id])
+                secondaryEdgeIds[edge.id] = true
+        }
+
+        for (var nodeIdKey in outgoingById) {
+            if (!outgoingById.hasOwnProperty(nodeIdKey))
+                continue
+            var outgoingEdges = outgoingById[nodeIdKey]
+            outgoingEdges.sort(function(left, right) {
+                return String(left.toId).localeCompare(String(right.toId))
+            })
+            outgoingCountByNodeId[nodeIdKey] = outgoingEdges.length
+            for (order = 0; order < outgoingEdges.length; ++order)
+                outgoingSlotByEdgeId[outgoingEdges[order].id] = {"index": order, "count": outgoingEdges.length}
+        }
+
+        for (nodeIdKey in incomingById) {
+            if (!incomingById.hasOwnProperty(nodeIdKey))
+                continue
+            var incomingEdges = incomingById[nodeIdKey]
+            incomingEdges.sort(function(left, right) {
+                return String(left.fromId).localeCompare(String(right.fromId))
+            })
+            incomingCountByNodeId[nodeIdKey] = incomingEdges.length
+            for (order = 0; order < incomingEdges.length; ++order)
+                incomingSlotByEdgeId[incomingEdges[order].id] = {"index": order, "count": incomingEdges.length}
+        }
+
+        var minX = marginX
+        var maxX = marginX + maxLayerWidth
+        var minY = marginY
+        var maxY = marginY + Math.max(1, layers.length) * layerGap
+        for (var positionedId in positions) {
+            if (!positions.hasOwnProperty(positionedId))
+                continue
+            var positionedNode = nodeById(positionedId)
+            var width = nodeWidth(positionedNode)
+            var height = nodeHeight(positionedNode)
+            minX = Math.min(minX, positions[positionedId].x)
+            maxX = Math.max(maxX, positions[positionedId].x + width)
+            minY = Math.min(minY, positions[positionedId].y)
+            maxY = Math.max(maxY, positions[positionedId].y + height)
+        }
+
+        var shiftX = 72 - minX
+        var shiftY = 96 - minY
+        if (shiftX !== 0 || shiftY !== 0) {
+            for (var shiftedId in positions) {
+                if (!positions.hasOwnProperty(shiftedId))
+                    continue
+                positions[shiftedId].x += shiftX
+                positions[shiftedId].y += shiftY
+            }
+            minX += shiftX
+            maxX += shiftX
+            minY += shiftY
+            maxY += shiftY
+        }
+
+        return {
+            "positions": positions,
+            "primaryEdgeIds": primaryEdgeIds,
+            "secondaryEdgeIds": secondaryEdgeIds,
+            "branchSlotByNodeId": branchSlotByNodeId,
+            "outgoingSlotByEdgeId": outgoingSlotByEdgeId,
+            "incomingSlotByEdgeId": incomingSlotByEdgeId,
+            "outgoingCountByNodeId": outgoingCountByNodeId,
+            "incomingCountByNodeId": incomingCountByNodeId,
+            "layerById": layerById,
+            "layerCount": layers.length,
+            "rootId": rootNode.id,
+            "leftIds": [],
+            "rightIds": [],
+            "width": maxX + 72,
+            "height": maxY + 96
+        }
+    }
+
+    function componentOverviewGroupKey(node) {
+        if (!node)
+            return "other"
+
+        var kind = String(node.kind || "").toLowerCase()
+        var role = String(node.role || "").toLowerCase()
+        var stageName = String(node.stageName || "").toLowerCase()
+        var name = String(node.name || "").toLowerCase()
+
+        if (node.reachableFromEntry || kind === "entry" || kind === "entry_component" || stageName.indexOf("entry") >= 0)
+            return "entry"
+
+        if (role.indexOf("presentation") >= 0 || role.indexOf("visual") >= 0 ||
+                name.indexOf("ui") >= 0 || name.indexOf("view") >= 0 || name.indexOf("page") >= 0)
+            return "experience"
+
+        if (kind === "infrastructure" || kind === "support_component" ||
+                role.indexOf("support") >= 0 || role.indexOf("infra") >= 0)
+            return "support"
+
+        if (role.indexOf("analysis") >= 0 || role.indexOf("core") >= 0 ||
+                kind === "service" || kind === "capability")
+            return "core"
+
+        return "other"
+    }
+
+    function componentOverviewGroupTitle(groupKey) {
+        if (groupKey === "entry")
+            return "入口协同"
+        if (groupKey === "experience")
+            return "界面交互"
+        if (groupKey === "core")
+            return "核心处理"
+        if (groupKey === "support")
+            return "支撑基础"
+        return "其他组件"
+    }
+
+    function buildComponentOverviewGroups() {
+        var order = ["entry", "experience", "core", "support", "other"]
+        var groupsByKey = {}
+        for (var orderIndex = 0; orderIndex < order.length; ++orderIndex) {
+            groupsByKey[order[orderIndex]] = {
+                "key": order[orderIndex],
+                "title": componentOverviewGroupTitle(order[orderIndex]),
+                "nodes": []
+            }
+        }
+
+        for (var index = 0; index < nodes.length; ++index) {
+            var node = nodes[index]
+            groupsByKey[componentOverviewGroupKey(node)].nodes.push(node)
+        }
+
+        var groups = []
+        for (var groupIndex = 0; groupIndex < order.length; ++groupIndex) {
+            var group = groupsByKey[order[groupIndex]]
+            group.nodes.sort(function(left, right) {
+                return String(left.name || "").localeCompare(String(right.name || ""))
+            })
+            if (group.nodes.length > 0)
+                groups.push(group)
+        }
+        return groups
+    }
+
+    function componentOverviewSectionLeft(groupIndex) {
+        return 72 + groupIndex * (componentOverviewCardWidth + componentOverviewGapX)
+    }
+
+    function componentOverviewMaxRows() {
+        var maxRows = 1
+        for (var index = 0; index < componentOverviewGroups.length; ++index) {
+            maxRows = Math.max(maxRows, componentOverviewGroups[index].nodes.length)
+        }
+        return maxRows
+    }
+
+    function componentOverviewPlacement(nodeId, fallbackIndex) {
+        for (var groupIndex = 0; groupIndex < componentOverviewGroups.length; ++groupIndex) {
+            var group = componentOverviewGroups[groupIndex]
+            for (var nodeIndex = 0; nodeIndex < group.nodes.length; ++nodeIndex) {
+                if (group.nodes[nodeIndex].id !== nodeId)
+                    continue
+
+                return {
+                    "x": componentOverviewSectionLeft(groupIndex),
+                    "y": 96 + componentOverviewHeaderHeight + 16
+                         + nodeIndex * (componentOverviewCardHeight + componentOverviewGapY),
+                    "groupIndex": groupIndex
+                }
+            }
+        }
+
+        return {
+            "x": componentOverviewSectionLeft(0),
+            "y": 96 + componentOverviewHeaderHeight + 16
+                 + fallbackIndex * (componentOverviewCardHeight + componentOverviewGapY),
+            "groupIndex": -1
+        }
+    }
+
+    function componentOverviewSceneHeight() {
+        var rows = componentOverviewMaxRows()
+        return 96
+               + componentOverviewHeaderHeight
+               + 16
+               + rows * componentOverviewCardHeight
+               + Math.max(0, rows - 1) * componentOverviewGapY
+               + 72
+    }
+
     function sceneX(item, fallbackIndex) {
+        if (componentOverviewMode) {
+            return componentOverviewPlacement(item ? item.id : fallbackIndex, fallbackIndex).x
+        }
+        if (!componentMode && item && item.id !== undefined && overviewMindMapLayout.positions && overviewMindMapLayout.positions[item.id])
+            return overviewMindMapLayout.positions[item.id].x
         if (item && item.x !== undefined)
             return item.x
         return 64 + (fallbackIndex % 3) * 320
     }
 
     function sceneY(item, fallbackIndex) {
+        if (componentOverviewMode) {
+            return componentOverviewPlacement(item ? item.id : fallbackIndex, fallbackIndex).y
+        }
+        if (!componentMode && item && item.id !== undefined && overviewMindMapLayout.positions && overviewMindMapLayout.positions[item.id])
+            return overviewMindMapLayout.positions[item.id].y
         if (item && item.y !== undefined)
             return item.y
         return 90 + Math.floor(fallbackIndex / 3) * 170
     }
 
     function nodeWidth(item) {
+        if (componentOverviewMode)
+            return componentOverviewCardWidth
         return Math.max(230, Math.min(280, item && item.width ? item.width : 240))
     }
 
     function nodeHeight(item) {
+        if (componentOverviewMode)
+            return componentOverviewCardHeight
         return Math.max(118, Math.min(160, item && item.height ? item.height : 126))
+    }
+
+    function componentOverviewColumns(viewWidth, compact) {
+        var minCardWidth = compact ? 148 : 184
+        return Math.max(2, Math.min(compact ? 5 : 6, Math.floor((Math.max(1, viewWidth) + 10) / minCardWidth)))
+    }
+
+    function componentOverviewTileWidth(viewWidth, compact) {
+        var gap = compact ? 8 : 12
+        var columns = componentOverviewColumns(viewWidth, compact)
+        return Math.max(compact ? 136 : 164, Math.floor((viewWidth - Math.max(0, columns - 1) * gap) / columns))
+    }
+
+    function componentOverviewTileHeight(compact) {
+        return compact ? 58 : 82
     }
 
     function nodeRectById(nodeId) {
@@ -116,12 +655,42 @@ Item {
         return node && (edge.fromId === node.id || edge.toId === node.id)
     }
 
+    function overviewHoverRelation(edge) {
+        if (!hoverNode || hoverNode.id === undefined || !edge)
+            return ""
+        if (edge.toId === hoverNode.id)
+            return "incoming"
+        if (edge.fromId === hoverNode.id)
+            return "outgoing"
+        return ""
+    }
+
     function collectVisibleEdges(edgeList, selected, hovered, showAll) {
         var output = []
-        var node = selected || hovered
-        if (!node && !showAll)
+        if (relationshipFocusActive)
             return output
 
+        if (!componentMode) {
+            var overviewNode = hovered && hovered.id !== undefined ? hovered : null
+            for (var overviewIndex = 0; overviewIndex < edgeList.length; ++overviewIndex) {
+                var primaryEdge = edgeList[overviewIndex]
+                if (!isOverviewPrimaryEdge(primaryEdge))
+                    continue
+                if (overviewNode && !(primaryEdge.fromId === overviewNode.id || primaryEdge.toId === overviewNode.id))
+                    continue
+
+                output.push({
+                    "edge": primaryEdge,
+                    "laneIndex": output.length
+                })
+            }
+            return output
+        }
+
+        if (!showAll)
+            return output
+
+        var node = selected || hovered
         var limit = node ? focusEdgeLimit : overviewEdgeLimit
         for (var index = 0; index < edgeList.length && output.length < limit; ++index) {
             var edge = edgeList[index]
@@ -138,6 +707,86 @@ Item {
 
     function edgeLane(laneIndex) {
         return ((laneIndex % 11) - 5) * 5
+    }
+
+    function focusOverlayMetrics() {
+        var overlayWidth = Math.min(width - 56, 1120)
+        var overlayHeight = Math.max(440, height - 116)
+        overlayHeight = Math.min(overlayHeight, height - 54)
+        var x = (width - overlayWidth) / 2
+        var y = 34
+        var sideWidth = Math.min(270, overlayWidth * 0.265)
+        var centerWidth = Math.min(360, overlayWidth * 0.33)
+        var railGap = Math.max(82, (overlayWidth - sideWidth * 2 - centerWidth - 64) / 2)
+        var overviewHeight = 0
+        return {
+            "x": x,
+            "y": y,
+            "width": overlayWidth,
+            "height": overlayHeight,
+            "sideWidth": sideWidth,
+            "centerWidth": centerWidth,
+            "railGap": railGap,
+            "overviewHeight": overviewHeight
+        }
+    }
+
+    function focusRelationGap(count) {
+        return count > 5 ? 10 : 14
+    }
+
+    function focusRelationCardHeight(count) {
+        var metrics = focusOverlayMetrics()
+        var usableHeight = Math.max(220, metrics.height - 98 - metrics.overviewHeight)
+        return Math.max(62, Math.min(92, (usableHeight - Math.max(0, count - 1) * focusRelationGap(count)) / Math.max(1, count)))
+    }
+
+    function focusRelationY(index, count) {
+        var metrics = focusOverlayMetrics()
+        var cardHeight = focusRelationCardHeight(count)
+        var gap = focusRelationGap(count)
+        var contentHeight = count * cardHeight + Math.max(0, count - 1) * gap
+        var top = metrics.y + (metrics.height - metrics.overviewHeight - contentHeight) / 2
+        return top + index * (cardHeight + gap)
+    }
+
+    function focusCenterRect() {
+        var metrics = focusOverlayMetrics()
+        var width = metrics.centerWidth
+        var height = componentMode ? 188 : 176
+        return {
+            "x": metrics.x + (metrics.width - width) / 2,
+            "y": metrics.y + (metrics.height - metrics.overviewHeight - height) / 2,
+            "width": width,
+            "height": height
+        }
+    }
+
+    function focusRelationRect(direction, index, count) {
+        var metrics = focusOverlayMetrics()
+        var width = metrics.sideWidth
+        var height = focusRelationCardHeight(count)
+        var x = direction === "incoming"
+                ? metrics.x + 18
+                : metrics.x + metrics.width - width - 18
+        return {
+            "x": x,
+            "y": focusRelationY(index, count),
+            "width": width,
+            "height": height
+        }
+    }
+
+    function relationAnchorPoint(direction, index, count) {
+        var rect = focusRelationRect(direction, index, count)
+        return Qt.point(direction === "incoming" ? rect.x + rect.width : rect.x,
+                        rect.y + rect.height / 2)
+    }
+
+    function centerAnchorPoint(direction) {
+        var rect = focusCenterRect()
+        return Qt.point(direction === "incoming" ? rect.x : rect.x + rect.width,
+                        rect.y + rect.height / 2)
     }
 
     function nodeRectAt(nodeIndex, margin) {
@@ -191,6 +840,327 @@ Item {
             }
         }
         return false
+    }
+
+    function endpointPeerOffset(edge, endpointKey, step) {
+        if (!componentMode)
+            return 0
+
+        var matches = []
+        for (var index = 0; index < visibleEdges.length; ++index) {
+            var candidate = visibleEdges[index].edge
+            if (candidate && candidate[endpointKey] === edge[endpointKey])
+                matches.push(candidate)
+        }
+
+        if (matches.length <= 1)
+            return 0
+
+        for (var matchIndex = 0; matchIndex < matches.length; ++matchIndex) {
+            if (matches[matchIndex].id === edge.id)
+                return (matchIndex - (matches.length - 1) / 2) * step
+        }
+
+        return 0
+    }
+
+    function nodeCenter(rect) {
+        return Qt.point(rect.x + rect.width / 2, rect.y + rect.height / 2)
+    }
+
+    function focusRailGroupKey(edge) {
+        var focus = focusNode()
+        if (!focus || !componentMode)
+            return ""
+        if (edge.fromId === focus.id)
+            return "outgoing"
+        if (edge.toId === focus.id)
+            return "incoming"
+        return ""
+    }
+
+    function focusRailMembers(groupKey) {
+        var focus = focusNode()
+        if (!focus || !groupKey)
+            return []
+
+        var matches = []
+        for (var index = 0; index < visibleEdges.length; ++index) {
+            var candidate = visibleEdges[index].edge
+            if (!candidate || focusRailGroupKey(candidate) !== groupKey)
+                continue
+
+            var otherNodeId = candidate.fromId === focus.id ? candidate.toId : candidate.fromId
+            var otherRect = nodeRectById(otherNodeId)
+            if (!otherRect.valid)
+                continue
+
+            matches.push({
+                "edge": candidate,
+                "otherNodeId": otherNodeId,
+                "sortY": otherRect.y + otherRect.height / 2
+            })
+        }
+
+        matches.sort(function(left, right) {
+            if (Math.abs(left.sortY - right.sortY) > 0.5)
+                return left.sortY - right.sortY
+            return String(left.edge.id).localeCompare(String(right.edge.id))
+        })
+        return matches
+    }
+
+    function focusRailPlacement(edge) {
+        var groupKey = focusRailGroupKey(edge)
+        if (!groupKey)
+            return {"valid": false, "groupKey": "", "index": 0, "count": 0}
+
+        var members = focusRailMembers(groupKey)
+        for (var index = 0; index < members.length; ++index) {
+            if (members[index].edge.id === edge.id) {
+                return {
+                    "valid": true,
+                    "groupKey": groupKey,
+                    "index": index,
+                    "count": members.length
+                }
+            }
+        }
+
+        return {"valid": false, "groupKey": groupKey, "index": 0, "count": members.length}
+    }
+
+    function overviewHoverRailMembers(groupKey) {
+        if (!hoverNode || hoverNode.id === undefined || componentMode || !groupKey)
+            return []
+
+        var matches = []
+        for (var index = 0; index < edges.length; ++index) {
+            var candidate = edges[index]
+            if (!candidate || !isOverviewPrimaryEdge(candidate))
+                continue
+
+            var relation = overviewHoverRelation(candidate)
+            if (relation !== groupKey)
+                continue
+
+            var otherNodeId = relation === "outgoing" ? candidate.toId : candidate.fromId
+            var otherRect = nodeRectById(otherNodeId)
+            if (!otherRect.valid)
+                continue
+
+            matches.push({
+                "edge": candidate,
+                "otherNodeId": otherNodeId,
+                "sortX": otherRect.x + otherRect.width / 2
+            })
+        }
+
+        matches.sort(function(left, right) {
+            if (Math.abs(left.sortX - right.sortX) > 0.5)
+                return left.sortX - right.sortX
+            return String(left.edge.id).localeCompare(String(right.edge.id))
+        })
+        return matches
+    }
+
+    function overviewHoverRailPlacement(edge) {
+        var groupKey = overviewHoverRelation(edge)
+        if (!groupKey)
+            return {"valid": false, "groupKey": "", "index": 0, "count": 0}
+
+        var members = overviewHoverRailMembers(groupKey)
+        for (var index = 0; index < members.length; ++index) {
+            if (members[index].edge.id === edge.id) {
+                return {
+                    "valid": true,
+                    "groupKey": groupKey,
+                    "index": index,
+                    "count": members.length
+                }
+            }
+        }
+
+        return {"valid": false, "groupKey": groupKey, "index": 0, "count": members.length}
+    }
+
+    function hoveredOverviewPrimaryRoute(edge) {
+        if (componentMode || !hoverNode || hoverNode.id === undefined || !isOverviewPrimaryEdge(edge))
+            return null
+
+        var relation = overviewHoverRelation(edge)
+        if (!relation)
+            return null
+
+        var focusRect = nodeRectById(hoverNode.id)
+        var otherRect = nodeRectById(relation === "outgoing" ? edge.toId : edge.fromId)
+        if (!focusRect.valid || !otherRect.valid)
+            return null
+
+        var placement = overviewHoverRailPlacement(edge)
+        if (!placement.valid)
+            return null
+
+        var fromLayer = overviewMindMapLayout.layerById ? overviewMindMapLayout.layerById[edge.fromId] : undefined
+        var toLayer = overviewMindMapLayout.layerById ? overviewMindMapLayout.layerById[edge.toId] : undefined
+        var verticalRelation = fromLayer !== undefined && toLayer !== undefined && fromLayer !== toLayer
+        var side = relation === "outgoing"
+                   ? (verticalRelation ? (toLayer > fromLayer ? "bottom" : "top") : "right")
+                   : (verticalRelation ? (fromLayer < toLayer ? "top" : "bottom") : "left")
+        var direction = side === "bottom" || side === "right" ? 1 : -1
+        var railSpacing = 26
+        var portSpacing = 12
+        var centerOffset = placement.count > 1 ? (placement.index - (placement.count - 1) / 2) : 0
+        var otherCenter = nodeCenter(otherRect)
+        var focusPortOffset = centerOffset * portSpacing
+        var peerPortOffset = centerOffset * (portSpacing * 0.7)
+        var focusPort = portPoint(focusRect, side, focusPortOffset)
+
+        if (verticalRelation) {
+            var railBaseY = (side === "top" ? focusRect.y : focusRect.y + focusRect.height) + direction * 52
+            var railY = railBaseY + direction * centerOffset * railSpacing
+            var peerSide = railY <= otherCenter.y ? "top" : "bottom"
+            var peerPort = portPoint(otherRect, peerSide, peerPortOffset)
+
+            if (relation === "outgoing") {
+                return {
+                    "p0": focusPort,
+                    "p1": Qt.point(focusPort.x, railY),
+                    "p2": Qt.point(peerPort.x, railY),
+                    "p3": peerPort
+                }
+            }
+
+            return {
+                "p0": peerPort,
+                "p1": Qt.point(peerPort.x, railY),
+                "p2": Qt.point(focusPort.x, railY),
+                "p3": focusPort
+            }
+        }
+
+        var railBaseX = (side === "left" ? focusRect.x : focusRect.x + focusRect.width) + direction * 52
+        var railX = railBaseX + direction * centerOffset * railSpacing
+        var peerHorizontalSide = railX <= otherCenter.x ? "left" : "right"
+        var horizontalPeerPort = portPoint(otherRect, peerHorizontalSide, peerPortOffset)
+
+        if (relation === "outgoing") {
+            return {
+                "p0": focusPort,
+                "p1": Qt.point(railX, focusPort.y),
+                "p2": Qt.point(railX, horizontalPeerPort.y),
+                "p3": horizontalPeerPort
+            }
+        }
+
+        return {
+            "p0": horizontalPeerPort,
+            "p1": Qt.point(railX, horizontalPeerPort.y),
+            "p2": Qt.point(railX, focusPort.y),
+            "p3": focusPort
+        }
+    }
+
+    function focusedComponentRoute(edge) {
+        var focus = focusNode()
+        if (!componentMode || !focus || !edgeTouchesFocus(edge))
+            return null
+
+        var focusIsSource = edge.fromId === focus.id
+        var focusRect = nodeRectById(focus.id)
+        var otherRect = nodeRectById(focusIsSource ? edge.toId : edge.fromId)
+        if (!focusRect.valid || !otherRect.valid)
+            return null
+
+        var placement = focusRailPlacement(edge)
+        if (!placement.valid)
+            return null
+
+        var side = placement.groupKey === "outgoing" ? "left" : "right"
+        var direction = side === "left" ? -1 : 1
+        var railSpacing = 22
+        var portSpacing = 11
+        var centerOffset = placement.count > 1 ? (placement.index - (placement.count - 1) / 2) : 0
+        var focusCenter = nodeCenter(focusRect)
+        var otherCenter = nodeCenter(otherRect)
+        var focusPortOffset = centerOffset * portSpacing
+        var peerPortOffset = centerOffset * (portSpacing * 0.75)
+        var railBaseX = (side === "left" ? focusRect.x : focusRect.x + focusRect.width) + direction * 40
+        var railX = railBaseX + direction * centerOffset * railSpacing
+        var peerSide = railX <= otherCenter.x ? "left" : "right"
+
+        var focusPort = portPoint(focusRect, side, focusPortOffset)
+        var peerPort = portPoint(otherRect, peerSide, peerPortOffset)
+
+        if (focusIsSource) {
+            return {
+                "p0": focusPort,
+                "p1": Qt.point(railX, focusPort.y),
+                "p2": Qt.point(railX, peerPort.y),
+                "p3": peerPort
+            }
+        }
+
+        return {
+            "p0": peerPort,
+            "p1": Qt.point(railX, peerPort.y),
+            "p2": Qt.point(railX, focusPort.y),
+            "p3": focusPort
+        }
+    }
+
+    function routeFromScenePoints(edge, laneIndex) {
+        if (!edge || !edge.routePoints || edge.routePoints.length < 2)
+            return null
+
+        var focusedRoute = focusedComponentRoute(edge)
+        if (focusedRoute)
+            return focusedRoute
+
+        var points = edge.routePoints
+        var startPoint = Qt.point(points[0].x, points[0].y)
+        if (points.length >= 4) {
+            return {
+                "p0": startPoint,
+                "p1": Qt.point(points[1].x, points[1].y),
+                "p2": Qt.point(points[2].x, points[2].y),
+                "p3": Qt.point(points[points.length - 1].x, points[points.length - 1].y)
+            }
+        }
+
+        var endPoint = Qt.point(points[points.length - 1].x, points[points.length - 1].y)
+        var laneOffset = componentMode ? edgeLane(laneIndex) * 0.18 : 0
+        var sourceOffset = endpointPeerOffset(edge, "fromId", 10) + laneOffset
+        var targetOffset = endpointPeerOffset(edge, "toId", 8) - laneOffset * 0.6
+        var horizontal = Math.abs(endPoint.x - startPoint.x) >= Math.abs(endPoint.y - startPoint.y)
+
+        if (horizontal) {
+            var bundleBaseX = startPoint.x + (endPoint.x - startPoint.x) * 0.34
+            var bundleX = bundleBaseX + (sourceOffset - targetOffset) * 0.9
+            var minStubX = Math.min(startPoint.x, endPoint.x) + 28
+            var maxStubX = Math.max(startPoint.x, endPoint.x) - 28
+            bundleX = Math.max(minStubX, Math.min(maxStubX, bundleX))
+
+            return {
+                "p0": Qt.point(startPoint.x, startPoint.y + sourceOffset),
+                "p1": Qt.point(bundleX, startPoint.y + sourceOffset),
+                "p2": Qt.point(bundleX, endPoint.y + targetOffset),
+                "p3": Qt.point(endPoint.x, endPoint.y + targetOffset)
+            }
+        }
+
+        var bundleBaseY = startPoint.y + (endPoint.y - startPoint.y) * 0.5
+        var bundleY = bundleBaseY + (sourceOffset - targetOffset) * 0.8
+        var minStubY = Math.min(startPoint.y, endPoint.y) + 26
+        var maxStubY = Math.max(startPoint.y, endPoint.y) - 26
+        bundleY = Math.max(minStubY, Math.min(maxStubY, bundleY))
+
+        return {
+            "p0": Qt.point(startPoint.x + sourceOffset, startPoint.y),
+            "p1": Qt.point(startPoint.x + sourceOffset, bundleY),
+            "p2": Qt.point(endPoint.x + targetOffset, bundleY),
+            "p3": Qt.point(endPoint.x + targetOffset, endPoint.y)
+        }
     }
 
     function verticalLane(fromRect, toRect, laneIndex) {
@@ -300,7 +1270,91 @@ Item {
         return [start, Qt.point(start.x, yLane.value), Qt.point(end.x, yLane.value), end]
     }
 
+    function overviewMindMapRoute(edge, laneIndex) {
+        if (componentMode)
+            return null
+
+        var hoveredRoute = hoveredOverviewPrimaryRoute(edge)
+        if (hoveredRoute)
+            return hoveredRoute
+
+        var fromRect = nodeRectById(edge.fromId)
+        var toRect = nodeRectById(edge.toId)
+        if (!fromRect.valid || !toRect.valid)
+            return null
+
+        var fromCenter = nodeCenter(fromRect)
+        var toCenter = nodeCenter(toRect)
+        var slotOffset = 0
+        var outgoingSlot = overviewMindMapLayout.outgoingSlotByEdgeId
+                           ? overviewMindMapLayout.outgoingSlotByEdgeId[edge.id]
+                           : null
+        var incomingSlot = overviewMindMapLayout.incomingSlotByEdgeId
+                           ? overviewMindMapLayout.incomingSlotByEdgeId[edge.id]
+                           : null
+        var outgoingCount = overviewMindMapLayout.outgoingCountByNodeId
+                            ? (overviewMindMapLayout.outgoingCountByNodeId[edge.fromId] || 1)
+                            : 1
+        var incomingCount = overviewMindMapLayout.incomingCountByNodeId
+                            ? (overviewMindMapLayout.incomingCountByNodeId[edge.toId] || 1)
+                            : 1
+        var outgoingOffset = outgoingSlot ? (outgoingSlot.index - (outgoingCount - 1) / 2) * 14 : 0
+        var incomingOffset = incomingSlot ? (incomingSlot.index - (incomingCount - 1) / 2) * 14 : 0
+
+        if (isOverviewPrimaryEdge(edge)) {
+            var fromLayer = overviewMindMapLayout.layerById ? overviewMindMapLayout.layerById[edge.fromId] : undefined
+            var toLayer = overviewMindMapLayout.layerById ? overviewMindMapLayout.layerById[edge.toId] : undefined
+            if (fromLayer !== undefined && toLayer !== undefined && toLayer !== fromLayer) {
+                var startSide = toLayer > fromLayer ? "bottom" : "top"
+                var endSide = toLayer > fromLayer ? "top" : "bottom"
+                var primaryStart = portPoint(fromRect, startSide, outgoingOffset)
+                var primaryEnd = portPoint(toRect, endSide, incomingOffset)
+                var midY = (primaryStart.y + primaryEnd.y) / 2
+
+                return {
+                    "p0": primaryStart,
+                    "p1": Qt.point(primaryStart.x, midY),
+                    "p2": Qt.point(primaryEnd.x, midY),
+                    "p3": primaryEnd
+                }
+            }
+
+            var horizontalDirection = toCenter.x >= fromCenter.x ? 1 : -1
+            var fallbackStart = portPoint(fromRect, horizontalDirection > 0 ? "right" : "left", outgoingOffset)
+            var fallbackEnd = portPoint(toRect, horizontalDirection > 0 ? "left" : "right", incomingOffset)
+            var midX = (fallbackStart.x + fallbackEnd.x) / 2
+            return {
+                "p0": fallbackStart,
+                "p1": Qt.point(midX, fallbackStart.y),
+                "p2": Qt.point(midX, fallbackEnd.y),
+                "p3": fallbackEnd
+            }
+        }
+
+        var direction = toCenter.x >= fromCenter.x ? 1 : -1
+        var laneOffset = edgeLane(laneIndex) * 0.56
+        var startPoint = portPoint(fromRect, direction > 0 ? "right" : "left", slotOffset * 0.2 + laneOffset * 0.18)
+        var endPoint = portPoint(toRect, direction > 0 ? "left" : "right", slotOffset * 0.32 - laneOffset * 0.14)
+        var bend = Math.max(66, Math.min(162, Math.abs(endPoint.x - startPoint.x) * 0.36))
+        var bendY = laneOffset * 0.32
+
+        return {
+            "p0": startPoint,
+            "p1": Qt.point(startPoint.x + direction * bend, startPoint.y + bendY),
+            "p2": Qt.point(endPoint.x - direction * bend * 0.82, endPoint.y - bendY),
+            "p3": endPoint
+        }
+    }
+
     function routeEdge(edge, laneIndex) {
+        var overviewRoute = overviewMindMapRoute(edge, laneIndex)
+        if (overviewRoute)
+            return overviewRoute
+
+        var mappedRoute = routeFromScenePoints(edge, laneIndex)
+        if (mappedRoute)
+            return mappedRoute
+
         var fromRect = nodeRectById(edge.fromId)
         var toRect = nodeRectById(edge.toId)
         if (!fromRect.valid || !toRect.valid) {
@@ -339,6 +1393,17 @@ Item {
     }
 
     function edgeColor(edge) {
+        if (!componentMode) {
+            var hoverRelation = overviewHoverRelation(edge)
+            if (hoverRelation === "incoming")
+                return tokens.signalRaspberry
+            if (hoverRelation === "outgoing")
+                return tokens.signalCobalt
+            if (isOverviewPrimaryEdge(edge))
+                return Qt.rgba(0.13, 0.48, 1, 0.88)
+            return Qt.rgba(0.33, 0.43, 0.56, 0.66)
+        }
+
         var node = focusNode()
         if (node && edge.toId === node.id)
             return tokens.signalRaspberry
@@ -426,6 +1491,9 @@ Item {
         scale: root.effectiveScale
         transformOrigin: Item.TopLeft
         z: 2
+        opacity: root.relationshipFocusActive ? (root.componentMode ? 0.08 : 0.04) : 1.0
+
+        Behavior on opacity { NumberAnimation { duration: 140 } }
 
         Repeater {
             model: root.visibleEdges
@@ -440,19 +1508,43 @@ Item {
                 property point p1: route.p1
                 property point p2: route.p2
                 property point p3: route.p3
+                property bool emphasized: root.edgeTouchesFocus(edge)
                 property real strokeScale: Math.max(0.38, root.effectiveScale)
-                property point arrowLeft: root.arrowWing(p3, p2, 9 / strokeScale, -1)
-                property point arrowRight: root.arrowWing(p3, p2, 9 / strokeScale, 1)
+                property real arrowSize: (root.componentMode ? 10.5 : 9) / strokeScale
+                property point arrowLeft: root.arrowWing(p3, p2, arrowSize, -1)
+                property point arrowRight: root.arrowWing(p3, p2, arrowSize, 1)
+                property point curveControl1: Qt.point((edgeShape.p0.x + edgeShape.p1.x * 1.35) / 2.35,
+                                                       (edgeShape.p0.y + edgeShape.p1.y * 1.35) / 2.35)
+                property point curveControl2: Qt.point((edgeShape.p3.x + edgeShape.p2.x * 1.35) / 2.35,
+                                                       (edgeShape.p3.y + edgeShape.p2.y * 1.35) / 2.35)
                 property color lineColor: root.edgeColor(edge)
+                property bool overviewPrimary: root.isOverviewPrimaryEdge(edge)
+                property bool overviewCurved: !root.componentMode
+                property string overviewRelation: root.overviewHoverRelation(edge)
+                property real lineOpacity: root.componentMode
+                                           ? (root.focusNode() ? (emphasized ? 0.96 : 0.34) : 0.7)
+                                           : (overviewPrimary
+                                              ? (root.hoverNode
+                                                 ? (overviewRelation === "incoming" || overviewRelation === "outgoing" ? 0.94 : 0.22)
+                                                 : 0.84)
+                                              : (emphasized ? 0.82 : 0.22))
+                property real haloOpacity: root.componentMode
+                                           ? (root.focusNode() ? (emphasized ? 0.24 : 0.09) : 0.16)
+                                           : (overviewPrimary
+                                              ? (root.hoverNode ? 0.1 : 0.13)
+                                              : (emphasized ? 0.1 : 0.04))
+                property color haloColor: Qt.rgba(1, 1, 1, haloOpacity)
+                property color inactiveColor: "transparent"
 
                 anchors.fill: parent
-                z: 0
-                opacity: root.focusNode() ? 0.82 : 0.22
+                z: overviewPrimary ? 1 : (emphasized ? 2 : 0)
+                opacity: lineOpacity
                 antialiasing: true
 
                 ShapePath {
-                    strokeWidth: (root.focusNode() ? 2.0 : 1.2) / edgeShape.strokeScale
-                    strokeColor: edgeShape.lineColor
+                    strokeWidth: (root.componentMode ? (root.focusNode() ? 5.4 : 4.2) : (overviewPrimary ? 4.0 : 3.0)) / edgeShape.strokeScale
+                    strokeColor: edgeShape.overviewCurved ? edgeShape.inactiveColor
+                                                          : (root.componentMode ? edgeShape.inactiveColor : edgeShape.haloColor)
                     fillColor: "transparent"
                     capStyle: ShapePath.RoundCap
                     joinStyle: ShapePath.RoundJoin
@@ -465,15 +1557,163 @@ Item {
                 }
 
                 ShapePath {
+                    strokeWidth: (root.componentMode ? (root.focusNode() ? 5.4 : 4.2) : (overviewPrimary ? 4.0 : 3.0)) / edgeShape.strokeScale
+                    strokeColor: edgeShape.overviewCurved ? edgeShape.haloColor
+                                                          : (root.componentMode ? edgeShape.haloColor : edgeShape.inactiveColor)
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+                    joinStyle: ShapePath.RoundJoin
+                    startX: edgeShape.p0.x
+                    startY: edgeShape.p0.y
+
+                    PathCubic {
+                        control1X: edgeShape.curveControl1.x
+                        control1Y: edgeShape.curveControl1.y
+                        control2X: edgeShape.curveControl2.x
+                        control2Y: edgeShape.curveControl2.y
+                        x: edgeShape.p3.x
+                        y: edgeShape.p3.y
+                    }
+                }
+
+                ShapePath {
+                    strokeWidth: (root.componentMode ? (root.focusNode() ? 2.6 : 2.0) : (overviewPrimary ? 2.2 : 1.6)) / edgeShape.strokeScale
+                    strokeColor: edgeShape.overviewCurved ? edgeShape.inactiveColor
+                                                          : (root.componentMode ? edgeShape.inactiveColor : edgeShape.lineColor)
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+                    joinStyle: ShapePath.RoundJoin
+                    startX: edgeShape.p0.x
+                    startY: edgeShape.p0.y
+
+                    PathLine { x: edgeShape.p1.x; y: edgeShape.p1.y }
+                    PathLine { x: edgeShape.p2.x; y: edgeShape.p2.y }
+                    PathLine { x: edgeShape.p3.x; y: edgeShape.p3.y }
+                }
+
+                ShapePath {
+                    strokeWidth: (root.componentMode ? (root.focusNode() ? 2.6 : 2.0) : (overviewPrimary ? 2.2 : 1.6)) / edgeShape.strokeScale
+                    strokeColor: edgeShape.overviewCurved ? edgeShape.lineColor
+                                                          : (root.componentMode ? edgeShape.lineColor : edgeShape.inactiveColor)
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+                    joinStyle: ShapePath.RoundJoin
+                    startX: edgeShape.p0.x
+                    startY: edgeShape.p0.y
+
+                    PathCubic {
+                        control1X: edgeShape.curveControl1.x
+                        control1Y: edgeShape.curveControl1.y
+                        control2X: edgeShape.curveControl2.x
+                        control2Y: edgeShape.curveControl2.y
+                        x: edgeShape.p3.x
+                        y: edgeShape.p3.y
+                    }
+                }
+
+                ShapePath {
                     strokeWidth: 0
                     strokeColor: "transparent"
-                    fillColor: edgeShape.lineColor
+                    fillColor: root.componentMode ? edgeShape.haloColor : edgeShape.haloColor
                     startX: edgeShape.p3.x
                     startY: edgeShape.p3.y
 
                     PathLine { x: edgeShape.arrowLeft.x; y: edgeShape.arrowLeft.y }
                     PathLine { x: edgeShape.arrowRight.x; y: edgeShape.arrowRight.y }
                     PathLine { x: edgeShape.p3.x; y: edgeShape.p3.y }
+                }
+
+                ShapePath {
+                    strokeWidth: 0
+                    strokeColor: "transparent"
+                    fillColor: root.componentMode ? edgeShape.lineColor : edgeShape.lineColor
+                    startX: edgeShape.p3.x
+                    startY: edgeShape.p3.y
+
+                    PathLine { x: edgeShape.arrowLeft.x; y: edgeShape.arrowLeft.y }
+                    PathLine { x: edgeShape.arrowRight.x; y: edgeShape.arrowRight.y }
+                    PathLine { x: edgeShape.p3.x; y: edgeShape.p3.y }
+                }
+            }
+        }
+
+        Repeater {
+            model: root.componentOverviewMode ? root.componentOverviewGroups : []
+
+            Rectangle {
+                x: root.componentOverviewSectionLeft(index)
+                y: 96
+                width: root.componentOverviewCardWidth
+                height: root.componentOverviewHeaderHeight
+                radius: root.tokens.radius8
+                color: Qt.rgba(1, 1, 1, 0.84)
+                border.color: Qt.rgba(0.12, 0.18, 0.28, 0.06)
+                visible: !root.relationshipFocusActive
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 14
+                    spacing: 10
+
+                    Rectangle {
+                        Layout.preferredWidth: 10
+                        Layout.preferredHeight: 10
+                        radius: 5
+                        color: modelData.key === "entry"
+                               ? root.tokens.signalTeal
+                               : modelData.key === "experience"
+                                 ? root.tokens.signalRaspberry
+                                 : modelData.key === "core"
+                                   ? root.tokens.signalCobalt
+                                   : modelData.key === "support"
+                                     ? Qt.rgba(0.96, 0.58, 0.18, 0.88)
+                                     : Qt.rgba(0.48, 0.54, 0.68, 0.82)
+                    }
+
+                    Label {
+                        text: modelData.title
+                        color: root.tokens.text1
+                        font.family: root.tokens.displayFontFamily
+                        font.pixelSize: 14
+                        font.weight: Font.DemiBold
+                    }
+
+                    Rectangle {
+                        radius: 999
+                        color: Qt.rgba(0.14, 0.48, 1, 0.08)
+                        border.color: Qt.rgba(0.14, 0.48, 1, 0.18)
+                        implicitWidth: sectionCountLabel.implicitWidth + 16
+                        implicitHeight: 24
+
+                        Label {
+                            id: sectionCountLabel
+                            anchors.centerIn: parent
+                            text: modelData.nodes.length + " 个"
+                            color: root.tokens.signalCobalt
+                            font.family: root.tokens.textFontFamily
+                            font.pixelSize: 11
+                            font.weight: Font.DemiBold
+                        }
+                    }
+
+                    Label {
+                        text: modelData.key === "entry"
+                              ? "优先看到入口与触发点"
+                              : modelData.key === "experience"
+                                ? "界面、交互和展示层"
+                                : modelData.key === "core"
+                                  ? "核心处理与业务能力"
+                                  : modelData.key === "support"
+                                    ? "基础设施与通用支撑"
+                                    : "暂未归类的剩余组件"
+                        color: root.tokens.text3
+                        font.family: root.tokens.textFontFamily
+                        font.pixelSize: 11
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignRight
+                    }
                 }
             }
         }
@@ -584,16 +1824,40 @@ Item {
 
                     RowLayout {
                         Layout.fillWidth: true
+                        spacing: 8
+
+                        Rectangle {
+                            visible: root.componentMode && (modelData.scopeLabel || "").length > 0
+                            radius: 999
+                            color: Qt.rgba(0.14, 0.48, 1, 0.08)
+                            border.color: Qt.rgba(0.14, 0.48, 1, 0.16)
+                            implicitWidth: scopeLabel.implicitWidth + 14
+                            implicitHeight: 22
+
+                            Label {
+                                id: scopeLabel
+                                anchors.centerIn: parent
+                                text: modelData.scopeLabel || ""
+                                color: root.tokens.signalCobalt
+                                font.family: root.tokens.textFontFamily
+                                font.pixelSize: 10
+                                font.weight: Font.DemiBold
+                                elide: Text.ElideRight
+                            }
+                        }
 
                         Label {
-                            text: modelData.kind || modelData.role || "Node"
+                            text: root.componentMode && (modelData.scopeLabel || "").length > 0
+                                  ? (modelData.kind || modelData.role || "Node")
+                                  : ((modelData.scopeLabel || "").length > 0
+                                     ? modelData.scopeLabel
+                                     : (modelData.kind || modelData.role || "Node"))
                             color: root.tokens.text3
                             font.family: root.tokens.textFontFamily
                             font.pixelSize: 11
                             elide: Text.ElideRight
+                            Layout.fillWidth: true
                         }
-
-                        Item { Layout.fillWidth: true }
 
                         Label {
                             text: (modelData.fileCount || modelData.sourceFileCount || 0) + " Files"
@@ -625,6 +1889,429 @@ Item {
                         wheel.accepted = true
                     }
                 }
+            }
+        }
+    }
+
+    Item {
+        id: relationshipFocusLayer
+        anchors.fill: parent
+        visible: root.relationshipFocusActive
+        z: 18
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton
+            onClicked: root.blankClicked()
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            color: root.componentMode ? Qt.rgba(0.985, 0.988, 0.994, 0.94) : Qt.rgba(0.97, 0.975, 0.985, 0.82)
+        }
+
+        Canvas {
+            id: relationshipCanvas
+            anchors.fill: parent
+
+            function drawCurve(ctx, startPoint, endPoint, color, direction) {
+                var deltaX = Math.abs(endPoint.x - startPoint.x)
+                var bend = Math.max(56, Math.min(132, deltaX * 0.42))
+                var c1x = startPoint.x + (direction === "incoming" ? bend : -bend)
+                var c2x = endPoint.x + (direction === "incoming" ? -bend * 0.55 : bend * 0.55)
+                var c1y = startPoint.y
+                var c2y = endPoint.y
+
+                ctx.beginPath()
+                ctx.moveTo(startPoint.x, startPoint.y)
+                ctx.bezierCurveTo(c1x, c1y, c2x, c2y, endPoint.x, endPoint.y)
+                ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.92)
+                ctx.lineWidth = 6
+                ctx.stroke()
+
+                ctx.beginPath()
+                ctx.moveTo(startPoint.x, startPoint.y)
+                ctx.bezierCurveTo(c1x, c1y, c2x, c2y, endPoint.x, endPoint.y)
+                ctx.strokeStyle = color
+                ctx.lineWidth = 2.6
+                ctx.stroke()
+
+                var tail = Qt.point(endPoint.x + (direction === "incoming" ? -18 : 18), endPoint.y)
+                var arrowLeft = root.arrowWing(endPoint, tail, 11, -1)
+                var arrowRight = root.arrowWing(endPoint, tail, 11, 1)
+                ctx.beginPath()
+                ctx.moveTo(endPoint.x, endPoint.y)
+                ctx.lineTo(arrowLeft.x, arrowLeft.y)
+                ctx.lineTo(arrowRight.x, arrowRight.y)
+                ctx.closePath()
+                ctx.fillStyle = color
+                ctx.fill()
+            }
+
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+
+                var incomingTarget = root.centerAnchorPoint("incoming")
+                for (var index = 0; index < root.focusedIncomingRelations.length; ++index) {
+                    drawCurve(
+                                ctx,
+                                root.relationAnchorPoint("incoming", index, root.focusedIncomingRelations.length),
+                                incomingTarget,
+                                root.tokens.signalRaspberry,
+                                "incoming")
+                }
+
+                var outgoingStart = root.centerAnchorPoint("outgoing")
+                for (var outIndex = 0; outIndex < root.focusedOutgoingRelations.length; ++outIndex) {
+                    drawCurve(
+                                ctx,
+                                outgoingStart,
+                                root.relationAnchorPoint("outgoing", outIndex, root.focusedOutgoingRelations.length),
+                                root.tokens.signalCobalt,
+                                "outgoing")
+                }
+            }
+
+            Connections {
+                target: root
+
+                function onSelectedNodeChanged() { relationshipCanvas.requestPaint() }
+                function onSceneChanged() { relationshipCanvas.requestPaint() }
+                function onWidthChanged() { relationshipCanvas.requestPaint() }
+                function onHeightChanged() { relationshipCanvas.requestPaint() }
+            }
+        }
+
+        Rectangle {
+            id: focusFrame
+            readonly property var metrics: root.focusOverlayMetrics()
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: metrics.y
+            width: metrics.width
+            height: metrics.height
+            radius: root.tokens.radius8 + 8
+            color: root.componentMode ? Qt.rgba(1, 1, 1, 0.54) : Qt.rgba(1, 1, 1, 0.72)
+            border.color: Qt.rgba(0.12, 0.18, 0.28, 0.07)
+
+            Rectangle {
+                readonly property var rect: root.focusCenterRect()
+                x: rect.x - focusFrame.metrics.x
+                y: rect.y - focusFrame.metrics.y
+                width: rect.width
+                height: rect.height
+                radius: root.tokens.radius8
+                color: root.tokens.base0
+                border.color: root.tokens.signalCobalt
+                border.width: 2
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 18
+                    spacing: 10
+
+                    Rectangle {
+                        radius: 999
+                        color: root.componentMode ? Qt.rgba(0.83, 0.34, 0.92, 0.1) : Qt.rgba(0.14, 0.48, 1, 0.1)
+                        border.color: root.componentMode ? Qt.rgba(0.83, 0.34, 0.92, 0.26) : Qt.rgba(0.14, 0.48, 1, 0.24)
+                        implicitWidth: modeLabel.implicitWidth + 18
+                        implicitHeight: 26
+
+                        Label {
+                            id: modeLabel
+                            anchors.centerIn: parent
+                            text: root.componentMode ? "组件关系聚焦" : "架构关系聚焦"
+                            color: root.componentMode ? root.tokens.signalRaspberry : root.tokens.signalCobalt
+                            font.family: root.tokens.textFontFamily
+                            font.pixelSize: 11
+                            font.weight: Font.DemiBold
+                        }
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: root.selectedNode ? root.selectedNode.name || "未命名节点" : ""
+                        color: root.tokens.text1
+                        elide: Text.ElideRight
+                        font.family: root.tokens.displayFontFamily
+                        font.pixelSize: 22
+                        font.weight: Font.DemiBold
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: root.selectedNode ? (root.selectedNode.summary || root.selectedNode.responsibility || root.selectedNode.role || "当前焦点节点") : ""
+                        wrapMode: Text.WordWrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                        color: root.tokens.text3
+                        font.family: root.tokens.textFontFamily
+                        font.pixelSize: 13
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Rectangle {
+                            radius: 999
+                            color: Qt.rgba(0.17, 0.46, 0.94, 0.1)
+                            border.color: Qt.rgba(0.17, 0.46, 0.94, 0.22)
+                            implicitWidth: label1.implicitWidth + 18
+                            implicitHeight: 28
+
+                            Label {
+                                id: label1
+                                anchors.centerIn: parent
+                                text: "输入 " + root.focusedIncomingRelations.length
+                                color: root.tokens.signalRaspberry
+                                font.family: root.tokens.textFontFamily
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+                        }
+
+                        Rectangle {
+                            radius: 999
+                            color: Qt.rgba(0.09, 0.56, 0.92, 0.1)
+                            border.color: Qt.rgba(0.09, 0.56, 0.92, 0.22)
+                            implicitWidth: label2.implicitWidth + 18
+                            implicitHeight: 28
+
+                            Label {
+                                id: label2
+                                anchors.centerIn: parent
+                                text: "输出 " + root.focusedOutgoingRelations.length
+                                color: root.tokens.signalCobalt
+                                font.family: root.tokens.textFontFamily
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true }
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: root.componentMode ? "背景保留全部组件全景图，左右节点负责关系切换。" : "点击左右节点切换焦点；再点一次中间卡片可进入组件探测实验室。"
+                        horizontalAlignment: Text.AlignRight
+                        color: root.tokens.text3
+                        font.family: root.tokens.textFontFamily
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    enabled: !root.componentMode && !!root.selectedNode && root.selectedNode.id !== undefined
+                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onClicked: {
+                        if (root.selectedNode && root.selectedNode.id !== undefined)
+                            root.nodeDrilled(root.selectedNode)
+                    }
+                }
+            }
+
+            Repeater {
+                model: root.focusedIncomingRelations
+
+                Rectangle {
+                    readonly property var rect: root.focusRelationRect("incoming", index, root.focusedIncomingRelations.length)
+                    readonly property var relationNode: modelData.node
+                    x: rect.x - focusFrame.metrics.x
+                    y: rect.y - focusFrame.metrics.y
+                    width: rect.width
+                    height: rect.height
+                    radius: root.tokens.radius8
+                    color: root.tokens.base0
+                    border.color: Qt.rgba(0.83, 0.34, 0.92, 0.34)
+                    border.width: 1
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 5
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: relationNode.name || "未命名节点"
+                            elide: Text.ElideRight
+                            color: root.tokens.text1
+                            font.family: root.tokens.textFontFamily
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
+                        }
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: relationNode.summary || relationNode.responsibility || relationNode.role || "上游关系节点"
+                            maximumLineCount: 2
+                            elide: Text.ElideRight
+                            wrapMode: Text.WordWrap
+                            color: root.tokens.text3
+                            font.family: root.tokens.textFontFamily
+                            font.pixelSize: 11
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.nodeSelected(modelData.node)
+                    }
+                }
+            }
+
+            Repeater {
+                model: root.focusedOutgoingRelations
+
+                Rectangle {
+                    readonly property var rect: root.focusRelationRect("outgoing", index, root.focusedOutgoingRelations.length)
+                    readonly property var relationNode: modelData.node
+                    x: rect.x - focusFrame.metrics.x
+                    y: rect.y - focusFrame.metrics.y
+                    width: rect.width
+                    height: rect.height
+                    radius: root.tokens.radius8
+                    color: root.tokens.base0
+                    border.color: Qt.rgba(0.14, 0.48, 1, 0.28)
+                    border.width: 1
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 5
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: relationNode.name || "未命名节点"
+                            elide: Text.ElideRight
+                            color: root.tokens.text1
+                            font.family: root.tokens.textFontFamily
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
+                        }
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: relationNode.summary || relationNode.responsibility || relationNode.role || "下游关系节点"
+                            maximumLineCount: 2
+                            elide: Text.ElideRight
+                            wrapMode: Text.WordWrap
+                            color: root.tokens.text3
+                            font.family: root.tokens.textFontFamily
+                            font.pixelSize: 11
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.nodeSelected(modelData.node)
+                    }
+                }
+            }
+
+        }
+    }
+
+    Rectangle {
+        visible: root.componentOverviewMode && root.nodes.length > 0 && !root.relationshipFocusActive
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.margins: 18
+        width: 332
+        height: 102
+        radius: root.tokens.radius8 + 4
+        color: Qt.rgba(1, 1, 1, 0.9)
+        border.color: Qt.rgba(0.12, 0.18, 0.28, 0.08)
+        z: 24
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 14
+            spacing: 8
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Label {
+                    text: "组件全景图"
+                    color: root.tokens.text1
+                    font.family: root.tokens.displayFontFamily
+                    font.pixelSize: 16
+                    font.weight: Font.DemiBold
+                }
+
+                Rectangle {
+                    radius: 999
+                    color: Qt.rgba(0.14, 0.48, 1, 0.08)
+                    border.color: Qt.rgba(0.14, 0.48, 1, 0.18)
+                    implicitWidth: idleComponentCount.implicitWidth + 16
+                    implicitHeight: 24
+
+                    Label {
+                        id: idleComponentCount
+                        anchors.centerIn: parent
+                        text: root.componentCount + " 个"
+                        color: root.tokens.signalCobalt
+                        font.family: root.tokens.textFontFamily
+                        font.pixelSize: 11
+                        font.weight: Font.DemiBold
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: "当前是无连线组件全景图，并按入口、界面、核心、支撑分区展示；先扫全貌，再点组件进入关系聚焦。"
+                color: root.tokens.text3
+                font.family: root.tokens.textFontFamily
+                font.pixelSize: 11
+                wrapMode: Text.WordWrap
+            }
+        }
+    }
+
+    Rectangle {
+        visible: !root.componentMode && root.nodes.length > 0 && !root.relationshipFocusActive
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.margins: 18
+        width: 308
+        height: 92
+        radius: root.tokens.radius8 + 4
+        color: Qt.rgba(1, 1, 1, 0.9)
+        border.color: Qt.rgba(0.12, 0.18, 0.28, 0.08)
+        z: 24
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 14
+            spacing: 8
+
+            Label {
+                text: "架构全景图"
+                color: root.tokens.text1
+                font.family: root.tokens.displayFontFamily
+                font.pixelSize: 15
+                font.weight: Font.DemiBold
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: "全景图默认绘制全部主干线；鼠标悬浮节点时，只保留与该节点相关的主干线。"
+                wrapMode: Text.WordWrap
+                color: root.tokens.text3
+                font.family: root.tokens.textFontFamily
+                font.pixelSize: 11
             }
         }
     }
@@ -681,7 +2368,8 @@ Item {
             }
 
             ToolButton {
-                text: root.showAllEdges ? "全线" : "聚焦"
+                visible: root.componentMode
+                text: root.showAllEdges ? "隐线" : "显线"
                 onClicked: root.showAllEdges = !root.showAllEdges
             }
         }
@@ -691,7 +2379,9 @@ Item {
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.margins: 18
-        text: "拖动画布平移 · 滚轮缩放 · 悬停/选中查看依赖方向 · 双击节点下钻"
+        text: root.componentMode
+              ? "拖动画布平移 · 滚轮缩放 · 先看分区组件全景图，再点击组件进入关系聚焦"
+              : "拖动画布平移 · 滚轮缩放 · 全景图默认显示全部主干线，悬浮节点时只看相关主干"
         color: root.tokens.text3
         font.family: root.tokens.textFontFamily
         font.pixelSize: 11

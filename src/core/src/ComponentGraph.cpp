@@ -356,6 +356,236 @@ std::string parentFolderName(const std::string& path) {
                : parentPath.substr(parentSeparator + 1);
 }
 
+std::vector<std::string> splitPathSegments(const std::string& path) {
+    std::vector<std::string> segments;
+    std::string current;
+    current.reserve(path.size());
+    for (const char character : path) {
+        if (character == '/' || character == '\\') {
+            if (!current.empty()) {
+                segments.push_back(current);
+                current.clear();
+            }
+            continue;
+        }
+        current.push_back(character);
+    }
+    if (!current.empty()) {
+        segments.push_back(current);
+    }
+    return segments;
+}
+
+std::string joinedPathTail(
+    const std::vector<std::string>& segments,
+    const std::size_t count) {
+    if (segments.empty() || count == 0) {
+        return {};
+    }
+
+    const std::size_t start =
+        segments.size() > count ? segments.size() - count : 0;
+    std::ostringstream output;
+    for (std::size_t index = start; index < segments.size(); ++index) {
+        if (index > start) {
+            output << " / ";
+        }
+        output << humanizeIdentifier(segments[index]);
+    }
+    return collapseSpaces(output.str());
+}
+
+bool looksLikeMojibakeText(const std::string& value) {
+    if (value.empty()) {
+        return false;
+    }
+
+    static const std::initializer_list<const char*> tokens = {
+        "�", "锟", "鑱", "鏂", "鍙", "璁", "浠", "銆", "锛", "鏈", "娴"};
+    const std::string lowered = toLower(value);
+    return std::any_of(tokens.begin(), tokens.end(), [&](const char* token) {
+        return lowered.find(token) != std::string::npos;
+    });
+}
+
+std::string cleanDisplayContext(const std::string& value) {
+    const std::string collapsed = collapseSpaces(value);
+    if (collapsed.empty()) {
+        return {};
+    }
+    if (looksLikeMojibakeText(collapsed)) {
+        return {};
+    }
+    return collapsed;
+}
+
+std::string cleanStageName(const std::string& value) {
+    const std::string cleaned = cleanDisplayContext(value);
+    if (cleaned.empty()) {
+        return {};
+    }
+
+    const std::string lowered = toLower(cleaned);
+    if (lowered == "entry" || lowered == "core" || lowered == "leaf" ||
+        lowered == "support" || lowered == "internal") {
+        return lowered;
+    }
+    return cleaned;
+}
+
+std::string preferredComponentScope(const ComponentNode& node) {
+    for (const std::string& filePath : node.exampleFiles) {
+        const std::vector<std::string> segments = splitPathSegments(filePath);
+        if (segments.size() > 1) {
+            const std::string scope = cleanDisplayContext(joinedPathTail(segments, 2));
+            if (!scope.empty()) {
+                return scope;
+            }
+        }
+    }
+
+    if (!node.folderHint.empty()) {
+        const std::vector<std::string> segments = splitPathSegments(node.folderHint);
+        const std::string scope = cleanDisplayContext(joinedPathTail(segments, 2));
+        if (!scope.empty()) {
+            return scope;
+        }
+    }
+
+    for (const std::string& moduleName : node.moduleNames) {
+        const std::string scope =
+            cleanDisplayContext(humanizeIdentifier(moduleName));
+        if (!scope.empty()) {
+            return scope;
+        }
+    }
+
+    return {};
+}
+
+std::vector<std::string> componentNameCandidates(const ComponentNode& node) {
+    std::vector<std::string> candidates;
+    std::unordered_set<std::string> seen;
+
+    auto addCandidate = [&](const std::string& candidate) {
+        const std::string normalized = cleanDisplayContext(candidate);
+        if (normalized.empty()) {
+            return;
+        }
+        const std::string lowered = toLower(normalized);
+        if (!seen.insert(lowered).second) {
+            return;
+        }
+        candidates.push_back(normalized);
+    };
+
+    addCandidate(node.name);
+
+    if (!node.scopeLabel.empty()) {
+        addCandidate(node.scopeLabel + " · " + node.name);
+    }
+
+    if (!node.folderHint.empty()) {
+        const std::vector<std::string> segments = splitPathSegments(node.folderHint);
+        addCandidate(joinedPathTail(segments, 1) + " · " + node.name);
+        addCandidate(joinedPathTail(segments, 2) + " · " + node.name);
+        addCandidate(joinedPathTail(segments, 3) + " · " + node.name);
+    }
+
+    for (const std::string& moduleName : node.moduleNames) {
+        const std::string moduleScope = collapseSpaces(humanizeIdentifier(moduleName));
+        if (!moduleScope.empty()) {
+            addCandidate(moduleScope + " · " + node.name);
+        }
+    }
+
+    if (!node.stageName.empty()) {
+        addCandidate(collapseSpaces(humanizeIdentifier(node.stageName)) + " · " + node.name);
+    }
+
+    for (const std::string& filePath : node.exampleFiles) {
+        const std::vector<std::string> segments = splitPathSegments(filePath);
+        if (segments.size() <= 1) {
+            continue;
+        }
+        addCandidate(joinedPathTail(segments, 2) + " · " + node.name);
+        addCandidate(joinedPathTail(segments, 3) + " · " + node.name);
+    }
+
+    return candidates;
+}
+
+std::string componentIdentityKey(const ComponentNode& node) {
+    std::ostringstream output;
+    output << static_cast<int>(node.kind) << "|"
+           << collapseSpaces(toLower(node.scopeLabel)) << "|"
+           << collapseSpaces(toLower(node.stageName)) << "|";
+    for (const std::string& moduleName : node.moduleNames) {
+        output << collapseSpaces(toLower(moduleName)) << ",";
+    }
+    output << "|";
+    const std::size_t fileLimit = std::min<std::size_t>(node.exampleFiles.size(), 3);
+    for (std::size_t index = 0; index < fileLimit; ++index) {
+        output << collapseSpaces(toLower(node.exampleFiles[index])) << ",";
+    }
+    return output.str();
+}
+
+void resolveComponentNameConflicts(ComponentGraph& graph) {
+    std::unordered_map<std::string, std::vector<ComponentNode*>> nodesByBaseName;
+    for (ComponentNode& node : graph.nodes) {
+        nodesByBaseName[toLower(collapseSpaces(node.name))].push_back(&node);
+    }
+
+    for (auto& [baseKey, group] : nodesByBaseName) {
+        static_cast<void>(baseKey);
+        if (group.size() <= 1) {
+            continue;
+        }
+
+        std::unordered_map<ComponentNode*, std::vector<std::string>> candidatesByNode;
+        std::unordered_map<std::string, std::size_t> candidateUsage;
+        for (ComponentNode* node : group) {
+            std::vector<std::string> candidates = componentNameCandidates(*node);
+            for (const std::string& candidate : candidates) {
+                candidateUsage[toLower(candidate)] += 1;
+            }
+            candidatesByNode.emplace(node, std::move(candidates));
+        }
+
+        std::vector<ComponentNode*> unresolved;
+        unresolved.reserve(group.size());
+        for (ComponentNode* node : group) {
+            unresolved.push_back(node);
+            const auto candidateIt = candidatesByNode.find(node);
+            if (candidateIt == candidatesByNode.end()) {
+                continue;
+            }
+            for (const std::string& candidate : candidateIt->second) {
+                if (candidateUsage[toLower(candidate)] == 1) {
+                    node->name = candidate;
+                    unresolved.pop_back();
+                    break;
+                }
+            }
+        }
+
+        std::sort(unresolved.begin(), unresolved.end(), [](const ComponentNode* left, const ComponentNode* right) {
+            return componentIdentityKey(*left) < componentIdentityKey(*right);
+        });
+
+        for (std::size_t index = 0; index < unresolved.size(); ++index) {
+            ComponentNode* node = unresolved[index];
+            const auto candidateIt = candidatesByNode.find(node);
+            std::string fallbackBase = node->name;
+            if (candidateIt != candidatesByNode.end() && !candidateIt->second.empty()) {
+                fallbackBase = candidateIt->second.back();
+            }
+            node->name = fallbackBase + " #" + std::to_string(index + 1);
+        }
+    }
+}
+
 bool containsAnyToken(
     const std::string& text,
     const std::initializer_list<const char*> tokens) {
@@ -525,17 +755,18 @@ std::pair<std::size_t, std::string> componentStageForKind(
     const OverviewNode& fallbackOverview) {
     switch (kind) {
     case ComponentNodeKind::Entry:
-        return {0, "鍏ュ彛闃舵"};
+        return {0, "entry"};
     case ComponentNodeKind::Support:
-        return {2, "鏀拺闃舵"};
+        return {2, "support"};
     case ComponentNodeKind::Component:
         break;
     }
 
-    if (!fallbackOverview.stageName.empty()) {
-        return {1, fallbackOverview.stageName};
+    const std::string fallbackStageName = cleanStageName(fallbackOverview.stageName);
+    if (!fallbackStageName.empty()) {
+        return {1, fallbackStageName};
     }
-    return {1, "鍐呴儴闃舵"};
+    return {1, "internal"};
 }
 
 void assignStageGroups(ComponentGraph& graph) {
@@ -582,7 +813,20 @@ void finalizeComponentGraph(
         auto collaborators = collaboratorSets[node.id];
         collaborators = deduplicateSorted(std::move(collaborators), 8);
         node.collaboratorNames = std::move(collaborators);
+        node.stageName = cleanStageName(node.stageName);
         applyVibeCoderHeuristics(node);
+        node.scopeLabel = preferredComponentScope(node);
+        if (node.scopeLabel.empty()) {
+            node.scopeLabel = collapseSpaces(humanizeIdentifier(node.stageName));
+        }
+        if (collapseSpaces(toLower(node.scopeLabel)) == collapseSpaces(toLower(node.name))) {
+            node.scopeLabel.clear();
+        }
+    }
+
+    resolveComponentNameConflicts(graph);
+
+    for (ComponentNode& node : graph.nodes) {
         node.visualPriority = componentVisualPriority(node);
         node.evidence = buildNodeEvidence(node, graph);
     }
@@ -944,7 +1188,7 @@ ComponentGraph buildSingleOverviewFallbackComponentGraph(
             node.responsibility = "承担当前能力域中的一部分内部实现职责。";
         }
         node.summary =
-            node.responsibility + " 浠ｈ〃鏂囦欢: " + joinStrings(node.exampleFiles, 3) + ".";
+            node.responsibility + " 代表文件: " + joinStrings(node.exampleFiles, 3) + ".";
         graph.nodes.push_back(std::move(node));
     }
 

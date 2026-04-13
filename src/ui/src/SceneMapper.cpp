@@ -269,6 +269,7 @@ ComponentSceneData SceneMapper::buildComponentSceneData(
         item.insert(QStringLiteral("capabilityId"), static_cast<qulonglong>(node.capabilityId));
         item.insert(QStringLiteral("kind"), QString::fromStdString(core::toString(node.kind)));
         item.insert(QStringLiteral("name"), QString::fromStdString(node.name));
+        item.insert(QStringLiteral("scopeLabel"), QString::fromStdString(node.scopeLabel));
         item.insert(QStringLiteral("role"), QString::fromStdString(node.role));
         item.insert(QStringLiteral("responsibility"), QString::fromStdString(node.responsibility));
         item.insert(QStringLiteral("summary"), QString::fromStdString(node.summary));

@@ -5,9 +5,11 @@ QtObject {
 
     property var focusedNode: null
     property var focusedCapability: null
+    property var overviewReturnCapability: null
     property var focusedEdge: null
     property var compareSet: []
     property bool inspectorOpen: false
+    property bool restoreOverviewFocusPending: false
     property string ledgerTab: "证据"
     property string searchText: ""
 
@@ -23,11 +25,42 @@ QtObject {
         setNode(node)
     }
 
-    function clear() {
+    function rememberOverviewCapability(node) {
+        overviewReturnCapability = node
+        restoreOverviewFocusPending = !!node && node.id !== undefined
+    }
+
+    function prepareComponentDrill(node) {
+        if (!node || node.id === undefined)
+            return
+
+        rememberOverviewCapability(node)
+        focusedCapability = node
+        clearNodeFocus()
+    }
+
+    function restoreOverviewCapabilityFocus() {
+        var target = overviewReturnCapability
+        if ((!target || target.id === undefined) && focusedCapability && focusedCapability.id !== undefined)
+            target = focusedCapability
+
+        restoreOverviewFocusPending = false
+        if (target && target.id !== undefined)
+            setCapability(target)
+    }
+
+    function clearNodeFocus() {
         focusedNode = null
-        focusedCapability = null
         focusedEdge = null
-        compareSet = []
         inspectorOpen = false
+        ledgerTab = "证据"
+    }
+
+    function clear() {
+        clearNodeFocus()
+        focusedCapability = null
+        overviewReturnCapability = null
+        restoreOverviewFocusPending = false
+        compareSet = []
     }
 }

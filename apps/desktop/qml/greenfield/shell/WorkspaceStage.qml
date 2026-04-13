@@ -25,7 +25,7 @@ Item {
 
     function openComponentLab(node) {
         if (node && node.id !== undefined) {
-            root.focusState.setCapability(node)
+            root.focusState.prepareComponentDrill(node)
             root.analysisController.ensureComponentSceneForCapability(node.id)
         }
         root.caseState.navigate("component")
@@ -35,6 +35,18 @@ Item {
         target: root.caseState
 
         function onRouteChanged() {
+            if (root.caseState.route === "component") {
+                if (root.focusState.focusedNode &&
+                        root.focusState.focusedCapability &&
+                        root.focusState.focusedNode.id === root.focusState.focusedCapability.id) {
+                    root.focusState.rememberOverviewCapability(root.focusState.focusedCapability)
+                }
+                root.focusState.clearNodeFocus()
+            }
+
+            if (root.caseState.route === "overview" && root.focusState.restoreOverviewFocusPending)
+                root.focusState.restoreOverviewCapabilityFocus()
+
             if (root.caseState.route === "component" &&
                     root.focusState.focusedCapability &&
                     root.focusState.focusedCapability.id !== undefined) {
@@ -95,7 +107,7 @@ Item {
                            : "请在架构全景图中双击一个能力域以下钻。"
                 onNodeSelected: root.focusState.setNode(node)
                 onNodeDrilled: root.focusState.setNode(node)
-                onBlankClicked: root.focusState.inspectorOpen = false
+                onBlankClicked: root.focusState.clearNodeFocus()
             }
 
             Rectangle {
