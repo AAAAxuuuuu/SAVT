@@ -846,7 +846,7 @@ AnalysisAnnotationStats AnalysisAnnotationService::annotateCapabilityGraph(
     const savt::core::AnalysisReport& report,
     savt::core::CapabilityGraph& capabilityGraph) {
     const savt::ai::DeepSeekConfigLoadResult loadResult = savt::ai::loadDeepSeekConfig();
-    if (!loadResult.loadedFromFile || !loadResult.config.isUsable()) {
+    if (!loadResult.hasConfig() || !loadResult.config.isUsable()) {
         AnalysisAnnotationStats stats;
         stats.statusMessage = loadResult.errorMessage.isEmpty()
             ? QStringLiteral("AI annotation is not configured.")
@@ -866,7 +866,7 @@ AnalysisAnnotationStats AnalysisAnnotationService::annotateComponentGraph(
     const savt::core::AnalysisReport& report,
     savt::core::ComponentGraph& componentGraph) {
     const savt::ai::DeepSeekConfigLoadResult loadResult = savt::ai::loadDeepSeekConfig();
-    if (!loadResult.loadedFromFile || !loadResult.config.isUsable()) {
+    if (!loadResult.hasConfig() || !loadResult.config.isUsable()) {
         AnalysisAnnotationStats stats;
         stats.statusMessage = loadResult.errorMessage.isEmpty()
             ? QStringLiteral("AI annotation is not configured.")
@@ -904,7 +904,7 @@ AnalysisAnnotationStats AnalysisAnnotationService::annotate(
     }
 
     const savt::ai::DeepSeekConfigLoadResult loadResult = savt::ai::loadDeepSeekConfig();
-    if (!loadResult.loadedFromFile || !loadResult.config.isUsable()) {
+    if (!loadResult.hasConfig() || !loadResult.config.isUsable()) {
         stats.statusMessage = loadResult.errorMessage.isEmpty()
             ? QStringLiteral("AI annotation is not configured.")
             : loadResult.errorMessage;

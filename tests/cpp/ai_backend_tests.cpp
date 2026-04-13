@@ -1,9 +1,12 @@
 #include "savt/ai/DeepSeekClient.h"
 
+#include <QDir>
+#include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkRequest>
+#include <QTemporaryDir>
 
 #include <iostream>
 #include <string>
@@ -254,6 +257,57 @@ void testErrorResponseMessageExtraction() {
     expect(errorMessage.contains(QStringLiteral("model not found")), "error message should be surfaced from the API response");
 }
 
+void testFileConfigTakesPrecedenceOverBuiltInDefaults() {
+    QTemporaryDir tempDir;
+    expect(tempDir.isValid(), "temporary directory should be created");
+    if (!tempDir.isValid()) {
+        return;
+    }
+
+    const QString configDirPath = tempDir.filePath(QStringLiteral("config"));
+    QDir().mkpath(configDirPath);
+    QFile configFile(QDir(configDirPath).filePath(QStringLiteral("deepseek-ai.local.json")));
+    const bool opened = configFile.open(QIODevice::WriteOnly | QIODevice::Text);
+    expect(opened, "temporary config file should open for writing");
+    if (!opened) {
+        return;
+    }
+
+    configFile.write(R"JSON({
+        "provider": "deepseek",
+        "enabled": true,
+        "baseUrl": "https://example.com/direct",
+        "endpointPath": "/v1/chat/completions",
+        "model": "file-priority-model",
+        "apiKey": "sk-file-priority"
+    })JSON");
+    configFile.close();
+
+    const savt::ai::DeepSeekConfigLoadResult loadResult =
+        savt::ai::loadDeepSeekConfig(configFile.fileName());
+    expect(loadResult.loadedFromFile,
+           "explicit config path should load from file even when built-in defaults exist");
+    expect(!loadResult.loadedFromBuiltInDefaults,
+           "explicit config path should not report built-in defaults as the source");
+    expect(loadResult.config.model == QStringLiteral("file-priority-model"),
+           "explicit config path should preserve the file model value");
+}
+
+void testBuiltInConfigFallbackWhenFileIsMissing() {
+    const savt::ai::DeepSeekConfigLoadResult loadResult =
+        savt::ai::loadDeepSeekConfig(QStringLiteral("config/definitely-missing-ai-config.json"));
+    if (loadResult.loadedFromBuiltInDefaults) {
+        expect(loadResult.config.isUsable(),
+               "built-in fallback config should still be usable");
+        return;
+    }
+
+    expect(!loadResult.hasConfig(),
+           "missing config file without built-in defaults should report no config");
+    expect(loadResult.errorMessage.contains(QStringLiteral("not found"), Qt::CaseInsensitive),
+           "missing config without built-in defaults should surface a file-not-found error");
+}
+
 }  // namespace
 
 int main() {
@@ -266,6 +320,8 @@ int main() {
     testResponseParsing();
     testResponsesApiStyleResponseParsing();
     testErrorResponseMessageExtraction();
+    testFileConfigTakesPrecedenceOverBuiltInDefaults();
+    testBuiltInConfigFallbackWhenFileIsMissing();
 
     if (failureCount > 0) {
         std::cerr << "savt_ai_tests failed with " << failureCount << " assertion(s)." << std::endl;

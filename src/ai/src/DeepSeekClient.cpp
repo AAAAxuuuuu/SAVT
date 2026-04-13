@@ -1,4 +1,5 @@
 ﻿#include "savt/ai/DeepSeekClient.h"
+#include "DeepSeekBuildConfig.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -31,6 +32,22 @@ QStringList deduplicatedPaths(const QStringList &paths) {
   return items;
 }
 
+void appendRelativePathCandidates(QStringList *candidates, const QDir &baseDir,
+                                  const QString &cleanedRelativePath) {
+  if (!candidates || cleanedRelativePath.isEmpty()) {
+    return;
+  }
+
+  QDir cursor(baseDir.absolutePath());
+  while (true) {
+    candidates->push_back(
+        QDir::cleanPath(cursor.filePath(cleanedRelativePath)));
+    if (!cursor.cdUp()) {
+      break;
+    }
+  }
+}
+
 QStringList deepSeekConfigCandidatePaths(const QString &relativePath) {
   const QString cleanedRelativePath = normalizedConfigPath(relativePath);
   QStringList candidates;
@@ -44,19 +61,13 @@ QStringList deepSeekConfigCandidatePaths(const QString &relativePath) {
     return deduplicatedPaths(candidates);
   }
 
-  candidates.push_back(
-      QDir::cleanPath(QDir::current().filePath(cleanedRelativePath)));
+  appendRelativePathCandidates(&candidates, QDir::current(),
+                               cleanedRelativePath);
 
   const QString appDirPath = QCoreApplication::applicationDirPath().trimmed();
   if (!appDirPath.isEmpty()) {
-    QDir appDir(appDirPath);
-    candidates.push_back(QDir::cleanPath(appDir.filePath(cleanedRelativePath)));
-    candidates.push_back(QDir::cleanPath(
-        appDir.filePath(QStringLiteral("../") + cleanedRelativePath)));
-    candidates.push_back(QDir::cleanPath(
-        appDir.filePath(QStringLiteral("../../") + cleanedRelativePath)));
-    candidates.push_back(QDir::cleanPath(
-        appDir.filePath(QStringLiteral("../../../") + cleanedRelativePath)));
+    appendRelativePathCandidates(&candidates, QDir(appDirPath),
+                                 cleanedRelativePath);
   }
 
   return deduplicatedPaths(candidates);
@@ -140,6 +151,35 @@ QString resolvedChatCompletionsUrlForConfig(const DeepSeekConfig &config) {
 QString trimmedOrDefault(const QString &value, const QString &fallback) {
   const QString cleaned = value.trimmed();
   return cleaned.isEmpty() ? fallback : cleaned;
+}
+
+bool builtInDeepSeekConfigEnabled() {
+#if SAVT_AI_BUILTIN_ENABLED
+  return true;
+#else
+  return false;
+#endif
+}
+
+DeepSeekConfig builtInDeepSeekConfig() {
+  DeepSeekConfig config;
+  if (!builtInDeepSeekConfigEnabled()) {
+    return config;
+  }
+
+  config.enabled = true;
+  config.provider = QStringLiteral(SAVT_AI_BUILTIN_PROVIDER);
+  config.apiKey = QStringLiteral(SAVT_AI_BUILTIN_API_KEY);
+  config.baseUrl = QStringLiteral(SAVT_AI_BUILTIN_BASE_URL);
+  config.endpointPath = QStringLiteral(SAVT_AI_BUILTIN_ENDPOINT_PATH);
+  config.model = QStringLiteral(SAVT_AI_BUILTIN_MODEL);
+  config.timeoutMs = std::max(1000, SAVT_AI_BUILTIN_TIMEOUT_MS);
+
+  config.provider =
+      trimmedOrDefault(config.provider, QStringLiteral("deepseek"));
+  config.baseUrl = normalizedBaseUrl(config.baseUrl);
+  config.endpointPath = normalizedEndpointPath(config.endpointPath);
+  return config;
 }
 
 QString providerLabelForConfig(const DeepSeekConfig &config) {
@@ -725,6 +765,17 @@ DeepSeekConfigLoadResult loadDeepSeekConfig(const QString &preferredPath) {
 
   QFile file(configPath);
   if (!file.exists()) {
+    if (builtInDeepSeekConfigEnabled()) {
+      result.config = builtInDeepSeekConfig();
+      result.loadedFromBuiltInDefaults = true;
+      result.configPath = QStringLiteral("cmake://builtin-deepseek-config");
+      if (!result.config.isUsable()) {
+        result.errorMessage = QStringLiteral(
+            "Built-in AI config is incomplete. Reconfigure CMake with a valid "
+            "base URL, model, API key, and enabled flag.");
+      }
+      return result;
+    }
     result.errorMessage =
         QStringLiteral("AI config file was not found. Create %1 from %2 and "
                        "fill in your API key.")
@@ -1075,4 +1126,3 @@ bool parseDeepSeekChatCompletionsResponse(
 }
 
 } // namespace savt::ai
-

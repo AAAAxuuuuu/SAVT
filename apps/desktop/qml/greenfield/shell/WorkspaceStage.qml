@@ -189,6 +189,7 @@ Item {
     }
 
     component StartOverlay: Rectangle {
+        id: startOverlay
         required property QtObject tokens
         required property QtObject analysisController
         required property QtObject caseState
@@ -227,14 +228,14 @@ Item {
 
             RowLayout {
                 ActionButton {
-                    tokens: tokens
+                    tokens: startOverlay.tokens
                     text: caseState.hasProject ? "切换项目" : "选择项目"
                     tone: "secondary"
                     onClicked: chooseProjectRequested()
                 }
 
                 ActionButton {
-                    tokens: tokens
+                    tokens: startOverlay.tokens
                     text: analysisController.analyzing ? "分析中..." : "开始分析"
                     tone: "primary"
                     enabled: caseState.hasProject && !analysisController.analyzing

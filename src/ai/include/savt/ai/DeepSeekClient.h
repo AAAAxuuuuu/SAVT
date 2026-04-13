@@ -26,6 +26,9 @@ struct DeepSeekConfigLoadResult {
     QString configPath;
     QString errorMessage;
     bool loadedFromFile = false;
+    bool loadedFromBuiltInDefaults = false;
+
+    bool hasConfig() const { return loadedFromFile || loadedFromBuiltInDefaults; }
 };
 
 struct ArchitectureAssistantRequest {
@@ -90,4 +93,3 @@ bool parseDeepSeekChatCompletionsResponse(
     QString* rawContent = nullptr);
 
 }  // namespace savt::ai
-

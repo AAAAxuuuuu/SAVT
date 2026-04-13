@@ -124,8 +124,11 @@ QStringList collectNodeFieldValues(const QVariantList& nodeItems,
 }
 
 QString buildAiSetupMessage(const ai::DeepSeekConfigLoadResult& loadResult) {
-    if (!loadResult.loadedFromFile)
+    if (!loadResult.hasConfig())
         return QStringLiteral("AI 未就绪：%1").arg(loadResult.errorMessage);
+    if (loadResult.loadedFromBuiltInDefaults && !loadResult.config.enabled) {
+        return QStringLiteral("已加载编译期 AI 配置，但当前未启用。请重新配置 CMake 后再构建。");
+    }
     if (!loadResult.config.enabled) {
         return QStringLiteral("已找到 AI 配置，但当前未启用。把 %1 里的 enabled 改成 true 后即可使用。")
             .arg(QDir::toNativeSeparators(loadResult.configPath));
@@ -133,6 +136,12 @@ QString buildAiSetupMessage(const ai::DeepSeekConfigLoadResult& loadResult) {
     if (!loadResult.config.isUsable()) {
         return QStringLiteral(
             "AI 配置已加载，但还不能使用。请检查模型、地址、endpointPath 和 API Key 是否完整。");
+    }
+    if (loadResult.loadedFromBuiltInDefaults) {
+        return QStringLiteral("%1 已就绪，当前模型为 %2，请求地址为 %3。当前使用的是编译期 AI 配置。")
+            .arg(loadResult.config.providerLabel(),
+                 loadResult.config.model,
+                 loadResult.config.resolvedChatCompletionsUrl());
     }
     return QStringLiteral("%1 已就绪，当前模型为 %2，请求地址为 %3。AI 只会基于当前项目或节点的证据包进行解读。")
         .arg(loadResult.config.providerLabel(),
@@ -498,9 +507,11 @@ QString formattedResponseForDebug(const QByteArray& responseBytes) {
 
 AiAvailabilityState AiService::inspectAvailability() {
     AiAvailabilityState state;
-    state.configPath = ai::defaultDeepSeekConfigPath();
     const ai::DeepSeekConfigLoadResult loadResult = ai::loadDeepSeekConfig();
-    state.available = loadResult.loadedFromFile && loadResult.config.isUsable();
+    state.configPath = loadResult.configPath.trimmed().isEmpty()
+        ? ai::defaultDeepSeekConfigPath()
+        : loadResult.configPath;
+    state.available = loadResult.hasConfig() && loadResult.config.isUsable();
     state.setupMessage = buildAiSetupMessage(loadResult);
     return state;
 }
@@ -532,7 +543,7 @@ AiPreparedRequest AiService::prepareNodeRequest(
     }
 
     const ai::DeepSeekConfigLoadResult loadResult = ai::loadDeepSeekConfig();
-    if (!loadResult.loadedFromFile || !loadResult.config.isUsable()) {
+    if (!loadResult.hasConfig() || !loadResult.config.isUsable()) {
         prepared.availability.available = false;
         prepared.availability.setupMessage = buildAiSetupMessage(loadResult);
         prepared.failureStatusMessage = prepared.availability.setupMessage;
@@ -582,7 +593,7 @@ AiPreparedRequest AiService::prepareProjectRequest(
     }
 
     const ai::DeepSeekConfigLoadResult loadResult = ai::loadDeepSeekConfig();
-    if (!loadResult.loadedFromFile || !loadResult.config.isUsable()) {
+    if (!loadResult.hasConfig() || !loadResult.config.isUsable()) {
         prepared.availability.available = false;
         prepared.availability.setupMessage = buildAiSetupMessage(loadResult);
         prepared.failureStatusMessage = prepared.availability.setupMessage;
@@ -624,7 +635,7 @@ AiPreparedRequest AiService::prepareReportRequest(
     }
 
     const ai::DeepSeekConfigLoadResult loadResult = ai::loadDeepSeekConfig();
-    if (!loadResult.loadedFromFile || !loadResult.config.isUsable()) {
+    if (!loadResult.hasConfig() || !loadResult.config.isUsable()) {
         prepared.availability.available = false;
         prepared.availability.setupMessage = buildAiSetupMessage(loadResult);
         prepared.failureStatusMessage = prepared.availability.setupMessage;
