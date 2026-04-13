@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Shapes
+import "../foundation"
 
 Item {
     id: root
@@ -1659,7 +1660,7 @@ Item {
                     Rectangle {
                         Layout.preferredWidth: 10
                         Layout.preferredHeight: 10
-                        radius: 5
+                        radius: width / 2
                         color: modelData.key === "entry"
                                ? root.tokens.signalTeal
                                : modelData.key === "experience"
@@ -1680,7 +1681,7 @@ Item {
                     }
 
                     Rectangle {
-                        radius: 999
+                        radius: height / 2
                         color: Qt.rgba(0.14, 0.48, 1, 0.08)
                         border.color: Qt.rgba(0.14, 0.48, 1, 0.18)
                         implicitWidth: sectionCountLabel.implicitWidth + 16
@@ -1786,7 +1787,7 @@ Item {
                         Rectangle {
                             Layout.preferredWidth: 10
                             Layout.preferredHeight: 10
-                            radius: 5
+                            radius: width / 2
                             color: modelData.reachableFromEntry ? root.tokens.signalTeal
                                    : root.componentMode ? root.tokens.signalRaspberry
                                    : root.tokens.signalCobalt
@@ -1828,7 +1829,7 @@ Item {
 
                         Rectangle {
                             visible: root.componentMode && (modelData.scopeLabel || "").length > 0
-                            radius: 999
+                            radius: height / 2
                             color: Qt.rgba(0.14, 0.48, 1, 0.08)
                             border.color: Qt.rgba(0.14, 0.48, 1, 0.16)
                             implicitWidth: scopeLabel.implicitWidth + 14
@@ -1990,7 +1991,7 @@ Item {
             y: metrics.y
             width: metrics.width
             height: metrics.height
-            radius: root.tokens.radius8 + 8
+            radius: root.tokens.radiusXxl
             color: root.componentMode ? Qt.rgba(1, 1, 1, 0.54) : Qt.rgba(1, 1, 1, 0.72)
             border.color: Qt.rgba(0.12, 0.18, 0.28, 0.07)
 
@@ -2011,7 +2012,7 @@ Item {
                     spacing: 10
 
                     Rectangle {
-                        radius: 999
+                        radius: height / 2
                         color: root.componentMode ? Qt.rgba(0.83, 0.34, 0.92, 0.1) : Qt.rgba(0.14, 0.48, 1, 0.1)
                         border.color: root.componentMode ? Qt.rgba(0.83, 0.34, 0.92, 0.26) : Qt.rgba(0.14, 0.48, 1, 0.24)
                         implicitWidth: modeLabel.implicitWidth + 18
@@ -2054,7 +2055,7 @@ Item {
                         spacing: 8
 
                         Rectangle {
-                            radius: 999
+                            radius: height / 2
                             color: Qt.rgba(0.17, 0.46, 0.94, 0.1)
                             border.color: Qt.rgba(0.17, 0.46, 0.94, 0.22)
                             implicitWidth: label1.implicitWidth + 18
@@ -2072,7 +2073,7 @@ Item {
                         }
 
                         Rectangle {
-                            radius: 999
+                            radius: height / 2
                             color: Qt.rgba(0.09, 0.56, 0.92, 0.1)
                             border.color: Qt.rgba(0.09, 0.56, 0.92, 0.22)
                             implicitWidth: label2.implicitWidth + 18
@@ -2226,7 +2227,7 @@ Item {
         anchors.margins: 18
         width: 332
         height: 102
-        radius: root.tokens.radius8 + 4
+        radius: root.tokens.radiusXl
         color: Qt.rgba(1, 1, 1, 0.9)
         border.color: Qt.rgba(0.12, 0.18, 0.28, 0.08)
         z: 24
@@ -2249,7 +2250,7 @@ Item {
                 }
 
                 Rectangle {
-                    radius: 999
+                    radius: height / 2
                     color: Qt.rgba(0.14, 0.48, 1, 0.08)
                     border.color: Qt.rgba(0.14, 0.48, 1, 0.18)
                     implicitWidth: idleComponentCount.implicitWidth + 16
@@ -2287,7 +2288,7 @@ Item {
         anchors.margins: 18
         width: 308
         height: 92
-        radius: root.tokens.radius8 + 4
+        radius: root.tokens.radiusXl
         color: Qt.rgba(1, 1, 1, 0.9)
         border.color: Qt.rgba(0.12, 0.18, 0.28, 0.08)
         z: 24
@@ -2343,8 +2344,13 @@ Item {
             anchors.rightMargin: 8
             spacing: 6
 
-            ToolButton {
+            ActionButton {
+                tokens: root.tokens
                 text: "-"
+                compact: true
+                square: true
+                fixedWidth: 28
+                tone: "secondary"
                 onClicked: root.zoomAt(root.width / 2, root.height / 2, 0.86)
             }
 
@@ -2357,19 +2363,32 @@ Item {
                 font.pixelSize: 12
             }
 
-            ToolButton {
+            ActionButton {
+                tokens: root.tokens
                 text: "+"
+                compact: true
+                square: true
+                fixedWidth: 28
+                tone: "secondary"
                 onClicked: root.zoomAt(root.width / 2, root.height / 2, 1.16)
             }
 
-            ToolButton {
+            ActionButton {
+                tokens: root.tokens
                 text: "Fit"
+                compact: true
+                fixedWidth: 44
+                tone: "secondary"
                 onClicked: root.resetView()
             }
 
-            ToolButton {
+            ActionButton {
+                tokens: root.tokens
                 visible: root.componentMode
                 text: root.showAllEdges ? "隐线" : "显线"
+                compact: true
+                fixedWidth: 48
+                tone: "secondary"
                 onClicked: root.showAllEdges = !root.showAllEdges
             }
         }

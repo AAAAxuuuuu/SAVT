@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../atlas"
 import "../config"
+import "../foundation"
 import "../report"
 
 Item {
@@ -149,8 +150,10 @@ Item {
                         }
                     }
 
-                    Button {
+                    ActionButton {
+                        tokens: root.tokens
                         text: "返回全景"
+                        tone: "secondary"
                         onClicked: root.caseState.navigate("overview")
                     }
                 }
@@ -223,13 +226,17 @@ Item {
             }
 
             RowLayout {
-                Button {
+                ActionButton {
+                    tokens: tokens
                     text: caseState.hasProject ? "切换项目" : "选择项目"
+                    tone: "secondary"
                     onClicked: chooseProjectRequested()
                 }
 
-                Button {
+                ActionButton {
+                    tokens: tokens
                     text: analysisController.analyzing ? "分析中..." : "开始分析"
+                    tone: "primary"
                     enabled: caseState.hasProject && !analysisController.analyzing
                     onClicked: analysisController.analyzeCurrentProject()
                 }

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../foundation"
 
 Rectangle {
     id: root
@@ -78,10 +79,12 @@ Rectangle {
             }
         }
 
-        Button {
+        ActionButton {
+            tokens: root.tokens
             text: root.caseState.hasProject ? (root.analysisController.analyzing ? "停止" : "分析") : "选择项目"
-            implicitHeight: 32
-            implicitWidth: 92
+            compact: true
+            tone: root.analysisController.analyzing ? "danger" : "primary"
+            fixedWidth: 92
             onClicked: {
                 if (!root.caseState.hasProject) {
                     root.chooseProjectRequested()
@@ -94,10 +97,12 @@ Rectangle {
             }
         }
 
-        Button {
+        ActionButton {
+            tokens: root.tokens
             text: "AI"
-            implicitHeight: 32
-            implicitWidth: 64
+            compact: true
+            tone: "ai"
+            fixedWidth: 64
             enabled: root.analysisController.aiAvailable
             onClicked: {
                 if (root.focusState.focusedNode)

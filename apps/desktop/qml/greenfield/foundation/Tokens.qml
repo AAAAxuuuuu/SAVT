@@ -39,10 +39,19 @@ QtObject {
     readonly property color graphEdge: "#A1A1A6"
     readonly property color graphEdgeFocus: "#007AFF"
 
-    readonly property int radius2: 2
-    readonly property int radius4: 4
-    readonly property int radius6: 6
-    readonly property int radius8: 8
+    readonly property int radiusXs: 6
+    readonly property int radiusSm: 8
+    readonly property int radiusMd: 12
+    readonly property int radiusLg: 16
+    readonly property int radiusXl: 20
+    readonly property int radiusXxl: 24
+    readonly property int radiusPill: 999
+
+    // Backward-compatible aliases used by the current greenfield shell.
+    readonly property int radius2: radiusXs
+    readonly property int radius4: radiusSm
+    readonly property int radius6: radiusMd
+    readonly property int radius8: radiusLg
 
     readonly property int space4: 4
     readonly property int space8: 8

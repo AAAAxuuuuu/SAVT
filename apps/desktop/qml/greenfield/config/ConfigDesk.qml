@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../foundation"
 
 ScrollView {
     id: root
@@ -51,13 +52,17 @@ ScrollView {
                 }
 
                 RowLayout {
-                    Button {
+                    ActionButton {
+                        tokens: root.tokens
                         text: "选择项目"
+                        tone: "secondary"
                         onClicked: root.chooseProjectRequested()
                     }
 
-                    Button {
+                    ActionButton {
+                        tokens: root.tokens
                         text: root.analysisController.analyzing ? "停止分析" : "开始分析"
+                        tone: root.analysisController.analyzing ? "danger" : "primary"
                         enabled: root.caseState.hasProject
                         onClicked: {
                             if (root.analysisController.analyzing)
@@ -67,8 +72,10 @@ ScrollView {
                         }
                     }
 
-                    Button {
+                    ActionButton {
+                        tokens: root.tokens
                         text: "刷新 AI"
+                        tone: "secondary"
                         onClicked: root.analysisController.refreshAiAvailability()
                     }
                 }

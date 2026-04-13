@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../foundation"
 
 Rectangle {
     id: root
@@ -58,10 +59,13 @@ Rectangle {
                         font.weight: Font.DemiBold
                     }
 
-                    Button {
+                    ActionButton {
+                        tokens: root.tokens
                         text: "X"
-                        implicitWidth: 30
-                        implicitHeight: 28
+                        compact: true
+                        square: true
+                        fixedWidth: 30
+                        tone: "ghost"
                         onClicked: root.focusState.inspectorOpen = false
                     }
                 }
@@ -202,29 +206,15 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        ActionButton {
             Layout.fillWidth: true
             Layout.margins: 20
             Layout.preferredHeight: 42
-            radius: root.tokens.radius8
-            color: root.tokens.text1
-            opacity: root.analysisController.aiAvailable && root.focusState.focusedNode ? 1.0 : 0.45
-
-            Label {
-                anchors.centerIn: parent
-                text: "请求 AI 辅助解释"
-                color: "#FFFFFF"
-                font.family: root.tokens.textFontFamily
-                font.pixelSize: 14
-                font.weight: Font.Medium
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                enabled: root.analysisController.aiAvailable && !!root.focusState.focusedNode
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.analysisController.requestAiExplanation(root.focusState.focusedNode, "结合证据链解释这个架构节点，并指出风险和下一步动作。")
-            }
+            tokens: root.tokens
+            text: "请求 AI 辅助解释"
+            tone: "primary"
+            enabled: root.analysisController.aiAvailable && !!root.focusState.focusedNode
+            onClicked: root.analysisController.requestAiExplanation(root.focusState.focusedNode, "结合证据链解释这个架构节点，并指出风险和下一步动作。")
         }
     }
 

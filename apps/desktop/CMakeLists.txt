@@ -10,6 +10,7 @@ qt_add_qml_module(savt_desktop
         qml/greenfield/MainSurface.qml
         qml/greenfield/atlas/ArchitectureCanvas.qml
         qml/greenfield/config/ConfigDesk.qml
+        qml/greenfield/foundation/ActionButton.qml
         qml/greenfield/foundation/Tokens.qml
         qml/greenfield/report/ReportDesk.qml
         qml/greenfield/shell/CaseRail.qml

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../foundation"
 
 ScrollView {
     id: root
@@ -70,8 +71,10 @@ ScrollView {
 
                     Item { Layout.fillWidth: true }
 
-                    Button {
+                    ActionButton {
+                        tokens: root.tokens
                         text: "生成诊断"
+                        tone: "ai"
                         enabled: root.analysisController.aiAvailable
                         onClicked: root.analysisController.requestReportAiExplanation("基于当前报告生成架构诊断、风险和下一步建议。")
                     }
@@ -116,8 +119,10 @@ ScrollView {
 
                     Item { Layout.fillWidth: true }
 
-                    Button {
+                    ActionButton {
+                        tokens: root.tokens
                         text: "复制报告"
+                        tone: "secondary"
                         enabled: root.analysisController.analysisReport.length > 0
                         onClicked: root.analysisController.copyTextToClipboard(root.analysisController.analysisReport)
                     }
@@ -169,8 +174,10 @@ ScrollView {
 
                     Item { Layout.fillWidth: true }
 
-                    Button {
+                    ActionButton {
+                        tokens: root.tokens
                         text: "复制上下文"
+                        tone: "secondary"
                         enabled: root.analysisController.systemContextReport.length > 0
                         onClicked: root.analysisController.copyTextToClipboard(root.analysisController.systemContextReport)
                     }
