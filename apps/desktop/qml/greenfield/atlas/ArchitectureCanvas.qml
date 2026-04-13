@@ -1476,10 +1476,56 @@ Item {
             if (!dragged)
                 root.blankClicked()
         }
+    }
 
-        onWheel: function(wheel) {
-            root.zoomAt(wheel.x, wheel.y, wheel.angleDelta.y > 0 ? 1.12 : 0.88)
-            wheel.accepted = true
+    WheelHandler {
+        id: mouseWheelZoom
+        target: null
+        acceptedDevices: PointerDevice.Mouse
+        onWheel: function(event) {
+            root.zoomAt(point.position.x, point.position.y,
+                        event.angleDelta.y > 0 ? 1.12 : 0.88)
+        }
+    }
+
+    WheelHandler {
+        id: touchpadPan
+        target: null
+        acceptedDevices: PointerDevice.TouchPad
+        onWheel: function(event) {
+            var deltaX = event.pixelDelta.x
+            var deltaY = event.pixelDelta.y
+            if (Math.abs(deltaX) < 0.01 && Math.abs(deltaY) < 0.01) {
+                deltaX = event.angleDelta.x / 4.0
+                deltaY = event.angleDelta.y / 4.0
+            }
+
+            root.panX += deltaX
+            root.panY += deltaY
+        }
+    }
+
+    PinchHandler {
+        id: canvasPinch
+        target: null
+        acceptedDevices: PointerDevice.TouchPad | PointerDevice.TouchScreen
+        property real lastScale: 1.0
+
+        onActiveChanged: {
+            if (active)
+                lastScale = 1.0
+        }
+
+        onScaleChanged: {
+            if (!active)
+                return
+
+            var factor = scale / lastScale
+            if (Math.abs(factor - 1.0) < 0.001)
+                return
+
+            root.zoomAt(centroid.position.x, centroid.position.y, factor)
+            lastScale = scale
         }
     }
 
@@ -1884,11 +1930,6 @@ Item {
                     }
                     onClicked: root.nodeSelected(modelData)
                     onDoubleClicked: root.nodeDrilled(modelData)
-                    onWheel: function(wheel) {
-                        var point = card.mapToItem(root, wheel.x, wheel.y)
-                        root.zoomAt(point.x, point.y, wheel.angleDelta.y > 0 ? 1.12 : 0.88)
-                        wheel.accepted = true
-                    }
                 }
             }
         }
@@ -2281,42 +2322,6 @@ Item {
         }
     }
 
-    Rectangle {
-        visible: !root.componentMode && root.nodes.length > 0 && !root.relationshipFocusActive
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.margins: 18
-        width: 308
-        height: 92
-        radius: root.tokens.radiusXl
-        color: Qt.rgba(1, 1, 1, 0.9)
-        border.color: Qt.rgba(0.12, 0.18, 0.28, 0.08)
-        z: 24
-
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            spacing: 8
-
-            Label {
-                text: "架构全景图"
-                color: root.tokens.text1
-                font.family: root.tokens.displayFontFamily
-                font.pixelSize: 15
-                font.weight: Font.DemiBold
-            }
-
-            Label {
-                Layout.fillWidth: true
-                text: "全景图默认绘制全部主干线；鼠标悬浮节点时，只保留与该节点相关的主干线。"
-                wrapMode: Text.WordWrap
-                color: root.tokens.text3
-                font.family: root.tokens.textFontFamily
-                font.pixelSize: 11
-            }
-        }
-    }
-
     Label {
         anchors.centerIn: parent
         visible: root.nodes.length === 0
@@ -2394,16 +2399,4 @@ Item {
         }
     }
 
-    Label {
-        anchors.left: parent.left
-        anchors.bottom: parent.bottom
-        anchors.margins: 18
-        text: root.componentMode
-              ? "拖动画布平移 · 滚轮缩放 · 先看分区组件全景图，再点击组件进入关系聚焦"
-              : "拖动画布平移 · 滚轮缩放 · 全景图默认显示全部主干线，悬浮节点时只看相关主干"
-        color: root.tokens.text3
-        font.family: root.tokens.textFontFamily
-        font.pixelSize: 11
-        z: 30
-    }
 }
