@@ -472,7 +472,60 @@ Item {
     function nodeHeight(item) {
         if (componentOverviewMode)
             return componentOverviewCardHeight
-        return Math.max(118, Math.min(160, item && item.height ? item.height : 126))
+        return Math.max(136, Math.min(176, item && item.height ? item.height : 142))
+    }
+
+    function localizedMetaText(value) {
+        var raw = String(value || "")
+        var key = raw.toLowerCase()
+        if (!key.length)
+            return "节点"
+        if (key === "entry")
+            return "入口"
+        if (key === "entry_component")
+            return "入口组件"
+        if (key === "capability")
+            return "能力模块"
+        if (key === "service")
+            return "服务"
+        if (key === "infrastructure")
+            return "基础设施"
+        if (key === "support_component")
+            return "支撑组件"
+        if (key === "presentation")
+            return "展示层"
+        if (key === "visual")
+            return "可视层"
+        if (key === "analysis")
+            return "分析层"
+        if (key === "core")
+            return "核心模块"
+        if (key === "support")
+            return "支撑模块"
+        if (key === "experience")
+            return "交互层"
+        if (key === "other")
+            return "其他"
+        if (key === "node")
+            return "节点"
+        if (key === "report_context")
+            return "报告上下文"
+        return raw
+    }
+
+    function cardMetaLabel(item) {
+        if (!item)
+            return "节点"
+        if (componentMode && (item.scopeLabel || "").length > 0)
+            return localizedMetaText(item.kind || item.role || "node")
+        if ((item.scopeLabel || "").length > 0)
+            return localizedMetaText(item.scopeLabel)
+        return localizedMetaText(item.kind || item.role || "node")
+    }
+
+    function cardFileCountLabel(item) {
+        var count = item ? (item.fileCount || item.sourceFileCount || 0) : 0
+        return count + " 个文件"
     }
 
     function componentOverviewColumns(viewWidth, compact) {
@@ -1852,10 +1905,10 @@ Item {
 
                     Label {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 34
+                        Layout.preferredHeight: 50
                         text: modelData.summary || modelData.responsibility || modelData.role || "暂无描述。"
                         wrapMode: Text.WordWrap
-                        maximumLineCount: 2
+                        maximumLineCount: 3
                         elide: Text.ElideRight
                         color: root.tokens.text3
                         font.family: root.tokens.textFontFamily
@@ -1894,11 +1947,7 @@ Item {
                         }
 
                         Label {
-                            text: root.componentMode && (modelData.scopeLabel || "").length > 0
-                                  ? (modelData.kind || modelData.role || "Node")
-                                  : ((modelData.scopeLabel || "").length > 0
-                                     ? modelData.scopeLabel
-                                     : (modelData.kind || modelData.role || "Node"))
+                            text: root.cardMetaLabel(modelData)
                             color: root.tokens.text3
                             font.family: root.tokens.textFontFamily
                             font.pixelSize: 11
@@ -1907,7 +1956,7 @@ Item {
                         }
 
                         Label {
-                            text: (modelData.fileCount || modelData.sourceFileCount || 0) + " Files"
+                            text: root.cardFileCountLabel(modelData)
                             color: root.tokens.text3
                             font.family: root.tokens.textFontFamily
                             font.pixelSize: 11
