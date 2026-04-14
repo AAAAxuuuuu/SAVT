@@ -414,6 +414,10 @@ void AnalysisController::clearAiExplanation() {
 void AnalysisController::requestAiExplanation(
     const QVariantMap& nodeData,
     const QString& userTask) {
+    if (m_aiBusy) {
+        setAiStatusMessage(QStringLiteral("AI 正在生成，请等待当前请求完成。"));
+        return;
+    }
     const AiPreparedRequest prepared = AiService::prepareNodeRequest(
         AiRequestContext{
             m_projectRootPath,
@@ -452,6 +456,10 @@ void AnalysisController::requestAiExplanation(
 }
 
 void AnalysisController::requestProjectAiExplanation(const QString& userTask) {
+    if (m_aiBusy) {
+        setAiStatusMessage(QStringLiteral("AI 正在生成，请等待当前请求完成。"));
+        return;
+    }
     const AiPreparedRequest prepared = AiService::prepareProjectRequest(
         AiRequestContext{
             m_projectRootPath,
@@ -488,6 +496,10 @@ void AnalysisController::requestProjectAiExplanation(const QString& userTask) {
 }
 
 void AnalysisController::requestReportAiExplanation(const QString& userTask) {
+    if (m_aiBusy) {
+        setAiStatusMessage(QStringLiteral("AI 正在生成，请等待当前请求完成。"));
+        return;
+    }
     const AiPreparedRequest prepared = AiService::prepareReportRequest(
         AiRequestContext{
             m_projectRootPath,
