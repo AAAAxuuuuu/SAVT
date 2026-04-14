@@ -185,149 +185,69 @@ Item {
         var positions = {}
         var primaryEdgeIds = {}
         var secondaryEdgeIds = {}
-        var branchSlotByNodeId = {}
         var outgoingSlotByEdgeId = {}
         var incomingSlotByEdgeId = {}
         var outgoingCountByNodeId = {}
         var incomingCountByNodeId = {}
         var layerById = {}
-        var layers = []
-        var adjacency = {}
-        var indegree = {}
-        var outdegree = {}
         var rootId = rootNode.id
-        var layerGap = 220
-        var nodeGap = 220
-        var marginX = 120
-        var marginY = 120
+        var marginX = 96
+        var marginY = 96
+        var minX = 999999
+        var maxX = -999999
+        var minY = 999999
+        var maxY = -999999
+        var maxLayerIndex = 0
 
-        function ensureNode(nodeId) {
-            if (!adjacency[nodeId])
-                adjacency[nodeId] = []
-            if (indegree[nodeId] === undefined)
-                indegree[nodeId] = 0
-            if (outdegree[nodeId] === undefined)
-                outdegree[nodeId] = 0
+        for (var nodeIndex = 0; nodeIndex < nodes.length; ++nodeIndex) {
+            var node = nodes[nodeIndex]
+            var nodeX = node && node.x !== undefined ? Number(node.x) : (64 + (nodeIndex % 3) * 320)
+            var nodeY = node && node.y !== undefined ? Number(node.y) : (90 + Math.floor(nodeIndex / 3) * 170)
+            var width = nodeWidth(node)
+            var height = nodeHeight(node)
+            var laneIndex = node && node.layoutLaneIndex !== undefined ? Number(node.layoutLaneIndex) : 0
+
+            positions[node.id] = {"x": nodeX, "y": nodeY}
+            layerById[node.id] = laneIndex
+            maxLayerIndex = Math.max(maxLayerIndex, laneIndex)
+            minX = Math.min(minX, nodeX)
+            maxX = Math.max(maxX, nodeX + width)
+            minY = Math.min(minY, nodeY)
+            maxY = Math.max(maxY, nodeY + height)
         }
 
-        for (var nodeIndex = 0; nodeIndex < nodes.length; ++nodeIndex)
-            ensureNode(nodes[nodeIndex].id)
-
-        var dedup = {}
-        for (var edgeIndex = 0; edgeIndex < edges.length; ++edgeIndex) {
-            var edge = edges[edgeIndex]
-            ensureNode(edge.fromId)
-            ensureNode(edge.toId)
-            var key = edge.fromId + "->" + edge.toId
-            if (dedup[key])
-                continue
-            dedup[key] = true
-            adjacency[edge.fromId].push(edge.toId)
-            indegree[edge.toId] += 1
-            outdegree[edge.fromId] += 1
+        if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+            minX = 0
+            minY = 0
+            maxX = bounds.width || 980
+            maxY = bounds.height || 560
         }
 
-        function sortIdsByName(ids) {
-            ids.sort(function(leftId, rightId) {
-                var left = nodeById(leftId) || {}
-                var right = nodeById(rightId) || {}
-                return String(left.name || "").localeCompare(String(right.name || ""))
+        function sortPeerEdges(edgeList, pivotField, peerField) {
+            edgeList.sort(function(left, right) {
+                var leftPeer = positions[left[peerField]]
+                var rightPeer = positions[right[peerField]]
+                var leftPivot = positions[left[pivotField]]
+                var rightPivot = positions[right[pivotField]]
+                var leftSortY = leftPeer ? leftPeer.y : (leftPivot ? leftPivot.y : 0)
+                var rightSortY = rightPeer ? rightPeer.y : (rightPivot ? rightPivot.y : 0)
+                if (Math.abs(leftSortY - rightSortY) > 0.5)
+                    return leftSortY - rightSortY
+
+                var leftSortX = leftPeer ? leftPeer.x : (leftPivot ? leftPivot.x : 0)
+                var rightSortX = rightPeer ? rightPeer.x : (rightPivot ? rightPivot.x : 0)
+                if (Math.abs(leftSortX - rightSortX) > 0.5)
+                    return leftSortX - rightSortX
+
+                return String(left.id).localeCompare(String(right.id))
             })
-        }
-
-        var zeroIndegree = []
-        for (var idKey in indegree) {
-            if (!indegree.hasOwnProperty(idKey))
-                continue
-            if (indegree[idKey] === 0)
-                zeroIndegree.push(Number(idKey))
-        }
-
-        sortIdsByName(zeroIndegree)
-
-        var processed = {}
-        while (zeroIndegree.length > 0) {
-            var currentLayer = zeroIndegree.slice(0)
-            zeroIndegree = []
-            sortIdsByName(currentLayer)
-            layers.push(currentLayer)
-            for (var layerIndex = 0; layerIndex < currentLayer.length; ++layerIndex) {
-                var currentId = currentLayer[layerIndex]
-                processed[currentId] = true
-                var neighbors = adjacency[currentId] || []
-                for (var neighborIndex = 0; neighborIndex < neighbors.length; ++neighborIndex) {
-                    var nextId = neighbors[neighborIndex]
-                    indegree[nextId] -= 1
-                    if (indegree[nextId] === 0)
-                        zeroIndegree.push(nextId)
-                }
-            }
-        }
-
-        var remaining = []
-        for (var nodeCheck = 0; nodeCheck < nodes.length; ++nodeCheck) {
-            var nodeId = nodes[nodeCheck].id
-            if (!processed[nodeId])
-                remaining.push(nodeId)
-        }
-        if (remaining.length > 0) {
-            sortIdsByName(remaining)
-            layers.push(remaining)
-        }
-
-        for (layerIndex = 0; layerIndex < layers.length; ++layerIndex) {
-            var layer = layers[layerIndex]
-            layer.sort(function(leftId, rightId) {
-                var leftOut = outdegree[leftId] || 0
-                var rightOut = outdegree[rightId] || 0
-                if (leftOut !== rightOut)
-                    return rightOut - leftOut
-                var left = nodeById(leftId) || {}
-                var right = nodeById(rightId) || {}
-                return String(left.name || "").localeCompare(String(right.name || ""))
-            })
-            for (var order = 0; order < layer.length; ++order)
-                layerById[layer[order]] = layerIndex
-        }
-
-        var maxLayerWidth = 0
-        var maxLayerSize = 0
-        for (layerIndex = 0; layerIndex < layers.length; ++layerIndex) {
-            layer = layers[layerIndex]
-            maxLayerSize = Math.max(maxLayerSize, layer.length)
-            var rowWidth = 0
-            for (order = 0; order < layer.length; ++order) {
-                var node = nodeById(layer[order])
-                rowWidth += nodeWidth(node)
-                if (order > 0)
-                    rowWidth += nodeGap
-            }
-            maxLayerWidth = Math.max(maxLayerWidth, rowWidth)
-        }
-
-        for (layerIndex = 0; layerIndex < layers.length; ++layerIndex) {
-            layer = layers[layerIndex]
-            var rowWidthTotal = 0
-            for (order = 0; order < layer.length; ++order) {
-                node = nodeById(layer[order])
-                rowWidthTotal += nodeWidth(node)
-                if (order > 0)
-                    rowWidthTotal += nodeGap
-            }
-            var startX = marginX + Math.max(0, (maxLayerWidth - rowWidthTotal) / 2)
-            var y = marginY + layerIndex * layerGap
-            var cursorX = startX
-            for (order = 0; order < layer.length; ++order) {
-                node = nodeById(layer[order])
-                positions[layer[order]] = {"x": cursorX, "y": y}
-                cursorX += nodeWidth(node) + nodeGap
-            }
         }
 
         var outgoingById = {}
         var incomingById = {}
-        for (edgeIndex = 0; edgeIndex < edges.length; ++edgeIndex) {
-            edge = edges[edgeIndex]
+        for (var edgeIndex = 0; edgeIndex < edges.length; ++edgeIndex) {
+            var edge = edges[edgeIndex]
+            primaryEdgeIds[edge.id] = true
             if (!outgoingById[edge.fromId])
                 outgoingById[edge.fromId] = []
             if (!incomingById[edge.toId])
@@ -336,79 +256,13 @@ Item {
             incomingById[edge.toId].push(edge)
         }
 
-        function edgePriority(edge) {
-            var fromLayer = layerById[edge.fromId]
-            var toLayer = layerById[edge.toId]
-            if (fromLayer === undefined || toLayer === undefined)
-                return -9999
-            if (toLayer > fromLayer)
-                return 1000 + (toLayer - fromLayer) * 100 + (edge.weight || 0)
-            if (toLayer === fromLayer)
-                return 100 + (edge.weight || 0)
-            return 10 + (edge.weight || 0) - (fromLayer - toLayer) * 8
-        }
-
-        for (edgeIndex = 0; edgeIndex < edges.length; ++edgeIndex) {
-            edge = edges[edgeIndex]
-            var fromLayer = layerById[edge.fromId]
-            var toLayer = layerById[edge.toId]
-            if (fromLayer !== undefined && toLayer !== undefined && fromLayer < toLayer)
-                primaryEdgeIds[edge.id] = true
-        }
-
-        for (nodeIndex = 0; nodeIndex < nodes.length; ++nodeIndex) {
-            var targetNodeId = nodes[nodeIndex].id
-            var incomingEdgesForNode = incomingById[targetNodeId] || []
-            var hasIncomingPrimary = false
-            for (edgeIndex = 0; edgeIndex < incomingEdgesForNode.length; ++edgeIndex) {
-                if (primaryEdgeIds[incomingEdgesForNode[edgeIndex].id]) {
-                    hasIncomingPrimary = true
-                    break
-                }
-            }
-
-            if (hasIncomingPrimary || targetNodeId === rootId || incomingEdgesForNode.length === 0)
-                continue
-
-            var bestIncomingEdge = incomingEdgesForNode[0]
-            var bestIncomingPriority = edgePriority(bestIncomingEdge)
-            for (edgeIndex = 1; edgeIndex < incomingEdgesForNode.length; ++edgeIndex) {
-                var candidateIncoming = incomingEdgesForNode[edgeIndex]
-                var candidateIncomingPriority = edgePriority(candidateIncoming)
-                if (candidateIncomingPriority > bestIncomingPriority) {
-                    bestIncomingEdge = candidateIncoming
-                    bestIncomingPriority = candidateIncomingPriority
-                }
-            }
-            primaryEdgeIds[bestIncomingEdge.id] = true
-        }
-
-        var primaryCount = 0
-        for (var primaryEdgeId in primaryEdgeIds) {
-            if (primaryEdgeIds.hasOwnProperty(primaryEdgeId))
-                primaryCount += 1
-        }
-
-        if (primaryCount === 0) {
-            for (edgeIndex = 0; edgeIndex < edges.length; ++edgeIndex)
-                primaryEdgeIds[edges[edgeIndex].id] = true
-        }
-
-        for (edgeIndex = 0; edgeIndex < edges.length; ++edgeIndex) {
-            edge = edges[edgeIndex]
-            if (!primaryEdgeIds[edge.id])
-                secondaryEdgeIds[edge.id] = true
-        }
-
         for (var nodeIdKey in outgoingById) {
             if (!outgoingById.hasOwnProperty(nodeIdKey))
                 continue
             var outgoingEdges = outgoingById[nodeIdKey]
-            outgoingEdges.sort(function(left, right) {
-                return String(left.toId).localeCompare(String(right.toId))
-            })
+            sortPeerEdges(outgoingEdges, "fromId", "toId")
             outgoingCountByNodeId[nodeIdKey] = outgoingEdges.length
-            for (order = 0; order < outgoingEdges.length; ++order)
+            for (var order = 0; order < outgoingEdges.length; ++order)
                 outgoingSlotByEdgeId[outgoingEdges[order].id] = {"index": order, "count": outgoingEdges.length}
         }
 
@@ -416,61 +270,27 @@ Item {
             if (!incomingById.hasOwnProperty(nodeIdKey))
                 continue
             var incomingEdges = incomingById[nodeIdKey]
-            incomingEdges.sort(function(left, right) {
-                return String(left.fromId).localeCompare(String(right.fromId))
-            })
+            sortPeerEdges(incomingEdges, "toId", "fromId")
             incomingCountByNodeId[nodeIdKey] = incomingEdges.length
             for (order = 0; order < incomingEdges.length; ++order)
                 incomingSlotByEdgeId[incomingEdges[order].id] = {"index": order, "count": incomingEdges.length}
-        }
-
-        var minX = marginX
-        var maxX = marginX + maxLayerWidth
-        var minY = marginY
-        var maxY = marginY + Math.max(1, layers.length) * layerGap
-        for (var positionedId in positions) {
-            if (!positions.hasOwnProperty(positionedId))
-                continue
-            var positionedNode = nodeById(positionedId)
-            var width = nodeWidth(positionedNode)
-            var height = nodeHeight(positionedNode)
-            minX = Math.min(minX, positions[positionedId].x)
-            maxX = Math.max(maxX, positions[positionedId].x + width)
-            minY = Math.min(minY, positions[positionedId].y)
-            maxY = Math.max(maxY, positions[positionedId].y + height)
-        }
-
-        var shiftX = 72 - minX
-        var shiftY = 96 - minY
-        if (shiftX !== 0 || shiftY !== 0) {
-            for (var shiftedId in positions) {
-                if (!positions.hasOwnProperty(shiftedId))
-                    continue
-                positions[shiftedId].x += shiftX
-                positions[shiftedId].y += shiftY
-            }
-            minX += shiftX
-            maxX += shiftX
-            minY += shiftY
-            maxY += shiftY
         }
 
         return {
             "positions": positions,
             "primaryEdgeIds": primaryEdgeIds,
             "secondaryEdgeIds": secondaryEdgeIds,
-            "branchSlotByNodeId": branchSlotByNodeId,
             "outgoingSlotByEdgeId": outgoingSlotByEdgeId,
             "incomingSlotByEdgeId": incomingSlotByEdgeId,
             "outgoingCountByNodeId": outgoingCountByNodeId,
             "incomingCountByNodeId": incomingCountByNodeId,
             "layerById": layerById,
-            "layerCount": layers.length,
+            "layerCount": maxLayerIndex + 1,
             "rootId": rootNode.id,
             "leftIds": [],
             "rightIds": [],
-            "width": maxX + 72,
-            "height": maxY + 96
+            "width": Math.max(980, bounds.width || 0, maxX + marginX),
+            "height": Math.max(560, bounds.height || 0, maxY + marginY)
         }
     }
 
@@ -843,10 +663,13 @@ Item {
         return false
     }
 
-    function endpointPeerOffset(edge, endpointKey, step) {
-        if (!componentMode)
-            return 0
+    function routeObjectHitsModules(route, edge) {
+        if (!route)
+            return false
+        return routeHitsModules([route.p0, route.p1, route.p2, route.p3], edge)
+    }
 
+    function endpointPeerOffset(edge, endpointKey, step) {
         var matches = []
         for (var index = 0; index < visibleEdges.length; ++index) {
             var candidate = visibleEdges[index].edge
@@ -1111,6 +934,9 @@ Item {
     }
 
     function routeFromScenePoints(edge, laneIndex) {
+        if (!componentMode)
+            return null
+
         if (!edge || !edge.routePoints || edge.routePoints.length < 2)
             return null
 
@@ -1120,19 +946,60 @@ Item {
 
         var points = edge.routePoints
         var startPoint = Qt.point(points[0].x, points[0].y)
+        var sourceOffset = endpointPeerOffset(edge, "fromId", componentMode ? 10 : 12)
+        var targetOffset = endpointPeerOffset(edge, "toId", componentMode ? 8 : 10)
         if (points.length >= 4) {
-            return {
-                "p0": startPoint,
-                "p1": Qt.point(points[1].x, points[1].y),
-                "p2": Qt.point(points[2].x, points[2].y),
-                "p3": Qt.point(points[points.length - 1].x, points[points.length - 1].y)
+            var p1 = Qt.point(points[1].x, points[1].y)
+            var p2 = Qt.point(points[2].x, points[2].y)
+            var p3 = Qt.point(points[points.length - 1].x, points[points.length - 1].y)
+
+            if (Math.abs(p1.x - startPoint.x) >= Math.abs(p1.y - startPoint.y)) {
+                startPoint.y += sourceOffset
+                p1.y += sourceOffset
+            } else {
+                startPoint.x += sourceOffset
+                p1.x += sourceOffset
             }
+
+            if (Math.abs(p3.x - p2.x) >= Math.abs(p3.y - p2.y)) {
+                p2.y += targetOffset
+                p3.y += targetOffset
+            } else {
+                p2.x += targetOffset
+                p3.x += targetOffset
+            }
+
+            var routed = {
+                "p0": startPoint,
+                "p1": p1,
+                "p2": p2,
+                "p3": p3,
+                "style": componentMode ? "curved" : "orthogonal"
+            }
+
+            if (!componentMode && routeObjectHitsModules(routed, edge)) {
+                var fromRect = nodeRectById(edge.fromId)
+                var toRect = nodeRectById(edge.toId)
+                if (fromRect.valid && toRect.valid) {
+                    var vertical = Math.abs(routed.p3.y - routed.p0.y) >= Math.abs(routed.p3.x - routed.p0.x) * 0.72
+                    var bypass = bypassRoute(fromRect, toRect, laneIndex, vertical)
+                    return {
+                        "p0": bypass[0],
+                        "p1": bypass[1],
+                        "p2": bypass[2],
+                        "p3": bypass[3],
+                        "style": "orthogonal"
+                    }
+                }
+            }
+
+            return routed
         }
 
         var endPoint = Qt.point(points[points.length - 1].x, points[points.length - 1].y)
         var laneOffset = componentMode ? edgeLane(laneIndex) * 0.18 : 0
-        var sourceOffset = endpointPeerOffset(edge, "fromId", 10) + laneOffset
-        var targetOffset = endpointPeerOffset(edge, "toId", 8) - laneOffset * 0.6
+        sourceOffset += laneOffset
+        targetOffset -= laneOffset * 0.6
         var horizontal = Math.abs(endPoint.x - startPoint.x) >= Math.abs(endPoint.y - startPoint.y)
 
         if (horizontal) {
@@ -1142,12 +1009,28 @@ Item {
             var maxStubX = Math.max(startPoint.x, endPoint.x) - 28
             bundleX = Math.max(minStubX, Math.min(maxStubX, bundleX))
 
-            return {
+            var horizontalRoute = {
                 "p0": Qt.point(startPoint.x, startPoint.y + sourceOffset),
                 "p1": Qt.point(bundleX, startPoint.y + sourceOffset),
                 "p2": Qt.point(bundleX, endPoint.y + targetOffset),
-                "p3": Qt.point(endPoint.x, endPoint.y + targetOffset)
+                "p3": Qt.point(endPoint.x, endPoint.y + targetOffset),
+                "style": componentMode ? "curved" : "orthogonal"
             }
+            if (!componentMode && routeObjectHitsModules(horizontalRoute, edge)) {
+                var fromRect = nodeRectById(edge.fromId)
+                var toRect = nodeRectById(edge.toId)
+                if (fromRect.valid && toRect.valid) {
+                    var bypass = bypassRoute(fromRect, toRect, laneIndex, false)
+                    return {
+                        "p0": bypass[0],
+                        "p1": bypass[1],
+                        "p2": bypass[2],
+                        "p3": bypass[3],
+                        "style": "orthogonal"
+                    }
+                }
+            }
+            return horizontalRoute
         }
 
         var bundleBaseY = startPoint.y + (endPoint.y - startPoint.y) * 0.5
@@ -1156,12 +1039,28 @@ Item {
         var maxStubY = Math.max(startPoint.y, endPoint.y) - 26
         bundleY = Math.max(minStubY, Math.min(maxStubY, bundleY))
 
-        return {
+        var verticalRoute = {
             "p0": Qt.point(startPoint.x + sourceOffset, startPoint.y),
             "p1": Qt.point(startPoint.x + sourceOffset, bundleY),
             "p2": Qt.point(endPoint.x + targetOffset, bundleY),
-            "p3": Qt.point(endPoint.x + targetOffset, endPoint.y)
+            "p3": Qt.point(endPoint.x + targetOffset, endPoint.y),
+            "style": componentMode ? "curved" : "orthogonal"
         }
+        if (!componentMode && routeObjectHitsModules(verticalRoute, edge)) {
+            var sourceRect = nodeRectById(edge.fromId)
+            var sinkRect = nodeRectById(edge.toId)
+            if (sourceRect.valid && sinkRect.valid) {
+                var bypassVertical = bypassRoute(sourceRect, sinkRect, laneIndex, true)
+                return {
+                    "p0": bypassVertical[0],
+                    "p1": bypassVertical[1],
+                    "p2": bypassVertical[2],
+                    "p3": bypassVertical[3],
+                    "style": "orthogonal"
+                }
+            }
+        }
+        return verticalRoute
     }
 
     function verticalLane(fromRect, toRect, laneIndex) {
@@ -1286,7 +1185,6 @@ Item {
 
         var fromCenter = nodeCenter(fromRect)
         var toCenter = nodeCenter(toRect)
-        var slotOffset = 0
         var outgoingSlot = overviewMindMapLayout.outgoingSlotByEdgeId
                            ? overviewMindMapLayout.outgoingSlotByEdgeId[edge.id]
                            : null
@@ -1301,22 +1199,32 @@ Item {
                             : 1
         var outgoingOffset = outgoingSlot ? (outgoingSlot.index - (outgoingCount - 1) / 2) * 14 : 0
         var incomingOffset = incomingSlot ? (incomingSlot.index - (incomingCount - 1) / 2) * 14 : 0
+        var vertical = Math.abs(toCenter.y - fromCenter.y) >= Math.abs(toCenter.x - fromCenter.x) * 0.72
 
         if (isOverviewPrimaryEdge(edge)) {
-            var fromLayer = overviewMindMapLayout.layerById ? overviewMindMapLayout.layerById[edge.fromId] : undefined
-            var toLayer = overviewMindMapLayout.layerById ? overviewMindMapLayout.layerById[edge.toId] : undefined
-            if (fromLayer !== undefined && toLayer !== undefined && toLayer !== fromLayer) {
-                var startSide = toLayer > fromLayer ? "bottom" : "top"
-                var endSide = toLayer > fromLayer ? "top" : "bottom"
+            if (vertical) {
+                var startSide = toCenter.y >= fromCenter.y ? "bottom" : "top"
+                var endSide = toCenter.y >= fromCenter.y ? "top" : "bottom"
                 var primaryStart = portPoint(fromRect, startSide, outgoingOffset)
                 var primaryEnd = portPoint(toRect, endSide, incomingOffset)
                 var midY = (primaryStart.y + primaryEnd.y) / 2
-
-                return {
+                var directVertical = {
                     "p0": primaryStart,
                     "p1": Qt.point(primaryStart.x, midY),
                     "p2": Qt.point(primaryEnd.x, midY),
-                    "p3": primaryEnd
+                    "p3": primaryEnd,
+                    "style": "orthogonal"
+                }
+                if (!routeObjectHitsModules(directVertical, edge))
+                    return directVertical
+
+                var bypassVertical = bypassRoute(fromRect, toRect, laneIndex, true)
+                return {
+                    "p0": bypassVertical[0],
+                    "p1": bypassVertical[1],
+                    "p2": bypassVertical[2],
+                    "p3": bypassVertical[3],
+                    "style": "orthogonal"
                 }
             }
 
@@ -1324,27 +1232,27 @@ Item {
             var fallbackStart = portPoint(fromRect, horizontalDirection > 0 ? "right" : "left", outgoingOffset)
             var fallbackEnd = portPoint(toRect, horizontalDirection > 0 ? "left" : "right", incomingOffset)
             var midX = (fallbackStart.x + fallbackEnd.x) / 2
-            return {
+            var directHorizontal = {
                 "p0": fallbackStart,
                 "p1": Qt.point(midX, fallbackStart.y),
                 "p2": Qt.point(midX, fallbackEnd.y),
-                "p3": fallbackEnd
+                "p3": fallbackEnd,
+                "style": "orthogonal"
+            }
+            if (!routeObjectHitsModules(directHorizontal, edge))
+                return directHorizontal
+
+            var bypassHorizontal = bypassRoute(fromRect, toRect, laneIndex, false)
+            return {
+                "p0": bypassHorizontal[0],
+                "p1": bypassHorizontal[1],
+                "p2": bypassHorizontal[2],
+                "p3": bypassHorizontal[3],
+                "style": "orthogonal"
             }
         }
 
-        var direction = toCenter.x >= fromCenter.x ? 1 : -1
-        var laneOffset = edgeLane(laneIndex) * 0.56
-        var startPoint = portPoint(fromRect, direction > 0 ? "right" : "left", slotOffset * 0.2 + laneOffset * 0.18)
-        var endPoint = portPoint(toRect, direction > 0 ? "left" : "right", slotOffset * 0.32 - laneOffset * 0.14)
-        var bend = Math.max(66, Math.min(162, Math.abs(endPoint.x - startPoint.x) * 0.36))
-        var bendY = laneOffset * 0.32
-
-        return {
-            "p0": startPoint,
-            "p1": Qt.point(startPoint.x + direction * bend, startPoint.y + bendY),
-            "p2": Qt.point(endPoint.x - direction * bend * 0.82, endPoint.y - bendY),
-            "p3": endPoint
-        }
+        return null
     }
 
     function routeEdge(edge, laneIndex) {
@@ -1393,6 +1301,50 @@ Item {
                         tip.y - size * Math.sin(angle + direction * Math.PI / 6))
     }
 
+    function pointDistance(left, right) {
+        var dx = right.x - left.x
+        var dy = right.y - left.y
+        return Math.sqrt(dx * dx + dy * dy)
+    }
+
+    function interpolatePoint(fromPoint, toPoint, amount) {
+        var t = Math.max(0, Math.min(1, amount))
+        return Qt.point(fromPoint.x + (toPoint.x - fromPoint.x) * t,
+                        fromPoint.y + (toPoint.y - fromPoint.y) * t)
+    }
+
+    function mixColor(left, right, amount) {
+        var t = Math.max(0, Math.min(1, amount))
+        return Qt.rgba(left.r * (1 - t) + right.r * t,
+                       left.g * (1 - t) + right.g * t,
+                       left.b * (1 - t) + right.b * t,
+                       left.a * (1 - t) + right.a * t)
+    }
+
+    function edgeCurveLeadControl(route, fromStart) {
+        var startPoint = fromStart ? route.p0 : route.p3
+        var anchorPoint = fromStart ? route.p1 : route.p2
+        var bendPoint = fromStart ? route.p2 : route.p1
+        var straightSpan = pointDistance(startPoint, anchorPoint)
+        var bendSpan = pointDistance(anchorPoint, bendPoint)
+        var straightRatio = straightSpan > 56 ? 0.94 : (straightSpan > 24 ? 0.86 : 0.7)
+        var bendRatio = bendSpan > 88 ? 0.08 : 0.14
+        var straightLead = interpolatePoint(startPoint, anchorPoint, straightRatio)
+        return interpolatePoint(straightLead, bendPoint, bendRatio)
+    }
+
+    function overviewEdgeBaseColor(edge) {
+        var base = Qt.rgba(0.12, 0.46, 0.98, 0.9)
+        var kind = String(edge && edge.kind ? edge.kind : "").toLowerCase()
+        if (kind === "activates")
+            return mixColor(base, tokens.signalTeal, 0.52)
+        if (kind === "uses_infrastructure")
+            return mixColor(Qt.rgba(0.42, 0.46, 0.54, 0.86), tokens.signalAmber, 0.38)
+        if (kind === "enables")
+            return mixColor(base, tokens.signalMoss, 0.28)
+        return base
+    }
+
     function edgeColor(edge) {
         if (!componentMode) {
             var hoverRelation = overviewHoverRelation(edge)
@@ -1401,8 +1353,8 @@ Item {
             if (hoverRelation === "outgoing")
                 return tokens.signalCobalt
             if (isOverviewPrimaryEdge(edge))
-                return Qt.rgba(0.13, 0.48, 1, 0.88)
-            return Qt.rgba(0.33, 0.43, 0.56, 0.66)
+                return overviewEdgeBaseColor(edge)
+            return mixColor(Qt.rgba(0.33, 0.43, 0.56, 0.62), overviewEdgeBaseColor(edge), 0.32)
         }
 
         var node = focusNode()
@@ -1560,13 +1512,11 @@ Item {
                 property real arrowSize: (root.componentMode ? 10.5 : 9) / strokeScale
                 property point arrowLeft: root.arrowWing(p3, p2, arrowSize, -1)
                 property point arrowRight: root.arrowWing(p3, p2, arrowSize, 1)
-                property point curveControl1: Qt.point((edgeShape.p0.x + edgeShape.p1.x * 1.35) / 2.35,
-                                                       (edgeShape.p0.y + edgeShape.p1.y * 1.35) / 2.35)
-                property point curveControl2: Qt.point((edgeShape.p3.x + edgeShape.p2.x * 1.35) / 2.35,
-                                                       (edgeShape.p3.y + edgeShape.p2.y * 1.35) / 2.35)
+                property point curveControl1: root.edgeCurveLeadControl(route, true)
+                property point curveControl2: root.edgeCurveLeadControl(route, false)
                 property color lineColor: root.edgeColor(edge)
                 property bool overviewPrimary: root.isOverviewPrimaryEdge(edge)
-                property bool overviewCurved: !root.componentMode
+                property bool overviewCurved: route.style === "curved"
                 property string overviewRelation: root.overviewHoverRelation(edge)
                 property real lineOpacity: root.componentMode
                                            ? (root.focusNode() ? (emphasized ? 0.96 : 0.34) : 0.7)
@@ -1580,7 +1530,9 @@ Item {
                                            : (overviewPrimary
                                               ? (root.hoverNode ? 0.1 : 0.13)
                                               : (emphasized ? 0.1 : 0.04))
-                property color haloColor: Qt.rgba(1, 1, 1, haloOpacity)
+                property color haloColor: root.componentMode
+                                          ? Qt.rgba(1, 1, 1, haloOpacity)
+                                          : Qt.rgba(edgeShape.lineColor.r, edgeShape.lineColor.g, edgeShape.lineColor.b, haloOpacity * 0.42)
                 property color inactiveColor: "transparent"
 
                 anchors.fill: parent

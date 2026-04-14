@@ -31,7 +31,7 @@ struct CapabilityNodePlacement {
     std::size_t orderInLane = 0;
 };
 
-int laneIndexForNode(const savt::core::CapabilityNode& node) {
+int capabilityKindPriority(const savt::core::CapabilityNode& node) {
     switch (node.kind) {
     case savt::core::CapabilityNodeKind::Entry:
         return 0;
@@ -333,68 +333,297 @@ CapabilitySceneLayoutResult LayeredGraphLayout::layoutCapabilityScene(
     CapabilitySceneLayoutResult result;
     result.diagnostics = graph.diagnostics;
 
-    std::array<std::vector<const savt::core::CapabilityNode*>, 3> lanes;
+    std::vector<const savt::core::CapabilityNode*> visibleNodes;
+    visibleNodes.reserve(graph.nodes.size());
+    std::unordered_map<std::size_t, const savt::core::CapabilityNode*> nodeIndex;
     for (const savt::core::CapabilityNode& node : graph.nodes) {
-        if (node.defaultVisible) {
-            lanes[static_cast<std::size_t>(laneIndexForNode(node))].push_back(&node);
+        if (!node.defaultVisible) {
+            continue;
+        }
+        visibleNodes.push_back(&node);
+        nodeIndex.emplace(node.id, &node);
+    }
+
+    if (visibleNodes.empty()) {
+        result.diagnostics.push_back("No visible capability nodes found for capability scene layout.");
+        return result;
+    }
+
+    const auto nodeSort = [](const savt::core::CapabilityNode* left, const savt::core::CapabilityNode* right) {
+        if (left->defaultPinned != right->defaultPinned) {
+            return left->defaultPinned;
+        }
+        const int leftKindPriority = capabilityKindPriority(*left);
+        const int rightKindPriority = capabilityKindPriority(*right);
+        if (leftKindPriority != rightKindPriority) {
+            return leftKindPriority < rightKindPriority;
+        }
+        if (left->visualPriority != right->visualPriority) {
+            return left->visualPriority > right->visualPriority;
+        }
+        if (left->aggregatedDependencyWeight != right->aggregatedDependencyWeight) {
+            return left->aggregatedDependencyWeight > right->aggregatedDependencyWeight;
+        }
+        return left->name < right->name;
+    };
+
+    std::unordered_map<std::size_t, std::vector<std::size_t>> adjacency;
+    std::unordered_map<std::size_t, std::vector<std::size_t>> reverseAdjacency;
+    std::unordered_map<std::size_t, std::size_t> workingIndegree;
+    std::unordered_map<std::size_t, std::size_t> outgoingDegree;
+    std::unordered_map<std::size_t, std::unordered_set<std::size_t>> dedup;
+    for (const savt::core::CapabilityNode* nodePtr : visibleNodes) {
+        workingIndegree.emplace(nodePtr->id, 0);
+        outgoingDegree.emplace(nodePtr->id, 0);
+    }
+
+    for (const savt::core::CapabilityEdge& edge : graph.edges) {
+        if (!edge.defaultVisible) {
+            continue;
+        }
+        if (!nodeIndex.contains(edge.fromId) || !nodeIndex.contains(edge.toId)) {
+            continue;
+        }
+        if (!dedup[edge.fromId].insert(edge.toId).second) {
+            continue;
+        }
+        adjacency[edge.fromId].push_back(edge.toId);
+        reverseAdjacency[edge.toId].push_back(edge.fromId);
+        ++workingIndegree[edge.toId];
+        ++outgoingDegree[edge.fromId];
+    }
+
+    std::unordered_set<std::size_t> placedIds;
+    std::vector<std::vector<std::size_t>> logicalLayers;
+
+    auto sortLayerIds = [&](std::vector<std::size_t>& ids) {
+        std::sort(ids.begin(), ids.end(), [&](const std::size_t leftId, const std::size_t rightId) {
+            return nodeSort(nodeIndex.at(leftId), nodeIndex.at(rightId));
+        });
+    };
+
+    std::vector<std::size_t> currentLayer;
+    for (const savt::core::CapabilityNode* nodePtr : visibleNodes) {
+        if (nodePtr->kind == savt::core::CapabilityNodeKind::Entry) {
+            currentLayer.push_back(nodePtr->id);
+        }
+    }
+    sortLayerIds(currentLayer);
+
+    if (currentLayer.empty()) {
+        for (const savt::core::CapabilityNode* nodePtr : visibleNodes) {
+            if (workingIndegree[nodePtr->id] == 0) {
+                currentLayer.push_back(nodePtr->id);
+            }
+        }
+        sortLayerIds(currentLayer);
+    }
+
+    while (!currentLayer.empty()) {
+        logicalLayers.push_back(currentLayer);
+        for (const std::size_t nodeId : currentLayer) {
+            placedIds.insert(nodeId);
+        }
+
+        for (const std::size_t nodeId : currentLayer) {
+            const auto adjacencyIt = adjacency.find(nodeId);
+            if (adjacencyIt == adjacency.end()) {
+                continue;
+            }
+            for (const std::size_t nextId : adjacencyIt->second) {
+                auto indegreeIt = workingIndegree.find(nextId);
+                if (indegreeIt != workingIndegree.end() && indegreeIt->second > 0) {
+                    --indegreeIt->second;
+                }
+            }
+        }
+
+        std::vector<std::size_t> nextLayer;
+        for (const savt::core::CapabilityNode* nodePtr : visibleNodes) {
+            if (placedIds.contains(nodePtr->id)) {
+                continue;
+            }
+            if (workingIndegree[nodePtr->id] == 0) {
+                nextLayer.push_back(nodePtr->id);
+            }
+        }
+        sortLayerIds(nextLayer);
+        currentLayer = std::move(nextLayer);
+    }
+
+    if (placedIds.size() < visibleNodes.size()) {
+        std::vector<std::size_t> remainingIds;
+        remainingIds.reserve(visibleNodes.size() - placedIds.size());
+        for (const savt::core::CapabilityNode* nodePtr : visibleNodes) {
+            if (!placedIds.contains(nodePtr->id)) {
+                remainingIds.push_back(nodePtr->id);
+            }
+        }
+        sortLayerIds(remainingIds);
+        logicalLayers.push_back(std::move(remainingIds));
+        result.diagnostics.push_back(
+            "Cycle detected in capability graph. Cyclic capability nodes were grouped into the final layout layer.");
+    }
+
+    std::unordered_map<std::size_t, std::size_t> logicalLayerById;
+    for (std::size_t layerIndex = 0; layerIndex < logicalLayers.size(); ++layerIndex) {
+        for (const std::size_t nodeId : logicalLayers[layerIndex]) {
+            logicalLayerById[nodeId] = layerIndex;
         }
     }
 
-    for (auto& lane : lanes) {
-        std::sort(lane.begin(), lane.end(), [](const savt::core::CapabilityNode* left, const savt::core::CapabilityNode* right) {
-            if (left->defaultPinned != right->defaultPinned) {
-                return left->defaultPinned;
+    std::size_t maxNonInfrastructureLayer = 0;
+    bool hasNonInfrastructure = false;
+    for (const savt::core::CapabilityNode* nodePtr : visibleNodes) {
+        if (nodePtr->kind == savt::core::CapabilityNodeKind::Infrastructure) {
+            continue;
+        }
+        hasNonInfrastructure = true;
+        maxNonInfrastructureLayer =
+            std::max(maxNonInfrastructureLayer, logicalLayerById[nodePtr->id]);
+    }
+
+    if (hasNonInfrastructure) {
+        for (const savt::core::CapabilityNode* nodePtr : visibleNodes) {
+            if (nodePtr->kind != savt::core::CapabilityNodeKind::Infrastructure) {
+                continue;
             }
-            if (left->visualPriority != right->visualPriority) {
-                return left->visualPriority > right->visualPriority;
+            logicalLayerById[nodePtr->id] =
+                std::max(logicalLayerById[nodePtr->id], maxNonInfrastructureLayer + 1);
+        }
+    }
+
+    std::size_t maxLogicalLayer = 0;
+    for (const auto& [nodeId, layerIndex] : logicalLayerById) {
+        maxLogicalLayer = std::max(maxLogicalLayer, layerIndex);
+    }
+
+    std::vector<std::vector<const savt::core::CapabilityNode*>> buckets(maxLogicalLayer + 1);
+    for (const savt::core::CapabilityNode* nodePtr : visibleNodes) {
+        buckets[logicalLayerById[nodePtr->id]].push_back(nodePtr);
+    }
+
+    std::unordered_map<std::size_t, std::size_t> rowHintById;
+    for (std::size_t layerIndex = 0; layerIndex < buckets.size(); ++layerIndex) {
+        auto& bucket = buckets[layerIndex];
+        std::sort(bucket.begin(), bucket.end(), [&](const savt::core::CapabilityNode* left, const savt::core::CapabilityNode* right) {
+            double leftAnchor = static_cast<double>(rowHintById[left->id]);
+            double rightAnchor = static_cast<double>(rowHintById[right->id]);
+
+            const auto leftIncoming = reverseAdjacency.find(left->id);
+            if (leftIncoming != reverseAdjacency.end() && !leftIncoming->second.empty()) {
+                double sum = 0.0;
+                std::size_t count = 0;
+                for (const std::size_t sourceId : leftIncoming->second) {
+                    if (!rowHintById.contains(sourceId)) {
+                        continue;
+                    }
+                    sum += static_cast<double>(rowHintById[sourceId]);
+                    ++count;
+                }
+                if (count > 0) {
+                    leftAnchor = sum / static_cast<double>(count);
+                }
             }
-            return left->name < right->name;
+
+            const auto rightIncoming = reverseAdjacency.find(right->id);
+            if (rightIncoming != reverseAdjacency.end() && !rightIncoming->second.empty()) {
+                double sum = 0.0;
+                std::size_t count = 0;
+                for (const std::size_t sourceId : rightIncoming->second) {
+                    if (!rowHintById.contains(sourceId)) {
+                        continue;
+                    }
+                    sum += static_cast<double>(rowHintById[sourceId]);
+                    ++count;
+                }
+                if (count > 0) {
+                    rightAnchor = sum / static_cast<double>(count);
+                }
+            }
+
+            if (std::abs(leftAnchor - rightAnchor) > 0.05) {
+                return leftAnchor < rightAnchor;
+            }
+
+            return nodeSort(left, right);
         });
+
+        for (std::size_t order = 0; order < bucket.size(); ++order) {
+            rowHintById[bucket[order]->id] = order;
+        }
     }
 
     std::unordered_map<std::size_t, CapabilityNodePlacement> nodePlacements;
     double maxBottom = options.marginY;
     double currentX = options.marginX;
+    std::size_t absoluteLaneIndex = 0;
+    const std::size_t maxRowsPerColumn = 3;
+    const double wrappedColumnGap = options.columnGap * 0.72;
 
-    for (std::size_t laneIndex = 0; laneIndex < lanes.size(); ++laneIndex) {
-        double currentY = options.marginY;
-        double maxLaneWidth = options.baseNodeWidth;
-
-        for (const savt::core::CapabilityNode* nodePtr : lanes[laneIndex]) {
-            const double importanceScale = importanceScaleForNode(*nodePtr, options);
-            maxLaneWidth = std::max(maxLaneWidth, options.baseNodeWidth * importanceScale);
+    for (std::size_t layerIndex = 0; layerIndex < buckets.size(); ++layerIndex) {
+        auto& bucket = buckets[layerIndex];
+        if (bucket.empty()) {
+            continue;
         }
 
-        for (std::size_t order = 0; order < lanes[laneIndex].size(); ++order) {
-            const savt::core::CapabilityNode& node = *lanes[laneIndex][order];
-            const double importanceScale = importanceScaleForNode(node, options);
-            const double nodeWidth = options.baseNodeWidth * importanceScale;
-            const double nodeHeight = options.baseNodeHeight * importanceScale;
-            const double x = currentX + (maxLaneWidth - nodeWidth) / 2.0;
-            const double y = currentY;
-
-            result.nodes.push_back(CapabilitySceneNodeLayout{
-                node.id,
-                laneIndex,
-                order,
-                x,
-                y,
-                nodeWidth,
-                nodeHeight,
-                importanceScale});
-            nodePlacements.emplace(node.id, CapabilityNodePlacement{
-                                                SceneRect{x, y, nodeWidth, nodeHeight},
-                                                laneIndex,
-                                                order});
-            maxBottom = std::max(maxBottom, y + nodeHeight);
-            currentY += nodeHeight + options.rowGap;
+        const std::size_t wrappedColumnCount =
+            std::max<std::size_t>(1, (bucket.size() + maxRowsPerColumn - 1) / maxRowsPerColumn);
+        std::vector<std::vector<const savt::core::CapabilityNode*>> wrappedColumns(wrappedColumnCount);
+        for (std::size_t index = 0; index < bucket.size(); ++index) {
+            wrappedColumns[index % wrappedColumnCount].push_back(bucket[index]);
         }
 
-        currentX += maxLaneWidth + options.columnGap;
-    }
+        std::vector<double> wrappedWidths(wrappedColumnCount, options.baseNodeWidth);
+        for (std::size_t wrappedIndex = 0; wrappedIndex < wrappedColumns.size(); ++wrappedIndex) {
+            for (const savt::core::CapabilityNode* nodePtr : wrappedColumns[wrappedIndex]) {
+                wrappedWidths[wrappedIndex] = std::max(
+                    wrappedWidths[wrappedIndex],
+                    options.baseNodeWidth * importanceScaleForNode(*nodePtr, options));
+            }
+        }
 
-    if (result.nodes.empty()) {
-        result.diagnostics.push_back("No visible capability nodes found for capability scene layout.");
+        double layerWidth = 0.0;
+        for (std::size_t wrappedIndex = 0; wrappedIndex < wrappedWidths.size(); ++wrappedIndex) {
+            if (wrappedIndex > 0) {
+                layerWidth += wrappedColumnGap;
+            }
+            layerWidth += wrappedWidths[wrappedIndex];
+        }
+
+        double columnX = currentX;
+        for (std::size_t wrappedIndex = 0; wrappedIndex < wrappedColumns.size(); ++wrappedIndex) {
+            double currentY = options.marginY;
+            for (std::size_t order = 0; order < wrappedColumns[wrappedIndex].size(); ++order) {
+                const savt::core::CapabilityNode& node = *wrappedColumns[wrappedIndex][order];
+                const double importanceScale = importanceScaleForNode(node, options);
+                const double nodeWidth = options.baseNodeWidth * importanceScale;
+                const double nodeHeight = options.baseNodeHeight * importanceScale;
+                const double x = columnX + (wrappedWidths[wrappedIndex] - nodeWidth) / 2.0;
+                const double y = currentY;
+
+                result.nodes.push_back(CapabilitySceneNodeLayout{
+                    node.id,
+                    absoluteLaneIndex,
+                    order,
+                    x,
+                    y,
+                    nodeWidth,
+                    nodeHeight,
+                    importanceScale});
+                nodePlacements.emplace(node.id, CapabilityNodePlacement{
+                                                    SceneRect{x, y, nodeWidth, nodeHeight},
+                                                    absoluteLaneIndex,
+                                                    order});
+                maxBottom = std::max(maxBottom, y + nodeHeight);
+                currentY += nodeHeight + options.rowGap;
+            }
+
+            columnX += wrappedWidths[wrappedIndex] + wrappedColumnGap;
+            ++absoluteLaneIndex;
+        }
+
+        currentX += layerWidth + options.columnGap;
     }
 
     for (const savt::core::CapabilityEdge& edge : graph.edges) {

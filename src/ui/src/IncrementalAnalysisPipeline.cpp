@@ -23,7 +23,7 @@ namespace {
 
 constexpr std::uint64_t kFnvOffsetBasis = 14695981039346656037ull;
 constexpr std::uint64_t kFnvPrime = 1099511628211ull;
-constexpr std::string_view kIncrementalAnalysisCacheVersion = "phase12-v1";
+constexpr std::string_view kIncrementalAnalysisCacheVersion = "phase12-v2";
 
 struct CachedScanEntry {
     savt::analyzer::ProjectScanManifest manifest;
