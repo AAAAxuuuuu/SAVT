@@ -13,7 +13,7 @@ Item {
     property string emptyText: "运行分析后，架构图会出现在这里。"
     property bool componentMode: false
     property var hoverNode: null
-    property bool showAllEdges: false
+    property bool showAllEdges: componentMode
 
     readonly property int focusEdgeLimit: 18
     readonly property int overviewEdgeLimit: 26
@@ -1382,10 +1382,51 @@ Item {
         return candidates.length > 0 ? candidates[0].route : null
     }
 
+    function componentOverviewRoute(edge, laneIndex) {
+        if (!componentMode || relationshipFocusActive)
+            return null
+
+        var fromRect = nodeRectById(edge.fromId)
+        var toRect = nodeRectById(edge.toId)
+        if (!fromRect.valid || !toRect.valid)
+            return null
+
+        var fromCenter = nodeCenter(fromRect)
+        var toCenter = nodeCenter(toRect)
+        var preferVertical = Math.abs(toCenter.y - fromCenter.y) > Math.abs(toCenter.x - fromCenter.x) * 1.1
+        var directHorizontal = orthogonalRouteObject(directRoute(edge, fromRect, toRect, laneIndex, false))
+        var directVertical = orthogonalRouteObject(directRoute(edge, fromRect, toRect, laneIndex, true))
+        var bypassHorizontal = orthogonalRouteObject(bypassRoute(fromRect, toRect, laneIndex, false))
+        var bypassVertical = orthogonalRouteObject(bypassRoute(fromRect, toRect, laneIndex, true))
+
+        var candidates = [
+            { "route": directHorizontal, "preferred": preferVertical ? 1 : 0 },
+            { "route": directVertical, "preferred": preferVertical ? 0 : 1 },
+            { "route": bypassHorizontal, "preferred": preferVertical ? 3 : 2 },
+            { "route": bypassVertical, "preferred": preferVertical ? 2 : 3 }
+        ]
+
+        candidates.sort(function(left, right) {
+            var leftHits = routeObjectHitsModules(left.route, edge) ? 1 : 0
+            var rightHits = routeObjectHitsModules(right.route, edge) ? 1 : 0
+            if (leftHits !== rightHits)
+                return leftHits - rightHits
+            if (left.preferred !== right.preferred)
+                return left.preferred - right.preferred
+            return routeMetric(left.route) - routeMetric(right.route)
+        })
+
+        return candidates.length > 0 ? candidates[0].route : null
+    }
+
     function routeEdge(edge, laneIndex) {
         var overviewRoute = overviewMindMapRoute(edge, laneIndex)
         if (overviewRoute)
             return overviewRoute
+
+        var componentRoute = componentOverviewRoute(edge, laneIndex)
+        if (componentRoute)
+            return componentRoute
 
         var mappedRoute = routeFromScenePoints(edge, laneIndex)
         if (mappedRoute)
@@ -1643,7 +1684,7 @@ Item {
                 property point curveControl2: root.edgeCurveLeadControl(route, false)
                 property color lineColor: root.edgeColor(edge)
                 property bool overviewPrimary: root.isOverviewPrimaryEdge(edge)
-                property bool overviewCurved: route.style === "curved"
+                property bool curvedRoute: route.style === "curved"
                 property string overviewRelation: root.overviewHoverRelation(edge)
                 property real lineOpacity: root.componentMode
                                            ? (root.focusNode() ? (emphasized ? 0.96 : 0.34) : 0.7)
@@ -1669,8 +1710,7 @@ Item {
 
                 ShapePath {
                     strokeWidth: (root.componentMode ? (root.focusNode() ? 5.4 : 4.2) : (overviewPrimary ? 4.0 : 3.0)) / edgeShape.strokeScale
-                    strokeColor: edgeShape.overviewCurved ? edgeShape.inactiveColor
-                                                          : (root.componentMode ? edgeShape.inactiveColor : edgeShape.haloColor)
+                    strokeColor: edgeShape.curvedRoute ? edgeShape.inactiveColor : edgeShape.haloColor
                     fillColor: "transparent"
                     capStyle: ShapePath.RoundCap
                     joinStyle: ShapePath.RoundJoin
@@ -1684,8 +1724,7 @@ Item {
 
                 ShapePath {
                     strokeWidth: (root.componentMode ? (root.focusNode() ? 5.4 : 4.2) : (overviewPrimary ? 4.0 : 3.0)) / edgeShape.strokeScale
-                    strokeColor: edgeShape.overviewCurved ? edgeShape.haloColor
-                                                          : (root.componentMode ? edgeShape.haloColor : edgeShape.inactiveColor)
+                    strokeColor: edgeShape.curvedRoute ? edgeShape.haloColor : edgeShape.inactiveColor
                     fillColor: "transparent"
                     capStyle: ShapePath.RoundCap
                     joinStyle: ShapePath.RoundJoin
@@ -1704,8 +1743,7 @@ Item {
 
                 ShapePath {
                     strokeWidth: (root.componentMode ? (root.focusNode() ? 2.6 : 2.0) : (overviewPrimary ? 2.2 : 1.6)) / edgeShape.strokeScale
-                    strokeColor: edgeShape.overviewCurved ? edgeShape.inactiveColor
-                                                          : (root.componentMode ? edgeShape.inactiveColor : edgeShape.lineColor)
+                    strokeColor: edgeShape.curvedRoute ? edgeShape.inactiveColor : edgeShape.lineColor
                     fillColor: "transparent"
                     capStyle: ShapePath.RoundCap
                     joinStyle: ShapePath.RoundJoin
@@ -1719,8 +1757,7 @@ Item {
 
                 ShapePath {
                     strokeWidth: (root.componentMode ? (root.focusNode() ? 2.6 : 2.0) : (overviewPrimary ? 2.2 : 1.6)) / edgeShape.strokeScale
-                    strokeColor: edgeShape.overviewCurved ? edgeShape.lineColor
-                                                          : (root.componentMode ? edgeShape.lineColor : edgeShape.inactiveColor)
+                    strokeColor: edgeShape.curvedRoute ? edgeShape.lineColor : edgeShape.inactiveColor
                     fillColor: "transparent"
                     capStyle: ShapePath.RoundCap
                     joinStyle: ShapePath.RoundJoin
