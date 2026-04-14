@@ -40,9 +40,12 @@ ApplicationWindow {
             "containerSummary": "",
             "containerNames": [],
             "topModules": [],
+            "mainFlowSummary": "",
+            "contextSections": [],
             "ruleFindings": [],
             "readingOrder": [],
             "riskSignals": [],
+            "hotspotSignals": [],
             "precisionSummary": "",
             "semanticReadiness": ({
                 "modeKey": "",
@@ -89,6 +92,7 @@ ApplicationWindow {
         function requestReportAiExplanation(userTask) {}
         function copyCodeContextToClipboard(nodeId) {}
         function copyTextToClipboard(text) {}
+        function describeFileNode(nodeData) { return ({ "available": false, "singleFile": false, "importClues": [], "declarationClues": [], "behaviorSignals": [], "readingHints": [], "previewText": "" }) }
     }
 
     readonly property var controller: _analysisController ? _analysisController : fallbackController

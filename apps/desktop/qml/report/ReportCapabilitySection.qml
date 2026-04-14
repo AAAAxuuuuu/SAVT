@@ -89,7 +89,7 @@ Item {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: root.capabilityRequested(modelData.name || "")
+                            onClicked: root.capabilityRequested(modelData.capabilityName || modelData.name || "")
                         }
                     }
                 }

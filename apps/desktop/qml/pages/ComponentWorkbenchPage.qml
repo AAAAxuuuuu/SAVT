@@ -17,6 +17,9 @@ Item {
 
     anchors.fill: parent
 
+    readonly property bool fileDetailActive: root.uiState.inspector.selectedNodeIsSingleFile
+                                             && !!root.uiState.selection.selectedComponentNode
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 12
@@ -34,19 +37,25 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             active: true
-            sourceComponent: root.uiState.selection.selectedCapabilityNode ? graphComponent : emptyComponent
+            sourceComponent: root.uiState.selection.selectedCapabilityNode
+                             ? (root.fileDetailActive ? fileDetailComponent : graphComponent)
+                             : emptyComponent
         }
 
         ContextActionStrip {
             Layout.fillWidth: true
             theme: root.theme
             title: root.uiState.selection.selectedComponentNode
-                   ? ("围绕组件「" + root.uiState.selection.selectedComponentNode.name + "」继续")
+                   ? (root.fileDetailActive
+                      ? ("围绕文件「" + root.uiState.selection.selectedComponentNode.name + "」继续")
+                      : ("围绕组件「" + root.uiState.selection.selectedComponentNode.name + "」继续"))
                    : (root.uiState.selection.selectedCapabilityNode
                       ? ("当前能力域 · " + root.uiState.selection.selectedCapabilityNode.name)
                       : "等待选择能力域")
             summary: root.uiState.selection.selectedComponentNode
-                     ? (root.uiState.selection.selectedComponentNode.summary || root.uiState.inspector.nextStepSummary)
+                     ? (root.fileDetailActive
+                        ? "当前已经切到文件解读。先看这个文件自己的导入、声明和关键片段，再回到组件关系确认它只负责哪一段。"
+                        : (root.uiState.selection.selectedComponentNode.summary || root.uiState.inspector.nextStepSummary))
                      : (root.uiState.selection.selectedCapabilityNode
                         ? "当前已经进入 L3。你可以继续选中内部组件，结合右侧摘要、底部托盘和 AI 导览形成具体改造切口。"
                         : "先在能力地图里选中一个能力域，再进入这里查看其内部组件关系。")
@@ -82,6 +91,24 @@ Item {
             stacked: false
 
             ComponentGraphCanvas {
+                anchors.fill: parent
+                theme: root.theme
+                analysisController: root.analysisController
+                selectionState: root.uiState.selection
+            }
+        }
+    }
+
+    Component {
+        id: fileDetailComponent
+
+        AppCard {
+            fillColor: root.theme.canvasBase
+            borderColor: root.theme.borderSubtle
+            cornerRadius: root.theme.radiusXxl
+            stacked: false
+
+            FileInsightView {
                 anchors.fill: parent
                 theme: root.theme
                 analysisController: root.analysisController

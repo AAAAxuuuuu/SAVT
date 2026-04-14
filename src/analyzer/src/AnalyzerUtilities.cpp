@@ -33,6 +33,7 @@ std::string normalizedFileName(const std::filesystem::path& filePath) {
 
 bool isProjectManifestFile(const std::string& fileName) {
     return fileName == "cmakelists.txt" || fileName == "package.json" ||
+           fileName == "qmldir" ||
            fileName == "pom.xml" || fileName == "mvnw" ||
            fileName == "build.gradle" || fileName == "build.gradle.kts" ||
            fileName == "settings.gradle" || fileName == "settings.gradle.kts" ||
@@ -41,7 +42,9 @@ bool isProjectManifestFile(const std::string& fileName) {
 }
 
 bool isBootstrapFileName(const std::string& fileName) {
-    return fileName == "main.cpp" || fileName == "main.cc" || fileName == "main.cxx" || fileName == "main.c" ||
+    return fileName == "main.cpp" || fileName == "main.cc" || fileName == "main.cxx" ||
+           fileName == "main.cp" || fileName == "main.c++" || fileName == "main.cppm" ||
+           fileName == "main.ixx" || fileName == "main.mm" || fileName == "main.c" ||
            fileName == "main.js" || fileName == "main.mjs" || fileName == "main.cjs" ||
            fileName == "index.js" || fileName == "index.mjs" || fileName == "index.cjs" ||
            fileName == "app.js" || fileName == "app.mjs" || fileName == "app.cjs" ||
@@ -109,6 +112,17 @@ bool isLikelyToolchainDirectory(const std::string& nameLower) {
            nameLower.starts_with("msvc") ||
            nameLower == "qt" ||
            nameLower.starts_with("qt-");
+}
+
+std::size_t pathSegmentCount(const std::filesystem::path& path) {
+    std::size_t count = 0;
+    for (const std::filesystem::path& segment : path) {
+        const std::string value = segment.string();
+        if (!value.empty() && value != ".") {
+            ++count;
+        }
+    }
+    return count;
 }
 
 bool shouldSkipConfiguredDirectory(
@@ -289,7 +303,10 @@ struct PrefixStats {
 
 bool hasSourceExtension(const std::filesystem::path& filePath) {
     static const std::unordered_set<std::string> extensions = {
-        ".h", ".hh", ".hpp", ".hxx", ".c", ".cc", ".cpp", ".cxx"
+        ".h", ".hh", ".hpp", ".hxx", ".h++",
+        ".c", ".cc", ".cpp", ".cxx", ".cp", ".c++",
+        ".ipp", ".inl", ".tpp", ".tcc", ".txx",
+        ".ixx", ".cppm", ".ii", ".cu", ".cuh", ".mm"
     };
 
     return hasNormalizedExtension(filePath, extensions);
@@ -301,10 +318,14 @@ bool hasArchitectureRelevantExtension(const std::filesystem::path& filePath) {
     }
 
     static const std::unordered_set<std::string> extensions = {
-        ".h", ".hh", ".hpp", ".hxx", ".c", ".cc", ".cpp", ".cxx",
+        ".h", ".hh", ".hpp", ".hxx", ".h++",
+        ".c", ".cc", ".cpp", ".cxx", ".cp", ".c++",
+        ".ipp", ".inl", ".tpp", ".tcc", ".txx",
+        ".ixx", ".cppm", ".ii", ".cu", ".cuh", ".mm",
         ".qml", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts", ".html", ".htm", ".css",
         ".json", ".py", ".java",
-        ".ui", ".qrc", ".rc", ".pro", ".pri"
+        ".ui", ".qrc", ".rc", ".pro", ".pri", ".qbs", ".qmldir", ".cmake",
+        ".s", ".asm", ".def"
     };
 
     return hasNormalizedExtension(filePath, extensions);
@@ -357,8 +378,11 @@ bool shouldSkipGeneratedFile(const std::filesystem::path& filePath) {
 
 bool shouldSkipDirectory(const std::filesystem::path& directoryPath, const AnalyzerOptions& options) {
     const std::string name = directoryPath.filename().string();
+    const std::string nameLower = lowerCopy(name);
 
-    if (!options.includeThirdParty && name == "third_party") {
+    if (!options.includeThirdParty &&
+        isDependencyLikeSegment(nameLower) &&
+        pathSegmentCount(directoryPath) <= 1) {
         return true;
     }
 
@@ -379,7 +403,6 @@ bool shouldSkipDirectory(const std::filesystem::path& directoryPath, const Analy
         "dist", "out", ".next", ".nuxt"
     };
 
-    const std::string nameLower = lowerCopy(name);
     const std::string normalizedLowerPath =
         lowerCopy(directoryPath.lexically_normal().generic_string());
     if (buildDirs.contains(name) || buildDirs.contains(nameLower)) {
@@ -435,7 +458,12 @@ std::vector<std::filesystem::path> collectSourceFiles(
 
         const std::filesystem::directory_entry& entry = *iterator;
         if (entry.is_directory(errorCode)) {
-            if (shouldSkipDirectory(entry.path(), options) ||
+            std::error_code relativeError;
+            const std::filesystem::path relativeDirectory =
+                std::filesystem::relative(entry.path(), rootPath, relativeError);
+            const std::filesystem::path directoryForFiltering =
+                relativeError ? entry.path().filename() : relativeDirectory;
+            if (shouldSkipDirectory(directoryForFiltering, options) ||
                 shouldSkipConfiguredDirectory(rootPath, entry.path(), projectConfig)) {
                 iterator.disable_recursion_pending();
             }
@@ -524,9 +552,8 @@ std::unordered_map<std::string, std::string> inferModuleNames(
             ++topLevel.directFileCount;
             const std::filesystem::path relativeFile(relativePath);
             const std::string fileName = normalizedFileName(relativeFile);
-            topLevel.hasDirectBootstrapFile = topLevel.hasDirectBootstrapFile ||
-                                             fileName == "main.cpp" || fileName == "main.cc" ||
-                                             fileName == "main.cxx" || fileName == "main.c";
+            topLevel.hasDirectBootstrapFile =
+                topLevel.hasDirectBootstrapFile || isBootstrapFileName(fileName);
             topLevel.hasDirectManifest = topLevel.hasDirectManifest || isProjectManifestFile(fileName);
             if (const std::string stem = componentStemForFile(relativeFile); !stem.empty()) {
                 topLevel.directComponentStems.emplace(stem);
@@ -813,9 +840,12 @@ SourceLanguage detectLanguage(const std::filesystem::path& filePath) {
     if (ext == ".js" || ext == ".mjs" || ext == ".cjs")
                                               return SourceLanguage::JavaScript;
     if (ext == ".h"  || ext == ".hh"  ||
-        ext == ".hpp"|| ext == ".hxx" ||
+        ext == ".hpp"|| ext == ".hxx" || ext == ".h++" ||
         ext == ".c"  || ext == ".cc"  ||
-        ext == ".cpp"|| ext == ".cxx")        return SourceLanguage::Cpp;
+        ext == ".cpp"|| ext == ".cxx" || ext == ".cp" || ext == ".c++" ||
+        ext == ".ipp"|| ext == ".inl" || ext == ".tpp" || ext == ".tcc" || ext == ".txx" ||
+        ext == ".ixx"|| ext == ".cppm" || ext == ".ii" || ext == ".cu" || ext == ".cuh" ||
+        ext == ".mm")                         return SourceLanguage::Cpp;
     return SourceLanguage::Unknown;
 }
 

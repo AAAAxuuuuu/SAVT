@@ -10,7 +10,7 @@ Item {
     required property QtObject uiState
     required property QtObject analysisController
 
-    implicitHeight: root.uiState.contextTrayExpanded ? 176 : 44
+    implicitHeight: root.uiState.contextTrayExpanded ? 228 : 44
 
     Behavior on implicitHeight {
         NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
@@ -57,8 +57,8 @@ Item {
                         Layout.fillWidth: true
                         text: root.traySummary()
                         wrapMode: Text.WordWrap
-                        maximumLineCount: 1
-                        elide: Text.ElideRight
+                        maximumLineCount: root.uiState.contextTrayExpanded ? 2 : 1
+                        elide: root.uiState.contextTrayExpanded ? Text.ElideNone : Text.ElideRight
                         color: root.theme.inkMuted
                         font.family: root.theme.textFontFamily
                         font.pixelSize: root.uiState.contextTrayExpanded ? 11 : 10
@@ -110,7 +110,9 @@ Item {
 
                 Repeater {
                     model: root.uiState.navigation.pageId === "project.overview"
-                           ? (root.analysisController.systemContextCards || [])
+                           ? (((root.analysisController.systemContextData.contextSections || []).length > 0)
+                              ? (root.analysisController.systemContextData.contextSections || [])
+                              : (root.analysisController.systemContextCards || []))
                            : root.uiState.inspector.relationshipItems.slice(0, 4)
 
                     AppCard {
@@ -126,7 +128,7 @@ Item {
 
                             Label {
                                 text: root.uiState.navigation.pageId === "project.overview"
-                                      ? (modelData.name || "")
+                                      ? (modelData.title || modelData.name || "")
                                       : (modelData.summary || "")
                                 color: root.theme.inkStrong
                                 font.family: root.theme.displayFontFamily
@@ -137,7 +139,7 @@ Item {
                             Label {
                                 Layout.fillWidth: true
                                 text: root.uiState.navigation.pageId === "project.overview"
-                                      ? (modelData.summary || "")
+                                      ? (modelData.body || modelData.summary || "")
                                       : ("权重 " + (modelData.weight || 0) + " · " + (modelData.kind || ""))
                                 wrapMode: Text.WordWrap
                                 color: root.theme.inkMuted

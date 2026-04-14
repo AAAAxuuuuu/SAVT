@@ -79,7 +79,9 @@ Item {
                 StatusBadge {
                     theme: root.theme
                     text: root.hasSelection
-                          ? (root.inspectorState.kind === "edge" ? "关系" : "模块")
+                          ? (root.inspectorState.kind === "edge"
+                             ? "关系"
+                             : (root.inspectorState.selectedNodeIsSingleFile ? "文件" : "模块"))
                           : "未选中"
                     tone: root.hasSelection ? "brand" : "neutral"
                 }
@@ -265,6 +267,7 @@ Item {
                     visible: root.hasSelection
                     theme: root.theme
                     inspectorState: root.inspectorState
+                    analysisController: root.analysisController
                 }
 
                 RowLayout {
@@ -284,7 +287,7 @@ Item {
                         theme: root.theme
                         compact: true
                         tone: "ai"
-                        text: "AI 导览"
+                        text: root.inspectorState.selectedNodeIsSingleFile ? "AI 文件解读" : "AI 导览"
                         onClicked: root.askRequested()
                     }
 
@@ -292,7 +295,7 @@ Item {
                         theme: root.theme
                         compact: true
                         tone: "ghost"
-                        text: "复制对象上下文"
+                        text: root.inspectorState.selectedNodeIsSingleFile ? "复制文件上下文" : "复制对象上下文"
                         visible: root.inspectorState.supportsCodeContext
                         enabled: root.inspectorState.supportsCodeContext
                         onClicked: root.analysisController.copyCodeContextToClipboard(root.inspectorState.selectedNode.id)

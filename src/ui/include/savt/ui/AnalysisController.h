@@ -121,6 +121,7 @@ public:
     Q_INVOKABLE void requestReportAiExplanation(const QString& userTask = QString());
     Q_INVOKABLE void copyCodeContextToClipboard(qulonglong nodeId);
     Q_INVOKABLE void copyTextToClipboard(const QString& text);
+    Q_INVOKABLE QVariantMap describeFileNode(const QVariantMap& nodeData) const;
 
 signals:
     void projectRootPathChanged();

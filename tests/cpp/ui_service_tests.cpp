@@ -1,6 +1,7 @@
 #include "savt/ui/AnalysisController.h"
 #include "savt/ui/AiService.h"
 #include "savt/ui/AstPreviewService.h"
+#include "savt/ui/FileInsightService.h"
 #include "savt/ui/IncrementalAnalysisPipeline.h"
 #include "savt/ui/ReportService.h"
 
@@ -140,10 +141,17 @@ void testReportServiceBuildsReadableSystemContextPayload() {
     analysisCapability.exampleFiles = {"src/analyzer/src/CppProjectAnalyzer.cpp"};
     analysisCapability.defaultVisible = true;
     analysisCapability.visualPriority = 180;
+    analysisCapability.fileCount = 18;
+    analysisCapability.incomingEdgeCount = 4;
+    analysisCapability.outgoingEdgeCount = 3;
+    analysisCapability.flowParticipationCount = 2;
+    analysisCapability.riskScore = 6;
+    analysisCapability.riskLevel = "high";
     graph.nodes.push_back(analysisCapability);
 
     graph.groups.push_back({1, savt::core::CapabilityGroupKind::Lane, "Entry", "", {10}, true, true, 0});
     graph.groups.push_back({2, savt::core::CapabilityGroupKind::Lane, "Capability", "", {11}, true, true, 0});
+    graph.flows.push_back({1, "Primary path", "Desktop Shell -> Analyzer Pipeline", {10, 11}, 5, 2});
 
     savt::layout::LayoutResult layout;
     layout.width = 800.0;
@@ -166,6 +174,12 @@ void testReportServiceBuildsReadableSystemContextPayload() {
            "system context should expose an entry summary");
     expect(!systemContext.value(QStringLiteral("containerNames")).toStringList().isEmpty(),
            "system context should publish core container names");
+    expect(systemContext.value(QStringLiteral("mainFlowSummary")).toString().contains(QStringLiteral("Desktop Shell")),
+           "system context should publish the primary collaboration path");
+    expect(!systemContext.value(QStringLiteral("contextSections")).toList().isEmpty(),
+           "system context should publish complete structured context sections");
+    expect(!systemContext.value(QStringLiteral("hotspotSignals")).toList().isEmpty(),
+           "system context should publish structural hotspot signals");
 
     const QVariantList cards =
         savt::ui::ReportService::buildSystemContextCards(report, overview, graph);
@@ -204,6 +218,358 @@ void testAiServiceClassifiesCapabilityAndComponentScopes() {
     componentNode.insert(QStringLiteral("kind"), QStringLiteral("service"));
     expect(savt::ui::AiService::classifyNodeScope(componentNode) == QStringLiteral("component_node"),
            "component scene nodes should be routed through the L3 AI scope");
+
+    QVariantMap fileNode = componentNode;
+    fileNode.insert(QStringLiteral("name"), QStringLiteral("indexService.js"));
+    fileNode.insert(QStringLiteral("fileCount"), 1);
+    fileNode.insert(QStringLiteral("exampleFiles"), QVariantList{QStringLiteral("src/services/indexService.js")});
+    expect(savt::ui::AiService::classifyNodeScope(fileNode) == QStringLiteral("file_node"),
+           "single-file component nodes should be routed through the file AI scope");
+
+    QVariantMap companionFileNode = componentNode;
+    companionFileNode.insert(QStringLiteral("name"), QStringLiteral("TrafficBackend.cpp"));
+    companionFileNode.insert(QStringLiteral("fileCount"), 2);
+    companionFileNode.insert(QStringLiteral("exampleFiles"),
+                             QVariantList{QStringLiteral("App/backend/facade/TrafficBackend.cpp"),
+                                          QStringLiteral("App/backend/facade/TrafficBackend.h")});
+    expect(savt::ui::AiService::classifyNodeScope(companionFileNode) == QStringLiteral("file_node"),
+           "file-named component nodes should use the file AI scope even when paired with a companion header");
+
+    QVariantMap rewrittenFileCluster = componentNode;
+    rewrittenFileCluster.insert(QStringLiteral("name"), QStringLiteral("facade 入口协调"));
+    rewrittenFileCluster.insert(QStringLiteral("fileCount"), 2);
+    rewrittenFileCluster.insert(QStringLiteral("fileCluster"), true);
+    rewrittenFileCluster.insert(QStringLiteral("fileBacked"), true);
+    rewrittenFileCluster.insert(QStringLiteral("primaryFilePath"),
+                                QStringLiteral("App/backend/facade/TrafficBackend.cpp"));
+    rewrittenFileCluster.insert(QStringLiteral("exampleFiles"),
+                                QVariantList{QStringLiteral("App/backend/facade/TrafficBackend.cpp"),
+                                             QStringLiteral("App/backend/facade/TrafficBackend.h")});
+    expect(savt::ui::AiService::classifyNodeScope(rewrittenFileCluster) == QStringLiteral("file_node"),
+           "file-cluster metadata should route rewritten display labels through the file AI scope");
+
+    QVariantMap folderNode = componentNode;
+    folderNode.insert(QStringLiteral("name"), QStringLiteral("facade"));
+    folderNode.insert(QStringLiteral("fileCount"), 1);
+    folderNode.insert(QStringLiteral("exampleFiles"),
+                      QVariantList{QStringLiteral("App/backend/facade/TrafficBackend.cpp")});
+    expect(savt::ui::AiService::classifyNodeScope(folderNode) == QStringLiteral("component_node"),
+           "folder-named component nodes should stay in the component AI scope even with one source file");
+}
+
+void testFileInsightServiceBuildsPortableSingleFileSummary() {
+    namespace fs = std::filesystem;
+
+    const fs::path tempRoot = makeTempDirectory("savt_ui_file_insight");
+    writeTextFile(tempRoot / "src" / "services" / "indexService.js",
+                  "import fetchIndex from './fetchIndex.js';\n"
+                  "const cache = new Map();\n\n"
+                  "export function refreshIndex(query) {\n"
+                  "  return fetchIndex(query).then(result => {\n"
+                  "    cache.set(query, result);\n"
+                  "    return result;\n"
+                  "  });\n"
+                  "}\n");
+    writeTextFile(tempRoot / "App" / "backend" / "facade" / "TrafficBackend.cpp",
+                  "#include \"TrafficBackend.h\"\n"
+                  "#include <vector>\n"
+                  "\n"
+                  "namespace app {\n"
+                  "int helperOnly() { return 1; }\n"
+                  "}\n"
+                  "\n"
+                  "void TrafficBackend::parseSource(const std::string& source) {\n"
+                  "  const auto parsed = source.size();\n"
+                  "  dispatchTrafficUpdate(parsed);\n"
+                  "}\n");
+    writeTextFile(tempRoot / "App" / "backend" / "facade" / "TrafficBackend.h",
+                  "class TrafficBackend {};\n");
+    writeTextFile(tempRoot / "config" / "app.json",
+                  "{\n"
+                  "  \"name\": \"demo\",\n"
+                  "  \"routes\": [\n"
+                  "    {\"path\": \"/\", \"target\": \"Home\"}\n"
+                  "  ],\n"
+                  "  \"plugins\": [\"auth\"]\n"
+                  "}\n");
+
+    QVariantMap fileNode;
+    fileNode.insert(QStringLiteral("name"), QStringLiteral("indexService.js"));
+    fileNode.insert(QStringLiteral("role"), QStringLiteral("service"));
+    fileNode.insert(QStringLiteral("fileCount"), 1);
+    fileNode.insert(QStringLiteral("exampleFiles"),
+                    QVariantList{QStringLiteral("src/services/indexService.js")});
+    fileNode.insert(QStringLiteral("topSymbols"),
+                    QVariantList{QStringLiteral("refreshIndex")});
+    fileNode.insert(QStringLiteral("collaboratorNames"),
+                    QVariantList{QStringLiteral("Search Store")});
+
+    const QVariantMap detail = savt::ui::FileInsightService::buildDetail(
+        QString::fromStdString(tempRoot.generic_string()), fileNode);
+    expect(detail.value(QStringLiteral("available")).toBool(),
+           "file insight should be available for an existing single file");
+    expect(detail.value(QStringLiteral("languageLabel")).toString() == QStringLiteral("JavaScript"),
+           "file insight should infer the language from the suffix");
+    expect(detail.value(QStringLiteral("roleLabel")).toString().contains(QStringLiteral("服务")),
+           "file insight should infer a portable role label");
+    expect(!detail.value(QStringLiteral("importClues")).toList().isEmpty(),
+           "file insight should expose import clues");
+    expect(!detail.value(QStringLiteral("readingHints")).toList().isEmpty(),
+           "file insight should expose reading hints");
+    expect(detail.value(QStringLiteral("summary")).toString().contains(QStringLiteral("refreshIndex")),
+           "file insight summary should use concrete declaration clues instead of only generic text");
+
+    QVariantMap fileClusterNode;
+    fileClusterNode.insert(QStringLiteral("name"), QStringLiteral("facade 入口协调"));
+    fileClusterNode.insert(QStringLiteral("role"), QStringLiteral("service"));
+    fileClusterNode.insert(QStringLiteral("fileCount"), 2);
+    fileClusterNode.insert(QStringLiteral("fileCluster"), true);
+    fileClusterNode.insert(QStringLiteral("fileBacked"), true);
+    fileClusterNode.insert(QStringLiteral("primaryFilePath"),
+                           QStringLiteral("App/backend/facade/TrafficBackend.cpp"));
+    fileClusterNode.insert(QStringLiteral("exampleFiles"),
+                           QVariantList{QStringLiteral("App/backend/facade/TrafficBackend.cpp"),
+                                        QStringLiteral("App/backend/facade/TrafficBackend.h")});
+    fileClusterNode.insert(QStringLiteral("topSymbols"),
+                           QVariantList{QStringLiteral("parseSource")});
+
+    const QVariantMap clusterDetail = savt::ui::FileInsightService::buildDetail(
+        QString::fromStdString(tempRoot.generic_string()), fileClusterNode);
+    expect(clusterDetail.value(QStringLiteral("available")).toBool(),
+           "file insight should be available for a file cluster with an explicit primary file");
+    expect(clusterDetail.value(QStringLiteral("fileName")).toString() == QStringLiteral("TrafficBackend.cpp"),
+           "file insight should use the explicit primary file instead of the rewritten display label");
+    expect(clusterDetail.value(QStringLiteral("languageLabel")).toString() == QStringLiteral("C++"),
+           "file insight should prefer the C++ implementation file over its companion header");
+    expect(clusterDetail.value(QStringLiteral("previewText")).toString().contains(QStringLiteral("parseSource")),
+           "file insight preview should prefer symbol-backed implementation code");
+    expect(!clusterDetail.value(QStringLiteral("previewText")).toString().contains(QStringLiteral("#include")),
+           "file insight preview should not treat include lines as key implementation code");
+
+    QVariantMap configNode;
+    configNode.insert(QStringLiteral("name"), QStringLiteral("app.json"));
+    configNode.insert(QStringLiteral("fileCount"), 1);
+    configNode.insert(QStringLiteral("fileCluster"), true);
+    configNode.insert(QStringLiteral("fileBacked"), true);
+    configNode.insert(QStringLiteral("primaryFilePath"), QStringLiteral("config/app.json"));
+    configNode.insert(QStringLiteral("exampleFiles"),
+                      QVariantList{QStringLiteral("config/app.json")});
+
+    const QVariantMap configDetail = savt::ui::FileInsightService::buildDetail(
+        QString::fromStdString(tempRoot.generic_string()), configNode);
+    expect(configDetail.value(QStringLiteral("previewText")).toString().contains(QStringLiteral("routes")),
+           "file insight preview should use generic key/value structure for configuration files");
+    expect(configDetail.value(QStringLiteral("previewText")).toString().contains(QStringLiteral("plugins")),
+           "file insight preview should not require source-code-specific symbols to show useful configuration snippets");
+
+    writeTextFile(tempRoot / "src" / "ai" / "ApiClient.cpp",
+                  "#include \"ApiClient.h\"\n"
+                  "#include <QString>\n"
+                  "#include <vector>\n"
+                  "\n"
+                  "namespace {\n"
+                  "void appendRelativePathCandidates(std::vector<QString>& candidates, const QString& path) {\n"
+                  "  if (!path.isEmpty()) {\n"
+                  "    candidates.push_back(path.trimmed());\n"
+                  "  }\n"
+                  "}\n"
+                  "\n"
+                  "bool builtInApiConfigEnabled() {\n"
+                  "  return true;\n"
+                  "}\n"
+                  "}\n"
+                  "\n"
+                  "ApiRequest buildApiChatCompletionsRequest(const ApiConfig& config, const ApiPayload& payload) {\n"
+                  "  ApiRequest request;\n"
+                  "  request.endpoint = config.endpoint;\n"
+                  "  request.body = payload.toJson();\n"
+                  "  request.headers.insert(\"Content-Type\", \"application/json\");\n"
+                  "  return request;\n"
+                  "}\n"
+                  "\n"
+                  "ApiReply parseApiChatCompletionsReply(const QByteArray& bytes) {\n"
+                  "  ApiReply reply;\n"
+                  "  reply.payload = parseJson(bytes);\n"
+                  "  if (reply.payload.isEmpty()) {\n"
+                  "    reply.error = \"empty reply\";\n"
+                  "  }\n"
+                  "  return reply;\n"
+                  "}\n");
+
+    QVariantMap apiClientNode;
+    apiClientNode.insert(QStringLiteral("name"), QStringLiteral("ApiClient.cpp"));
+    apiClientNode.insert(QStringLiteral("fileCount"), 1);
+    apiClientNode.insert(QStringLiteral("fileCluster"), true);
+    apiClientNode.insert(QStringLiteral("fileBacked"), true);
+    apiClientNode.insert(QStringLiteral("primaryFilePath"), QStringLiteral("src/ai/ApiClient.cpp"));
+    apiClientNode.insert(QStringLiteral("exampleFiles"),
+                         QVariantList{QStringLiteral("src/ai/ApiClient.cpp")});
+    apiClientNode.insert(QStringLiteral("topSymbols"),
+                         QVariantList{QStringLiteral("appendRelativePathCandidates"),
+                                      QStringLiteral("builtInApiConfigEnabled"),
+                                      QStringLiteral("buildApiChatCompletionsRequest"),
+                                      QStringLiteral("parseApiChatCompletionsReply")});
+
+    const QVariantMap apiClientDetail = savt::ui::FileInsightService::buildDetail(
+        QString::fromStdString(tempRoot.generic_string()), apiClientNode);
+    const QString apiClientPreview = apiClientDetail.value(QStringLiteral("previewText")).toString();
+    expect(apiClientPreview.contains(QStringLiteral("buildApiChatCompletionsRequest")),
+           "C++ preview should prefer file-identity-backed public implementation functions over private helpers");
+    expect(apiClientPreview.contains(QStringLiteral("parseApiChatCompletionsReply")),
+           "C++ preview should keep multiple central implementation anchors when they carry behavior");
+    expect(!apiClientPreview.contains(QStringLiteral("bool builtInApiConfigEnabled")),
+           "C++ preview should not spend a key-code slot on a private config switch helper");
+
+    writeTextFile(tempRoot / "src" / "core" / "WorkflowGraph.cpp",
+                  "#include \"WorkflowGraph.h\"\n"
+                  "#include <unordered_map>\n"
+                  "\n"
+                  "namespace {\n"
+                  "void assignStageGroups(WorkflowGraph& graph) {\n"
+                  "  graph.groups.clear();\n"
+                  "  for (const auto& node : graph.nodes) {\n"
+                  "    graph.groups[node.stage].push_back(node.id);\n"
+                  "  }\n"
+                  "}\n"
+                  "}\n"
+                  "\n"
+                  "WorkflowGraph buildWorkflowGraphForCapabilityImpl(const AnalysisReport& report,\n"
+                  "                                                   const CapabilityId capabilityId) {\n"
+                  "  WorkflowGraph graph;\n"
+                  "  for (const auto& node : report.nodes) {\n"
+                  "    if (node.capabilityId == capabilityId) {\n"
+                  "      graph.nodes.push_back(toWorkflowNode(node));\n"
+                  "    }\n"
+                  "  }\n"
+                  "  for (const auto& edge : report.edges) {\n"
+                  "    if (graph.contains(edge.from) && graph.contains(edge.to)) {\n"
+                  "      graph.edges.push_back(edge);\n"
+                  "    }\n"
+                  "  }\n"
+                  "  return graph;\n"
+                  "}\n"
+                  "\n"
+                  "WorkflowGraph buildWorkflowGraphForCapability(const AnalysisReport& report,\n"
+                  "                                               const CapabilityId capabilityId) {\n"
+                  "  WorkflowGraph graph = buildWorkflowGraphForCapabilityImpl(report, capabilityId);\n"
+                  "  assignStageGroups(graph);\n"
+                  "  return graph;\n"
+                  "}\n");
+
+    QVariantMap workflowGraphNode;
+    workflowGraphNode.insert(QStringLiteral("name"), QStringLiteral("WorkflowGraph.cpp"));
+    workflowGraphNode.insert(QStringLiteral("fileCount"), 1);
+    workflowGraphNode.insert(QStringLiteral("fileCluster"), true);
+    workflowGraphNode.insert(QStringLiteral("fileBacked"), true);
+    workflowGraphNode.insert(QStringLiteral("primaryFilePath"), QStringLiteral("src/core/WorkflowGraph.cpp"));
+    workflowGraphNode.insert(QStringLiteral("exampleFiles"),
+                             QVariantList{QStringLiteral("src/core/WorkflowGraph.cpp")});
+    workflowGraphNode.insert(QStringLiteral("topSymbols"),
+                             QVariantList{QStringLiteral("assignStageGroups"),
+                                          QStringLiteral("buildWorkflowGraphForCapabilityImpl"),
+                                          QStringLiteral("buildWorkflowGraphForCapability")});
+
+    const QVariantMap workflowGraphDetail = savt::ui::FileInsightService::buildDetail(
+        QString::fromStdString(tempRoot.generic_string()), workflowGraphNode);
+    const QString workflowGraphPreview =
+        workflowGraphDetail.value(QStringLiteral("previewText")).toString();
+    expect(workflowGraphPreview.contains(QStringLiteral("buildWorkflowGraphForCapabilityImpl")),
+           "C++ preview should prefer graph-building implementation functions that match the file identity");
+    expect(!workflowGraphPreview.contains(QStringLiteral("void assignStageGroups")),
+           "C++ preview should avoid promoting a private grouping helper above central orchestration code");
+
+    writeTextFile(tempRoot / "src" / "modules" / "TrafficMap.ixx",
+                  "export module TrafficMap;\n"
+                  "import <vector>;\n"
+                  "\n"
+                  "namespace detail {\n"
+                  "int trimMapSeed(int value) { return value; }\n"
+                  "}\n"
+                  "\n"
+                  "export TrafficMapModel buildTrafficMapModel(const std::vector<Road>& roads) {\n"
+                  "  TrafficMapModel model;\n"
+                  "  for (const auto& road : roads) {\n"
+                  "    model.routes.push_back(toTrafficRoute(road));\n"
+                  "  }\n"
+                  "  return model;\n"
+                  "}\n");
+
+    QVariantMap moduleNode;
+    moduleNode.insert(QStringLiteral("name"), QStringLiteral("TrafficMap.ixx"));
+    moduleNode.insert(QStringLiteral("fileCount"), 1);
+    moduleNode.insert(QStringLiteral("fileCluster"), true);
+    moduleNode.insert(QStringLiteral("fileBacked"), true);
+    moduleNode.insert(QStringLiteral("primaryFilePath"), QStringLiteral("src/modules/TrafficMap.ixx"));
+    moduleNode.insert(QStringLiteral("exampleFiles"),
+                      QVariantList{QStringLiteral("src/modules/TrafficMap.ixx")});
+    moduleNode.insert(QStringLiteral("topSymbols"),
+                      QVariantList{QStringLiteral("trimMapSeed"),
+                                   QStringLiteral("buildTrafficMapModel")});
+
+    const QVariantMap moduleDetail = savt::ui::FileInsightService::buildDetail(
+        QString::fromStdString(tempRoot.generic_string()), moduleNode);
+    const QString modulePreview = moduleDetail.value(QStringLiteral("previewText")).toString();
+    expect(moduleDetail.value(QStringLiteral("languageLabel")).toString() == QStringLiteral("C++ Module"),
+           "file insight should recognize mainstream C++ module interface files");
+    expect(modulePreview.contains(QStringLiteral("buildTrafficMapModel")),
+           "C++ module preview should use the same key-code extraction as cpp files");
+    expect(!modulePreview.contains(QStringLiteral("trimMapSeed")),
+           "C++ module preview should not promote a private helper above exported behavior");
+
+    writeTextFile(tempRoot / "CMakeLists.txt",
+                  "cmake_minimum_required(VERSION 3.25)\n"
+                  "project(TrafficMap LANGUAGES CXX)\n"
+                  "find_package(Qt6 REQUIRED COMPONENTS Quick)\n"
+                  "qt_add_executable(traffic_map src/main.cpp src/modules/TrafficMap.ixx)\n"
+                  "qt_add_qml_module(traffic_map URI TrafficMap QML_FILES qml/Main.qml)\n"
+                  "target_link_libraries(traffic_map PRIVATE Qt6::Quick)\n");
+
+    QVariantMap cmakeNode;
+    cmakeNode.insert(QStringLiteral("name"), QStringLiteral("CMakeLists.txt"));
+    cmakeNode.insert(QStringLiteral("fileCount"), 1);
+    cmakeNode.insert(QStringLiteral("fileCluster"), true);
+    cmakeNode.insert(QStringLiteral("fileBacked"), true);
+    cmakeNode.insert(QStringLiteral("primaryFilePath"), QStringLiteral("CMakeLists.txt"));
+    cmakeNode.insert(QStringLiteral("exampleFiles"),
+                     QVariantList{QStringLiteral("CMakeLists.txt")});
+
+    const QVariantMap cmakeDetail = savt::ui::FileInsightService::buildDetail(
+        QString::fromStdString(tempRoot.generic_string()), cmakeNode);
+    const QString cmakePreview = cmakeDetail.value(QStringLiteral("previewText")).toString();
+    expect(cmakeDetail.value(QStringLiteral("languageLabel")).toString() == QStringLiteral("CMake"),
+           "file insight should recognize CMake project files");
+    expect(cmakePreview.contains(QStringLiteral("qt_add_executable")) &&
+               cmakePreview.contains(QStringLiteral("target_link_libraries")),
+           "CMake preview should prefer build target and linkage declarations as key lines");
+
+    writeTextFile(tempRoot / "resources" / "app.qrc",
+                  "<RCC>\n"
+                  "  <qresource prefix=\"/\">\n"
+                  "    <file>qml/Main.qml</file>\n"
+                  "    <file>icons/map.svg</file>\n"
+                  "  </qresource>\n"
+                  "</RCC>\n");
+
+    QVariantMap qrcNode;
+    qrcNode.insert(QStringLiteral("name"), QStringLiteral("app.qrc"));
+    qrcNode.insert(QStringLiteral("fileCount"), 1);
+    qrcNode.insert(QStringLiteral("fileCluster"), true);
+    qrcNode.insert(QStringLiteral("fileBacked"), true);
+    qrcNode.insert(QStringLiteral("primaryFilePath"), QStringLiteral("resources/app.qrc"));
+    qrcNode.insert(QStringLiteral("exampleFiles"),
+                   QVariantList{QStringLiteral("resources/app.qrc")});
+
+    const QVariantMap qrcDetail = savt::ui::FileInsightService::buildDetail(
+        QString::fromStdString(tempRoot.generic_string()), qrcNode);
+    const QString qrcPreview = qrcDetail.value(QStringLiteral("previewText")).toString();
+    expect(qrcDetail.value(QStringLiteral("languageLabel")).toString() == QStringLiteral("Qt Resource"),
+           "file insight should recognize Qt resource collection files");
+    expect(qrcPreview.contains(QStringLiteral("<qresource")) &&
+               qrcPreview.contains(QStringLiteral("qml/Main.qml")),
+           "qrc preview should prefer resource prefixes and resource file entries");
+
+    std::error_code errorCode;
+    fs::remove_all(tempRoot, errorCode);
 }
 
 void testAiServiceParseReplyUsesScopeSpecificStatusMessages() {
@@ -232,6 +598,13 @@ void testAiServiceParseReplyUsesScopeSpecificStatusMessages() {
            "report-scope AI reply should parse successfully");
     expect(reportState.statusMessage.contains(QStringLiteral("报告导览")),
            "report-scope AI reply should use the L4 status message");
+
+    const savt::ui::AiReplyState fileState =
+        savt::ui::AiService::parseReply(response, QStringLiteral("file_node"), false, {});
+    expect(fileState.hasResult,
+           "file-scope AI reply should parse successfully");
+    expect(fileState.statusMessage.contains(QStringLiteral("文件解读")),
+           "file-scope AI reply should use the file status message");
 }
 
 void testIncrementalAnalysisPipelineReusesStableLayers() {
@@ -320,6 +693,7 @@ int main(int argc, char** argv) {
     testReportServiceBuildsReadableSystemContextPayload();
     testAnalysisControllerStartsFromStableDefaultState();
     testAiServiceClassifiesCapabilityAndComponentScopes();
+    testFileInsightServiceBuildsPortableSingleFileSummary();
     testAiServiceParseReplyUsesScopeSpecificStatusMessages();
     testIncrementalAnalysisPipelineReusesStableLayers();
     testIncrementalAnalysisPipelineInvalidatesChangedSourceFiles();

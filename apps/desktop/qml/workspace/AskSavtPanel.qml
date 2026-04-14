@@ -46,10 +46,12 @@ Item {
             return "项目导览"
         if (scope === "engineering_report")
             return "深入阅读建议"
+        if (scope === "file_node")
+            return "文件解读"
         if (scope === "capability_map" || scope === "component_node")
             return "模块解读"
         if (root.uiState.inspector.kind === "node")
-            return "模块解读"
+            return root.uiState.inspector.selectedNodeIsSingleFile ? "文件解读" : "模块解读"
         if (root.isReportFocus())
             return "深入阅读建议"
         return "项目导览"
@@ -229,7 +231,9 @@ Item {
                     Label {
                         Layout.fillWidth: true
                         text: root.uiState.inspector.kind === "node"
-                              ? ("当前将围绕「" + root.uiState.inspector.title + "」生成模块解读，说明它的职责、重要性和下一步先看哪里。")
+                              ? (root.uiState.inspector.selectedNodeIsSingleFile
+                                 ? ("当前将围绕「" + root.uiState.inspector.title + "」生成文件解读，说明它在系统里做什么、文件里该先看哪里、和谁协作。")
+                                 : ("当前将围绕「" + root.uiState.inspector.title + "」生成模块解读，说明它的职责、重要性和下一步先看哪里。"))
                               : (root.isReportFocus()
                                  ? "可以把当前分析结果整理成深入阅读建议，帮助你决定接下来先读哪里、先验证什么。"
                                  : "可以围绕当前项目生成项目导览，先说明项目是什么、建议从哪里开始看。")
@@ -377,12 +381,14 @@ Item {
                 }
             }
 
-            TextArea {
+                TextArea {
                 id: promptEditor
                 Layout.fillWidth: true
                 Layout.preferredHeight: 108
                 text: root.promptText
-                placeholderText: "补充你想问的问题，例如：解释这个模块为什么重要，并告诉我接下来先看哪两个文件。"
+                placeholderText: root.uiState.inspector.selectedNodeIsSingleFile
+                                 ? "补充你想问的问题，例如：解释这个文件在主流程里扮演什么角色，并告诉我应该先看哪几段代码。"
+                                 : "补充你想问的问题，例如：解释这个模块为什么重要，并告诉我接下来先看哪两个文件。"
                 wrapMode: TextEdit.Wrap
                 font.family: root.theme.textFontFamily
                 font.pixelSize: 13
@@ -423,7 +429,9 @@ Item {
                     theme: root.theme
                     compact: true
                     tone: "accent"
-                    text: root.analysisController.aiBusy ? "生成中..." : "生成模块解读"
+                    text: root.analysisController.aiBusy
+                          ? "生成中..."
+                          : (root.uiState.inspector.selectedNodeIsSingleFile ? "生成文件解读" : "生成模块解读")
                     enabled: root.uiState.inspector.kind === "node" &&
                              root.analysisController.aiAvailable &&
                              !root.analysisController.aiBusy
@@ -472,7 +480,9 @@ Item {
                         Label {
                             Layout.fillWidth: true
                             visible: root.analysisController.aiBusy
-                            text: "正在基于当前静态证据生成导览内容。"
+                            text: root.uiState.inspector.selectedNodeIsSingleFile
+                                  ? "正在基于当前文件的静态证据生成解读内容。"
+                                  : "正在基于当前静态证据生成导览内容。"
                             wrapMode: Text.WordWrap
                             color: root.theme.aiAccent
                             font.family: root.theme.textFontFamily
@@ -483,7 +493,9 @@ Item {
                         Label {
                             Layout.fillWidth: true
                             visible: !root.analysisController.aiHasResult && !root.analysisController.aiBusy
-                            text: "还没有 AI 导览，可以先生成项目导览、模块解读或深入阅读建议。"
+                            text: root.uiState.inspector.selectedNodeIsSingleFile
+                                  ? "还没有 AI 文件解读，可以先围绕当前文件生成一版具体说明。"
+                                  : "还没有 AI 导览，可以先生成项目导览、模块解读或深入阅读建议。"
                             wrapMode: Text.WordWrap
                             color: root.theme.inkMuted
                             font.family: root.theme.textFontFamily

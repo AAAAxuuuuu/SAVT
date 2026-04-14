@@ -20,22 +20,51 @@ Rectangle {
     readonly property var rawRules: evidence.rules || []
     readonly property var rawConclusions: evidence.conclusions || []
     readonly property var rawSourceFiles: evidence.sourceFiles || node.exampleFiles || []
-    readonly property string kindLabel: displayKind(node.kind || "")
-    readonly property string roleLabel: displayRole(node.role || "")
+    property var fileDetail: ({})
+    readonly property bool singleFileMode: !!fileDetail && !!fileDetail.available && !!fileDetail.singleFile
+    readonly property string kindLabel: singleFileMode ? "具体文件" : displayKind(node.kind || "")
+    readonly property string roleLabel: singleFileMode
+                                         ? cleanText(fileDetail.roleLabel || displayRole(node.role || ""))
+                                         : displayRole(node.role || "")
     readonly property int fileCount: Number(node.fileCount || node.sourceFileCount || 0)
-    readonly property string summaryText: cleanText(node.summary || node.responsibility)
+    readonly property string summaryText: singleFileMode
+                                          ? cleanText(fileDetail.summary)
+                                          : cleanText(node.summary || node.responsibility)
     readonly property string conclusionText: localizedConclusionText()
     readonly property var factRows: buildFactRows()
     readonly property var ruleRows: buildRuleRows()
-    readonly property var sourceFiles: dedupeClean(rawSourceFiles).slice(0, 4)
+    readonly property var sourceFiles: singleFileMode
+                                       ? dedupeClean([fileDetail.filePath || ""]).slice(0, 1)
+                                       : dedupeClean(rawSourceFiles).slice(0, 4)
+    readonly property var fileImportRows: dedupeClean(fileDetail.importClues || []).slice(0, 5)
+    readonly property var fileDeclarationRows: dedupeClean(fileDetail.declarationClues || []).slice(0, 5)
+    readonly property var fileBehaviorRows: dedupeClean(fileDetail.behaviorSignals || []).slice(0, 5)
+    readonly property var fileReadingRows: dedupeClean(fileDetail.readingHints || []).slice(0, 5)
+    readonly property string titleText: singleFileMode
+                                        ? cleanText(fileDetail.fileName || node.name)
+                                        : (cleanText(node.name) || "未命名节点")
+    readonly property string subtitleText: joinUnique(singleFileMode
+                                                      ? [cleanText(fileDetail.categoryLabel || "具体文件"),
+                                                         cleanText(fileDetail.languageLabel || ""),
+                                                         roleLabel]
+                                                      : [kindLabel, roleLabel])
+    readonly property string detailPathText: singleFileMode ? localizePath(fileDetail.filePath || "") : ""
+    readonly property string expectedAiScope: singleFileMode
+                                              ? "file_node"
+                                              : ((node && node.capabilityId !== undefined)
+                                                 ? "component_node"
+                                                 : "capability_map")
     property var aiCache: ({})
     property string activeAiNodeKey: ""
     readonly property string currentNodeKey: currentNodeCacheKey()
     readonly property var currentAiEntry: currentNodeKey.length > 0 && aiCache[currentNodeKey] ? aiCache[currentNodeKey] : null
+    readonly property bool aiTargetMatchesCurrentNode: targetMatchesCurrentNode()
     readonly property bool aiBusyForCurrentNode: analysisController.aiBusy
-                                                  && activeAiNodeKey.length > 0
-                                                  && activeAiNodeKey === currentNodeKey
+                                                  && (activeAiNodeKey === currentNodeKey
+                                                      || aiTargetMatchesCurrentNode)
     readonly property bool aiHasCachedResultForCurrentNode: !!currentAiEntry
+                                                            || (analysisController.aiHasResult
+                                                                && aiTargetMatchesCurrentNode)
     readonly property string aiCardText: currentAiCardText()
     readonly property bool showAiCard: aiBusyForCurrentNode || aiHasCachedResultForCurrentNode
 
@@ -46,6 +75,32 @@ Rectangle {
                 .replace(/[\u0000-\u0008\u000B-\u001F]/g, " ")
                 .replace(/\s+/g, " ")
                 .trim()
+    }
+
+    function cleanMultilineText(value) {
+        return String(value || "")
+                .replace(/\uFFFD/g, "")
+                .replace(/[\u0000-\u0008\u000B-\u001F]/g, " ")
+                .replace(/\r/g, "")
+                .trim()
+    }
+
+    function normalizedText(value) {
+        return cleanText(value).toLowerCase()
+    }
+
+    function joinUnique(values) {
+        var items = []
+        var seen = {}
+        var list = values || []
+        for (var index = 0; index < list.length; ++index) {
+            var text = cleanText(list[index])
+            if (!text.length || seen[text])
+                continue
+            seen[text] = true
+            items.push(text)
+        }
+        return items.join(" · ")
     }
 
     function dedupeClean(values) {
@@ -150,11 +205,55 @@ Rectangle {
         return cleanText(value).replace(/\\/g, "/")
     }
 
+    function refreshFileDetail() {
+        if (!root.node || root.node.id === undefined) {
+            root.fileDetail = ({})
+            return
+        }
+        root.fileDetail = root.analysisController.describeFileNode(root.node)
+    }
+
     function currentNodeCacheKey() {
-        return node && node.id !== undefined ? String(node.id) : ""
+        return node && node.id !== undefined ? (expectedAiScope + ":" + String(node.id)) : ""
+    }
+
+    function aiScopeMatchesCurrentNode() {
+        var scope = cleanText(root.analysisController.aiScope)
+        return scope.length > 0 && scope === root.expectedAiScope
+    }
+
+    function targetMatchesCurrentNode() {
+        if (!aiScopeMatchesCurrentNode())
+            return false
+
+        var aiName = normalizedText(root.analysisController.aiNodeName)
+        if (!aiName.length || !root.node || root.node.id === undefined)
+            return false
+
+        var candidates = [normalizedText(root.node.name)]
+        if (root.singleFileMode) {
+            candidates.push(normalizedText(root.fileDetail.fileName))
+            candidates.push(normalizedText(root.fileDetail.filePath))
+        }
+
+        for (var index = 0; index < candidates.length; ++index) {
+            var candidate = candidates[index]
+            if (!candidate.length)
+                continue
+            if (candidate === aiName || candidate.indexOf(aiName) >= 0 || aiName.indexOf(candidate) >= 0)
+                return true
+        }
+        return false
     }
 
     function localizedConclusionText() {
+        if (singleFileMode) {
+            if (fileReadingRows.length > 0)
+                return fileReadingRows[0]
+            if (summaryText.length > 0)
+                return summaryText
+            return "当前文件已选中，但还没有形成足够稳定的职责判断。"
+        }
         if (rawConclusions.length > 0)
             return localizeEvidenceText(rawConclusions[0])
         if (summaryText.length > 0)
@@ -195,7 +294,11 @@ Rectangle {
     }
 
     function cacheCurrentAiResult() {
-        if (activeAiNodeKey.length === 0 || analysisController.aiBusy || !analysisController.aiHasResult)
+        if (analysisController.aiBusy || !analysisController.aiHasResult || !aiTargetMatchesCurrentNode)
+            return
+
+        var targetKey = currentNodeKey.length > 0 ? currentNodeKey : activeAiNodeKey
+        if (targetKey.length === 0)
             return
 
         var cachedText = buildAiDisplayText(
@@ -205,7 +308,7 @@ Rectangle {
             return
 
         var nextCache = Object.assign({}, aiCache || ({}))
-        nextCache[activeAiNodeKey] = {
+        nextCache[targetKey] = {
             "text": cachedText
         }
         aiCache = nextCache
@@ -221,12 +324,40 @@ Rectangle {
             var statusMessage = cleanText(analysisController.aiStatusMessage)
             return statusMessage.length > 0
                    ? statusMessage
-                   : "正在结合当前节点的证据、规则和关键文件生成更完整的中文解读，请稍候。"
+                   : (singleFileMode
+                      ? "正在结合当前文件的路径、声明和关键片段生成更完整的中文解读，请稍候。"
+                      : "正在结合当前节点的证据、规则和关键文件生成更完整的中文解读，请稍候。")
         }
+        if (!currentAiEntry && analysisController.aiHasResult && aiTargetMatchesCurrentNode)
+            return buildAiDisplayText(analysisController.aiSummary, analysisController.aiResponsibility)
         if (currentAiEntry && currentAiEntry.text !== undefined)
             return cleanText(currentAiEntry.text)
         return ""
     }
+
+    function requestAiInterpretation() {
+        if (!root.focusState.focusedNode)
+            return
+
+        root.activeAiNodeKey = root.currentNodeKey
+        root.analysisController.requestAiExplanation(
+                    root.focusState.focusedNode,
+                    root.singleFileMode
+                    ? ("请只围绕当前文件进行中文解读。"
+                       + " 请结合文件路径、导入线索、声明符号、行为信号和关键片段来说明："
+                       + " 这个文件的核心职责、它依赖谁或被谁依赖、建议先看哪些符号、有哪些风险或不确定性。"
+                       + " 不要把整个能力域当成主体，不要给通用模块套话。")
+                    : ("请基于当前节点的证据链，生成一份更完整的中文解读。"
+                       + " 输出请使用简体中文，整体尽量写到约 200 到 300 字。"
+                       + " 请至少覆盖：这个模块是什么、负责什么、不负责什么、为什么值得现在阅读、应该先看哪些文件、有哪些风险或注意点。"
+                       + " 内容可以适当展开，不要只给一两句；如果证据不足，要明确说明证据缺口。"))
+    }
+
+    onNodeChanged: {
+        activeAiNodeKey = ""
+        refreshFileDetail()
+    }
+    Component.onCompleted: refreshFileDetail()
 
     ColumnLayout {
         anchors.fill: parent
@@ -250,7 +381,7 @@ Rectangle {
 
                     Label {
                         Layout.fillWidth: true
-                        text: cleanText(node.name) || "未命名节点"
+                        text: root.titleText
                         color: root.tokens.text1
                         elide: Text.ElideRight
                         font.family: root.tokens.displayFontFamily
@@ -271,14 +402,22 @@ Rectangle {
 
                 Label {
                     Layout.fillWidth: true
-                    text: [kindLabel, roleLabel].filter(function(item, index, list) {
-                        return item.length > 0 && list.indexOf(item) === index
-                    }).join(" · ")
+                    text: root.subtitleText
                     color: root.tokens.text3
                     elide: Text.ElideRight
                     visible: text.length > 0
                     font.family: root.tokens.textFontFamily
                     font.pixelSize: 13
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: root.detailPathText
+                    visible: root.singleFileMode && text.length > 0
+                    color: root.tokens.text3
+                    elide: Text.ElideMiddle
+                    font.family: root.tokens.monoFontFamily
+                    font.pixelSize: 11
                 }
 
                 Flow {
@@ -288,20 +427,32 @@ Rectangle {
                     ChipBadge {
                         tokens: root.tokens
                         visible: root.kindLabel.length > 0
-                        text: root.kindLabel
+                        text: root.singleFileMode ? cleanText(root.fileDetail.languageLabel || "具体文件") : root.kindLabel
                         tone: "brand"
                     }
 
                     ChipBadge {
                         tokens: root.tokens
-                        visible: root.roleLabel.length > 0 && root.roleLabel !== root.kindLabel
-                        text: root.roleLabel
+                        visible: root.singleFileMode
+                                 ? cleanText(root.fileDetail.categoryLabel || "").length > 0
+                                 : (root.roleLabel.length > 0 && root.roleLabel !== root.kindLabel)
+                        text: root.singleFileMode ? cleanText(root.fileDetail.categoryLabel || "") : root.roleLabel
                         tone: "neutral"
                     }
 
                     ChipBadge {
                         tokens: root.tokens
-                        text: root.fileCount + " 个文件"
+                        visible: root.singleFileMode
+                                 ? cleanText(root.fileDetail.roleLabel || "").length > 0
+                                 : true
+                        text: root.singleFileMode ? cleanText(root.fileDetail.roleLabel || "") : (root.fileCount + " 个文件")
+                        tone: root.singleFileMode ? "neutral" : "success"
+                    }
+
+                    ChipBadge {
+                        tokens: root.tokens
+                        visible: root.singleFileMode
+                        text: "总行数 " + Number(root.fileDetail.lineCount || 0)
                         tone: "success"
                     }
                 }
@@ -320,106 +471,223 @@ Rectangle {
             clip: true
             contentWidth: availableWidth
 
-            ColumnLayout {
+            Loader {
                 width: parent.width
-                spacing: 14
-
-                AccentCard {
-                    Layout.topMargin: 18
-                    Layout.leftMargin: 18
-                    Layout.rightMargin: 18
-                    Layout.fillWidth: true
-                    tokens: root.tokens
-                    title: "模块概览"
-                    body: root.summaryText.length > 0
-                          ? root.summaryText
-                          : "选中一个架构对象后，这里会优先给出简洁摘要，帮助你快速判断它是什么。"
-                    tone: "neutral"
-                }
-
-                AccentCard {
-                    Layout.leftMargin: 18
-                    Layout.rightMargin: 18
-                    Layout.fillWidth: true
-                    tokens: root.tokens
-                    title: "当前判断"
-                    body: root.conclusionText
-                    tone: "brand"
-                }
-
-                AccentCard {
-                    Layout.leftMargin: 18
-                    Layout.rightMargin: 18
-                    Layout.fillWidth: true
-                    visible: root.showAiCard
-                    tokens: root.tokens
-                    title: root.analysisController.aiBusy ? "AI 辅助解读 · 生成中" : "AI 辅助解读"
-                    body: root.aiCardText
-                    tone: "ai"
-                }
-
-                Rectangle {
-                    Layout.leftMargin: 18
-                    Layout.rightMargin: 18
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 72
-                    visible: !root.showAiCard && !!root.focusState.focusedNode
-                    radius: root.tokens.radius8
-                    color: Qt.rgba(1, 1, 1, 0.92)
-                    border.color: root.tokens.border1
-
-                    ActionButton {
-                        anchors.centerIn: parent
-                        width: parent.width - 28
-                        tokens: root.tokens
-                        text: root.analysisController.aiBusy ? "AI 正在生成..." : "请求 AI 辅助解读"
-                        tone: "primary"
-                        enabled: root.analysisController.aiAvailable
-                                 && !!root.focusState.focusedNode
-                                 && !root.analysisController.aiBusy
-                        onClicked: {
-                            root.activeAiNodeKey = root.currentNodeKey
-                            root.analysisController.requestAiExplanation(
-                                        root.focusState.focusedNode,
-                                        "请基于当前节点的证据链，生成一份更完整的中文解读。"
-                                        + " 输出请使用简体中文，整体尽量写到约 200 到 300 字。"
-                                        + " 请至少覆盖：这个模块是什么、负责什么、不负责什么、为什么值得现在阅读、应该先看哪些文件、有哪些风险或注意点。"
-                                        + " 内容可以适当展开，不要只给一两句；如果证据不足，要明确说明证据缺口。")
-                        }
-                    }
-                }
-
-                SectionBlock {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 18
-                    Layout.rightMargin: 18
-                    tokens: root.tokens
-                    title: "结构事实"
-                    rows: root.factRows
-                }
-
-                SectionBlock {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 18
-                    Layout.rightMargin: 18
-                    tokens: root.tokens
-                    title: "判断依据"
-                    rows: root.ruleRows
-                }
-
-                SectionBlock {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 18
-                    Layout.rightMargin: 18
-                    Layout.bottomMargin: 16
-                    tokens: root.tokens
-                    title: "关键文件"
-                    rows: root.sourceFiles.length > 0 ? root.sourceFiles.map(localizePath) : ["暂无源文件线索。"]
-                    mono: true
-                }
+                height: item ? item.implicitHeight : 0
+                sourceComponent: root.singleFileMode ? fileModeContent : moduleModeContent
             }
         }
 
+    }
+
+    Component {
+        id: moduleModeContent
+
+        ColumnLayout {
+            width: parent ? parent.width : 0
+            spacing: 14
+
+            AccentCard {
+                Layout.topMargin: 18
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                Layout.fillWidth: true
+                tokens: root.tokens
+                title: "模块概览"
+                body: root.summaryText.length > 0
+                      ? root.summaryText
+                      : "选中一个架构对象后，这里会优先给出简洁摘要，帮助你快速判断它是什么。"
+                tone: "neutral"
+            }
+
+            AccentCard {
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                Layout.fillWidth: true
+                tokens: root.tokens
+                title: "当前判断"
+                body: root.conclusionText
+                tone: "brand"
+            }
+
+            AccentCard {
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                Layout.fillWidth: true
+                visible: root.showAiCard
+                tokens: root.tokens
+                title: root.analysisController.aiBusy ? "AI 辅助解读 · 生成中" : "AI 辅助解读"
+                body: root.aiCardText
+                tone: "ai"
+            }
+
+            Rectangle {
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                Layout.fillWidth: true
+                Layout.preferredHeight: 72
+                visible: !root.showAiCard && !!root.focusState.focusedNode
+                radius: root.tokens.radius8
+                color: Qt.rgba(1, 1, 1, 0.92)
+                border.color: root.tokens.border1
+
+                ActionButton {
+                    anchors.centerIn: parent
+                    width: parent.width - 28
+                    tokens: root.tokens
+                    text: root.analysisController.aiBusy ? "AI 正在生成..." : "请求 AI 辅助解读"
+                    tone: "primary"
+                    enabled: root.analysisController.aiAvailable
+                             && !!root.focusState.focusedNode
+                             && !root.analysisController.aiBusy
+                    onClicked: root.requestAiInterpretation()
+                }
+            }
+
+            SectionBlock {
+                Layout.fillWidth: true
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                tokens: root.tokens
+                title: "结构事实"
+                rows: root.factRows
+            }
+
+            SectionBlock {
+                Layout.fillWidth: true
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                tokens: root.tokens
+                title: "判断依据"
+                rows: root.ruleRows
+            }
+
+            SectionBlock {
+                Layout.fillWidth: true
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                Layout.bottomMargin: 16
+                tokens: root.tokens
+                title: "关键文件"
+                rows: root.sourceFiles.length > 0 ? root.sourceFiles.map(localizePath) : ["暂无源文件线索。"]
+                mono: true
+            }
+        }
+    }
+
+    Component {
+        id: fileModeContent
+
+        ColumnLayout {
+            width: parent ? parent.width : 0
+            spacing: 14
+
+            AccentCard {
+                Layout.topMargin: 18
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                Layout.fillWidth: true
+                tokens: root.tokens
+                title: "文件定位"
+                body: root.summaryText.length > 0
+                      ? root.summaryText
+                      : "当前文件已选中，但还没有稳定的文件定位摘要。"
+                tone: "neutral"
+            }
+
+            AccentCard {
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                Layout.fillWidth: true
+                tokens: root.tokens
+                title: "当前判断"
+                body: root.conclusionText
+                tone: "brand"
+            }
+
+            AccentCard {
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                Layout.fillWidth: true
+                visible: root.showAiCard
+                tokens: root.tokens
+                title: root.analysisController.aiBusy ? "AI 文件解读 · 生成中" : "AI 文件解读"
+                body: root.aiCardText
+                tone: "ai"
+            }
+
+            Rectangle {
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                Layout.fillWidth: true
+                Layout.preferredHeight: 72
+                visible: !root.showAiCard && !!root.focusState.focusedNode
+                radius: root.tokens.radius8
+                color: Qt.rgba(1, 1, 1, 0.92)
+                border.color: root.tokens.border1
+
+                ActionButton {
+                    anchors.centerIn: parent
+                    width: parent.width - 28
+                    tokens: root.tokens
+                    text: root.analysisController.aiBusy ? "AI 正在生成..." : "请 AI 解读这个文件"
+                    tone: "primary"
+                    enabled: root.analysisController.aiAvailable
+                             && !!root.focusState.focusedNode
+                             && !root.analysisController.aiBusy
+                    onClicked: root.requestAiInterpretation()
+                }
+            }
+
+            SectionBlock {
+                Layout.fillWidth: true
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                tokens: root.tokens
+                title: "导入 / 依赖线索"
+                rows: root.fileImportRows.length > 0 ? root.fileImportRows : ["当前文件还没有抽取到明显的导入线索。"]
+            }
+
+            SectionBlock {
+                Layout.fillWidth: true
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                tokens: root.tokens
+                title: "声明 / 主符号"
+                rows: root.fileDeclarationRows.length > 0 ? root.fileDeclarationRows : ["当前文件还没有抽取到稳定的声明符号。"]
+            }
+
+            SectionBlock {
+                Layout.fillWidth: true
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                tokens: root.tokens
+                title: "行为信号"
+                rows: root.fileBehaviorRows.length > 0 ? root.fileBehaviorRows : ["当前文件还没有抽取到明显的行为信号。"]
+            }
+
+            SectionBlock {
+                Layout.fillWidth: true
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                tokens: root.tokens
+                title: "建议阅读顺序"
+                rows: root.fileReadingRows.length > 0 ? root.fileReadingRows : ["建议先从导入、主符号和首个非空代码片段开始。"]
+            }
+
+            AccentCard {
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                Layout.bottomMargin: 16
+                Layout.fillWidth: true
+                visible: root.cleanMultilineText(root.fileDetail.previewText).length > 0
+                tokens: root.tokens
+                title: "关键片段"
+                body: root.cleanMultilineText(root.fileDetail.previewText)
+                bodyMono: true
+                tone: "neutral"
+            }
+        }
     }
 
     Connections {
@@ -428,7 +696,10 @@ Rectangle {
         function onAiSummaryChanged() { root.cacheCurrentAiResult() }
         function onAiResponsibilityChanged() { root.cacheCurrentAiResult() }
         function onCapabilitySceneChanged() { root.clearAiCache() }
-        function onProjectRootPathChanged() { root.clearAiCache() }
+        function onProjectRootPathChanged() {
+            root.clearAiCache()
+            root.refreshFileDetail()
+        }
     }
 
     component ChipBadge: Rectangle {
@@ -468,6 +739,7 @@ Rectangle {
         property string title: ""
         property string body: ""
         property string tone: "neutral"
+        property bool bodyMono: false
 
         radius: tokens.radius8
         color: tone === "brand"
@@ -505,10 +777,10 @@ Rectangle {
             Label {
                 Layout.fillWidth: true
                 text: body
-                wrapMode: Text.WordWrap
+                wrapMode: bodyMono ? Text.WrapAnywhere : Text.WordWrap
                 color: root.tokens.text1
-                font.family: root.tokens.textFontFamily
-                font.pixelSize: 13
+                font.family: bodyMono ? root.tokens.monoFontFamily : root.tokens.textFontFamily
+                font.pixelSize: bodyMono ? 11 : 13
                 lineHeight: 1.2
             }
         }

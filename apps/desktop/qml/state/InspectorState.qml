@@ -10,10 +10,16 @@ QtObject {
     readonly property var evidencePackage: selectedEdge
                                          ? (selectedEdge.evidence || ({}))
                                          : (selectedNode ? (selectedNode.evidence || ({})) : ({}))
+    readonly property bool selectedNodeIsSingleFile: selectedNode
+                                                     ? InspectorFormatter.isSingleFileNode(selectedNode)
+                                                     : false
+    readonly property string primaryFilePath: selectedNodeIsSingleFile
+                                              ? InspectorFormatter.primaryFilePath(selectedNode)
+                                              : ""
 
     readonly property string title: InspectorFormatter.inspectorTitle(selectedNode, selectedEdge)
     readonly property string subtitle: InspectorFormatter.inspectorSubtitle(selectedNode, selectedEdge)
-    readonly property string nodeKindLabel: selectedNode ? InspectorFormatter.displayNodeKind(selectedNode.kind) : ""
+    readonly property string nodeKindLabel: selectedNode ? InspectorFormatter.displayNodeKind(selectedNode.kind, selectedNode) : ""
     readonly property string nodeRoleLabel: selectedNode ? (selectedNode.role || "") : ""
     readonly property string nodeFileCountLabel: selectedNode ? ("文件 " + (selectedNode.fileCount || 0)) : ""
     readonly property string edgeKindLabel: selectedEdge ? (selectedEdge.kind || "") : ""

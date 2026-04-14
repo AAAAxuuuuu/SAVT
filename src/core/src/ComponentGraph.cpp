@@ -172,6 +172,9 @@ EvidencePackage buildNodeEvidence(
         std::to_string(node.fileCount) + ", incoming=" +
         std::to_string(node.incomingEdgeCount) + ", outgoing=" +
         std::to_string(node.outgoingEdgeCount) + ".");
+    if (!node.primaryFilePath.empty()) {
+        evidence.facts.push_back("Primary file path: " + node.primaryFilePath + ".");
+    }
     if (!node.folderHint.empty()) {
         evidence.facts.push_back("Folder scope: " + node.folderHint + ".");
     }
@@ -186,6 +189,10 @@ EvidencePackage buildNodeEvidence(
         "Membership rule: only overview modules aggregated into the selected capability are allowed into this L3 graph.");
     evidence.rules.push_back(
         "Stage rule: the component inherits its stage index from the overview dependency ordering.");
+    if (node.fileCluster) {
+        evidence.rules.push_back(
+            "File cluster rule: files sharing the same path stem are treated as one file-level component and expose a primary file path.");
+    }
     if (node.kind == ComponentNodeKind::Entry) {
         evidence.rules.push_back(
             "Kind rule: entry-point overview modules become entry components.");
@@ -327,6 +334,73 @@ std::string lowerFileExtension(const std::string& path) {
         return static_cast<char>(std::tolower(c));
     });
     return extension;
+}
+
+bool isCppImplementationExtension(const std::string& extension) {
+    return extension == ".cpp" || extension == ".cc" || extension == ".cxx" ||
+           extension == ".cp" || extension == ".c++" || extension == ".cppm" ||
+           extension == ".ixx" || extension == ".cu" || extension == ".mm" ||
+           extension == ".c";
+}
+
+bool isCppHeaderOrInlineExtension(const std::string& extension) {
+    return extension == ".h" || extension == ".hh" || extension == ".hpp" ||
+           extension == ".hxx" || extension == ".h++" ||
+           extension == ".ipp" || extension == ".inl" || extension == ".tpp" ||
+           extension == ".tcc" || extension == ".txx" || extension == ".ii" ||
+           extension == ".cuh";
+}
+
+bool isCppFamilyExtension(const std::string& extension) {
+    return isCppImplementationExtension(extension) || isCppHeaderOrInlineExtension(extension);
+}
+
+int primaryFilePathRank(const std::string& path) {
+    const std::string extension = lowerFileExtension(path);
+    if (isCppImplementationExtension(extension)) {
+        return 0;
+    }
+    if (extension == ".qml" || extension == ".js" || extension == ".mjs" ||
+        extension == ".cjs" || extension == ".ts" || extension == ".tsx" ||
+        extension == ".mts" || extension == ".cts" || extension == ".py" ||
+        extension == ".java" || extension == ".kt" || extension == ".kts" ||
+        extension == ".go" || extension == ".rs") {
+        return 1;
+    }
+    if (extension == ".html" || extension == ".htm") {
+        return 2;
+    }
+    if (isCppHeaderOrInlineExtension(extension)) {
+        return 3;
+    }
+    if (extension == ".css" || extension == ".scss") {
+        return 4;
+    }
+    if (extension == ".json" || extension == ".yaml" || extension == ".yml" ||
+        extension == ".toml" || extension == ".xml") {
+        return 5;
+    }
+    if (extension == ".md") {
+        return 6;
+    }
+    return 10;
+}
+
+std::string selectPrimaryFilePath(std::vector<std::string> paths) {
+    paths = deduplicateSorted(std::move(paths));
+    if (paths.empty()) {
+        return {};
+    }
+
+    std::sort(paths.begin(), paths.end(), [](const std::string& left, const std::string& right) {
+        const int leftRank = primaryFilePathRank(left);
+        const int rightRank = primaryFilePathRank(right);
+        if (leftRank != rightRank) {
+            return leftRank < rightRank;
+        }
+        return left < right;
+    });
+    return paths.front();
 }
 
 std::string filePathWithoutExtension(const std::string& path) {
@@ -598,7 +672,8 @@ bool containsAnyToken(
 bool isEntryLikeFilePath(const std::string& path) {
     return containsAnyToken(
         path,
-        {"/main.cpp", "/main.cc", "/main.cxx", "/main.c", "/main.qml", "/app.qml",
+        {"/main.cpp", "/main.cc", "/main.cxx", "/main.cp", "/main.c++",
+         "/main.cppm", "/main.ixx", "/main.mm", "/main.c", "/main.qml", "/app.qml",
          "/mainwindow.cpp", "/mainwindow.qml"});
 }
 
@@ -627,6 +702,9 @@ void applyVibeCoderHeuristics(ComponentNode& node) {
     };
 
     auto firstContext = [&]() {
+        if (node.fileCluster && !node.primaryFilePath.empty()) {
+            return humanizeIdentifier(fileStemFromPath(node.primaryFilePath));
+        }
         if (!node.folderHint.empty()) {
             return humanizeIdentifier(node.folderHint);
         }
@@ -1112,9 +1190,7 @@ ComponentGraph buildSingleOverviewFallbackComponentGraph(
                 ++cluster.scriptFileCount;
             } else if (extension == ".json") {
                 ++cluster.dataFileCount;
-            } else if (extension == ".h" || extension == ".hh" || extension == ".hpp" ||
-                       extension == ".hxx" || extension == ".c" || extension == ".cc" ||
-                       extension == ".cpp" || extension == ".cxx") {
+            } else if (isCppFamilyExtension(extension)) {
                 ++cluster.sourceFileCount;
             }
         }
@@ -1167,6 +1243,9 @@ ComponentGraph buildSingleOverviewFallbackComponentGraph(
             std::vector<std::string>(cluster.moduleSet.begin(), cluster.moduleSet.end()), 4);
         node.exampleFiles = deduplicateSorted(
             std::vector<std::string>(cluster.filePathSet.begin(), cluster.filePathSet.end()), 8);
+        node.primaryFilePath = selectPrimaryFilePath(
+            std::vector<std::string>(cluster.filePathSet.begin(), cluster.filePathSet.end()));
+        node.fileCluster = !node.primaryFilePath.empty();
         node.topSymbols = deduplicateSorted(
             std::vector<std::string>(cluster.symbolSet.begin(), cluster.symbolSet.end()), 8);
         node.fileCount = cluster.fileCount;

@@ -3,6 +3,7 @@
 #include "savt/ui/AiService.h"
 #include "savt/ui/AnalysisOrchestrator.h"
 #include "savt/ui/AstPreviewService.h"
+#include "savt/ui/FileInsightService.h"
 #include "savt/core/ComponentGraph.h"
 
 #include <QtGui/QClipboard>
@@ -397,6 +398,10 @@ void AnalysisController::copyTextToClipboard(const QString& text) {
     if (QClipboard* clipboard = QGuiApplication::clipboard(); clipboard != nullptr) {
         clipboard->setText(text);
     }
+}
+
+QVariantMap AnalysisController::describeFileNode(const QVariantMap& nodeData) const {
+    return FileInsightService::buildDetail(m_projectRootPath, nodeData);
 }
 
 void AnalysisController::refreshAiAvailability() {

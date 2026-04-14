@@ -548,6 +548,22 @@ QJsonObject buildEvidenceObject(const ArchitectureAssistantRequest &request) {
   nodeObject.insert(QStringLiteral("collaborators"),
                     toJsonArray(deduplicatedList(request.collaboratorNames)));
 
+  QJsonObject fileObject;
+  fileObject.insert(QStringLiteral("path"), request.filePath.trimmed());
+  fileObject.insert(QStringLiteral("language"), request.fileLanguage.trimmed());
+  fileObject.insert(QStringLiteral("category"), request.fileCategory.trimmed());
+  fileObject.insert(QStringLiteral("roleHint"), request.fileRoleHint.trimmed());
+  fileObject.insert(QStringLiteral("summary"), request.fileSummary.trimmed());
+  fileObject.insert(QStringLiteral("codeExcerpt"), request.codeExcerpt.trimmed());
+  fileObject.insert(QStringLiteral("imports"),
+                    toJsonArray(deduplicatedList(request.fileImports)));
+  fileObject.insert(QStringLiteral("declarations"),
+                    toJsonArray(deduplicatedList(request.fileDeclarations)));
+  fileObject.insert(QStringLiteral("signals"),
+                    toJsonArray(deduplicatedList(request.fileSignals)));
+  fileObject.insert(QStringLiteral("readingHints"),
+                    toJsonArray(deduplicatedList(request.fileReadingHints)));
+
   QJsonObject projectObject;
   projectObject.insert(QStringLiteral("name"), request.projectName);
   projectObject.insert(QStringLiteral("rootPath"), request.projectRootPath);
@@ -577,6 +593,7 @@ QJsonObject buildEvidenceObject(const ArchitectureAssistantRequest &request) {
   QJsonObject evidence;
   evidence.insert(QStringLiteral("project"), projectObject);
   evidence.insert(QStringLiteral("node"), nodeObject);
+  evidence.insert(QStringLiteral("file"), fileObject);
   evidence.insert(QStringLiteral("guide"), guideObject);
   evidence.insert(QStringLiteral("userTask"), request.userTask.trimmed());
   return evidence;

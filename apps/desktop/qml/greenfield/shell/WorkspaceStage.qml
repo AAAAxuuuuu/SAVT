@@ -13,6 +13,11 @@ Item {
     required property QtObject analysisController
     required property QtObject caseState
     required property QtObject focusState
+    property var componentFileDetail: ({})
+    readonly property bool componentFileDetailActive: root.caseState.route === "component"
+                                                      && !!root.componentFileDetail
+                                                      && !!root.componentFileDetail.available
+                                                      && !!root.componentFileDetail.singleFile
 
     signal chooseProjectRequested()
 
@@ -50,6 +55,16 @@ Item {
         return catalog[id] || catalog[root.focusState.focusedCapability.id] || ({})
     }
 
+    function refreshComponentFileDetail() {
+        if (root.caseState.route !== "component"
+                || !root.focusState.focusedNode
+                || root.focusState.focusedNode.id === undefined) {
+            root.componentFileDetail = ({})
+            return
+        }
+        root.componentFileDetail = root.analysisController.describeFileNode(root.focusState.focusedNode)
+    }
+
     function openComponentLab(node) {
         if (node && node.id !== undefined) {
             root.focusState.prepareComponentDrill(node)
@@ -80,8 +95,24 @@ Item {
                 root.analysisController.ensureComponentSceneForCapability(
                             root.focusState.focusedCapability.id)
             }
+
+            root.refreshComponentFileDetail()
         }
     }
+
+    Connections {
+        target: root.focusState
+
+        function onFocusedNodeChanged() { root.refreshComponentFileDetail() }
+    }
+
+    Connections {
+        target: root.analysisController
+
+        function onProjectRootPathChanged() { root.refreshComponentFileDetail() }
+    }
+
+    Component.onCompleted: root.refreshComponentFileDetail()
 
     Loader {
         anchors.fill: parent
@@ -123,18 +154,9 @@ Item {
         id: componentView
 
         Item {
-            ArchitectureCanvas {
+            Loader {
                 anchors.fill: parent
-                tokens: root.tokens
-                scene: root.componentSceneForFocus()
-                selectedNode: root.focusState.focusedNode
-                componentMode: true
-                emptyText: root.focusState.focusedCapability
-                           ? "正在准备该能力域的组件图，或当前能力域暂无可下钻组件。"
-                           : "请在架构全景图中双击一个能力域以下钻。"
-                onNodeSelected: root.focusState.setNode(node)
-                onNodeDrilled: root.focusState.setNode(node)
-                onBlankClicked: root.focusState.clearNodeFocus()
+                sourceComponent: root.componentFileDetailActive ? componentFileView : componentCanvasView
             }
 
             Rectangle {
@@ -160,7 +182,14 @@ Item {
 
                         Label {
                             Layout.fillWidth: true
-                            text: root.focusState.focusedCapability ? ("组件探测：" + root.focusState.focusedCapability.name) : "组件探测实验室"
+                            text: root.componentFileDetailActive
+                                  ? ("文件解读：" + (root.componentFileDetail.fileName
+                                                     || (root.focusState.focusedNode
+                                                         ? root.focusState.focusedNode.name
+                                                         : "未命名文件")))
+                                  : (root.focusState.focusedCapability
+                                     ? ("组件探测：" + root.focusState.focusedCapability.name)
+                                     : "组件探测实验室")
                             color: root.tokens.text1
                             elide: Text.ElideRight
                             font.family: root.tokens.displayFontFamily
@@ -171,8 +200,12 @@ Item {
                         Label {
                             Layout.fillWidth: true
                             text: root.normalizedPreviewText(
-                                      root.componentSceneForFocus().summary,
-                                      "双击全景图节点后，SAVT 会接入 componentSceneCatalog 展开组件关系。")
+                                      root.componentFileDetailActive
+                                      ? root.componentFileDetail.summary
+                                      : root.componentSceneForFocus().summary,
+                                      root.componentFileDetailActive
+                                      ? "当前已切换到文件解读模式，会结合路径、声明、依赖和片段来理解这个文件。"
+                                      : "双击全景图节点后，SAVT 会接入 componentSceneCatalog 展开组件关系。")
                             color: root.tokens.text3
                             wrapMode: Text.WordWrap
                             maximumLineCount: 2
@@ -192,6 +225,41 @@ Item {
                     }
                 }
             }
+        }
+    }
+
+    Component {
+        id: componentCanvasView
+
+        ArchitectureCanvas {
+            anchors.fill: parent
+            tokens: root.tokens
+            scene: root.componentSceneForFocus()
+            selectedNode: root.focusState.focusedNode
+            componentMode: true
+            emptyText: root.focusState.focusedCapability
+                       ? "正在准备该能力域的组件图，或当前能力域暂无可下钻组件。"
+                       : "请在架构全景图中双击一个能力域以下钻。"
+            onNodeSelected: root.focusState.setNode(node)
+            onNodeDrilled: root.focusState.setNode(node)
+            onBlankClicked: root.focusState.clearNodeFocus()
+        }
+    }
+
+    Component {
+        id: componentFileView
+
+        FileFocusView {
+            anchors.fill: parent
+            anchors.leftMargin: 18
+            anchors.rightMargin: 18
+            anchors.topMargin: 122
+            anchors.bottomMargin: 18
+            tokens: root.tokens
+            analysisController: root.analysisController
+            focusState: root.focusState
+            scene: root.componentSceneForFocus()
+            fileDetail: root.componentFileDetail
         }
     }
 

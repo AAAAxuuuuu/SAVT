@@ -1,4 +1,5 @@
 #include "savt/ui/AiService.h"
+#include "savt/ui/FileInsightService.h"
 
 #include <QDebug>
 #include <QDir>
@@ -199,10 +200,15 @@ QString publicScopeLabel(const QString& scope) {
         return QStringLiteral("项目导览");
     }
     if (scope == QStringLiteral("engineering_report")) {
-        return QStringLiteral("深入阅读建议");
+        return QStringLiteral("报告导览");
     }
-    if (scope == QStringLiteral("capability_map") ||
-        scope == QStringLiteral("component_node")) {
+    if (scope == QStringLiteral("file_node")) {
+        return QStringLiteral("文件解读");
+    }
+    if (scope == QStringLiteral("capability_map")) {
+        return QStringLiteral("能力导览");
+    }
+    if (scope == QStringLiteral("component_node")) {
         return QStringLiteral("模块解读");
     }
     return QStringLiteral("模块解读");
@@ -337,6 +343,104 @@ ai::ArchitectureAssistantRequest buildComponentRequest(
     return request;
 }
 
+ai::ArchitectureAssistantRequest buildFileRequest(
+    const AiRequestContext& context,
+    const QVariantMap& nodeData) {
+    const QVariantMap fileDetail =
+        FileInsightService::buildDetail(context.projectRootPath, nodeData);
+
+    ai::ArchitectureAssistantRequest request;
+    request.projectName = projectNameFromRootPath(context.projectRootPath);
+    request.projectRootPath = QDir::toNativeSeparators(context.projectRootPath);
+    request.analyzerPrecision = inferAnalyzerPrecision(context.analysisReport);
+    request.analysisSummary = context.statusMessage.trimmed();
+    request.uiScope = QStringLiteral("l3_file_guide");
+    request.learningStage = QStringLiteral("L3");
+    request.audience = QStringLiteral("beginner");
+    request.explanationGoal = QStringLiteral(
+        "Help a beginner understand what this concrete file does, which structural clues support that judgment, and which parts should be read first.");
+    request.nodeName = fileDetail.value(QStringLiteral("fileName")).toString().trimmed();
+    if (request.nodeName.isEmpty()) {
+        request.nodeName = nodeData.value(QStringLiteral("name")).toString().trimmed();
+    }
+    request.nodeKind = QStringLiteral("file");
+    request.nodeRole = fileDetail.value(QStringLiteral("roleLabel")).toString().trimmed();
+    request.nodeSummary = fileDetail.value(QStringLiteral("summary")).toString().trimmed();
+    if (request.nodeSummary.isEmpty()) {
+        request.nodeSummary = nodeData.value(QStringLiteral("summary")).toString().trimmed();
+    }
+    request.userTask =
+        context.userTask.trimmed().isEmpty()
+            ? QStringLiteral(
+                  "Explain the selected file to a beginner who is new to this repository. "
+                  "Describe what this file is responsible for, which local code clues support that conclusion, "
+                  "what it appears to depend on, which declarations or sections are worth reading first, "
+                  "and what nearby files or components should be checked next. Use only the supplied evidence package.")
+            : context.userTask.trimmed();
+
+    request.moduleNames = toQStringList(nodeData.value(QStringLiteral("moduleNames")));
+    request.exampleFiles = mergeQStringLists(
+        {fileDetail.value(QStringLiteral("filePath")).toString().trimmed()},
+        toQStringList(nodeData.value(QStringLiteral("exampleFiles"))));
+    request.topSymbols = mergeQStringLists(
+        toQStringList(nodeData.value(QStringLiteral("topSymbols"))),
+        toQStringList(fileDetail.value(QStringLiteral("declarationClues"))));
+    request.collaboratorNames =
+        toQStringList(nodeData.value(QStringLiteral("collaboratorNames")));
+
+    request.filePath = fileDetail.value(QStringLiteral("filePath")).toString().trimmed();
+    request.fileLanguage = fileDetail.value(QStringLiteral("languageLabel")).toString().trimmed();
+    request.fileCategory = fileDetail.value(QStringLiteral("categoryLabel")).toString().trimmed();
+    request.fileRoleHint = fileDetail.value(QStringLiteral("roleLabel")).toString().trimmed();
+    request.fileSummary = fileDetail.value(QStringLiteral("summary")).toString().trimmed();
+    request.codeExcerpt = fileDetail.value(QStringLiteral("previewText")).toString().trimmed();
+    request.fileImports = toQStringList(fileDetail.value(QStringLiteral("importClues")));
+    request.fileDeclarations =
+        toQStringList(fileDetail.value(QStringLiteral("declarationClues")));
+    request.fileSignals = toQStringList(fileDetail.value(QStringLiteral("behaviorSignals")));
+    request.fileReadingHints =
+        toQStringList(fileDetail.value(QStringLiteral("readingHints")));
+    request.contextClues = mergeQStringLists(
+        {request.fileSummary,
+         QStringLiteral("language: %1").arg(request.fileLanguage),
+         QStringLiteral("category: %1").arg(request.fileCategory),
+         QStringLiteral("role hint: %1").arg(request.fileRoleHint)},
+        request.fileReadingHints);
+    request.diagnostics = {
+        QStringLiteral("analysis phase: %1")
+            .arg(context.analysisPhase.trimmed().isEmpty()
+                     ? QStringLiteral("unknown")
+                     : context.analysisPhase.trimmed()),
+        QStringLiteral("ai scope: file_node"),
+        QStringLiteral("audience: beginner"),
+        QStringLiteral("learning stage: L3"),
+        QStringLiteral("file path: %1").arg(request.filePath),
+        QStringLiteral("file language: %1").arg(request.fileLanguage),
+        QStringLiteral("file category: %1").arg(request.fileCategory),
+        QStringLiteral("file role hint: %1").arg(request.fileRoleHint),
+        QStringLiteral("line count: %1")
+            .arg(fileDetail.value(QStringLiteral("lineCount")).toULongLong()),
+        QStringLiteral("non-empty lines: %1")
+            .arg(fileDetail.value(QStringLiteral("nonEmptyLineCount")).toULongLong())};
+    for (const QString& item : request.fileImports) {
+        request.diagnostics.push_back(
+            QStringLiteral("import clue: %1").arg(item));
+    }
+    for (const QString& item : request.fileDeclarations) {
+        request.diagnostics.push_back(
+            QStringLiteral("declaration clue: %1").arg(item));
+    }
+    for (const QString& item : request.fileSignals) {
+        request.diagnostics.push_back(
+            QStringLiteral("behavior signal: %1").arg(item));
+    }
+    for (const QString& item : request.fileReadingHints) {
+        request.diagnostics.push_back(
+            QStringLiteral("reading hint: %1").arg(item));
+    }
+    return request;
+}
+
 ai::ArchitectureAssistantRequest buildProjectRequest(
     const AiRequestContext& context,
     const QVariantMap& systemContextData,
@@ -364,9 +468,15 @@ ai::ArchitectureAssistantRequest buildProjectRequest(
     summaryParts << systemContextData.value(QStringLiteral("headline")).toString().trimmed()
                  << systemContextData.value(QStringLiteral("purposeSummary")).toString().trimmed()
                  << systemContextData.value(QStringLiteral("entrySummary")).toString().trimmed()
+                 << systemContextData.value(QStringLiteral("mainFlowSummary")).toString().trimmed()
                  << systemContextData.value(QStringLiteral("inputSummary")).toString().trimmed()
                  << systemContextData.value(QStringLiteral("outputSummary")).toString().trimmed()
                  << systemContextData.value(QStringLiteral("containerSummary")).toString().trimmed();
+    const QStringList hotspotSignals = collectStructuredPreview(
+        systemContextData.value(QStringLiteral("hotspotSignals")).toList(),
+        QStringLiteral("title"),
+        QStringLiteral("summary"),
+        4);
     for (const QVariant& value : systemContextCards) {
         const QVariantMap item = value.toMap();
         const QString name = item.value(QStringLiteral("name")).toString().trimmed();
@@ -374,6 +484,8 @@ ai::ArchitectureAssistantRequest buildProjectRequest(
         if (!name.isEmpty() && !summary.isEmpty())
             summaryParts << QStringLiteral("%1：%2").arg(name, summary);
     }
+    for (const QString& hotspot : hotspotSignals)
+        summaryParts.push_back(QStringLiteral("结构热点：%1").arg(hotspot));
     request.nodeSummary = deduplicateQStringList(summaryParts).join(QStringLiteral(" "));
     request.userTask =
         context.userTask.trimmed().isEmpty()
@@ -399,6 +511,16 @@ ai::ArchitectureAssistantRequest buildProjectRequest(
             .arg(systemContextData.value(QStringLiteral("technologySummary"))
                      .toString()
                      .trimmed())};
+    const QString mainFlowSummary =
+        systemContextData.value(QStringLiteral("mainFlowSummary")).toString().trimmed();
+    if (!mainFlowSummary.isEmpty()) {
+        request.diagnostics.push_back(
+            QStringLiteral("main flow: %1").arg(mainFlowSummary));
+    }
+    for (const QString& hotspot : hotspotSignals) {
+        request.diagnostics.push_back(
+            QStringLiteral("hotspot signal: %1").arg(hotspot));
+    }
     for (const QVariant& value : capabilityNodeItems) {
         const QVariantMap node = value.toMap();
         for (const QString& path :
@@ -442,6 +564,7 @@ ai::ArchitectureAssistantRequest buildReportRequest(
         {systemContextData.value(QStringLiteral("projectKindSummary")).toString().trimmed(),
          systemContextData.value(QStringLiteral("purposeSummary")).toString().trimmed(),
          systemContextData.value(QStringLiteral("entrySummary")).toString().trimmed(),
+         systemContextData.value(QStringLiteral("mainFlowSummary")).toString().trimmed(),
          systemContextData.value(QStringLiteral("inputSummary")).toString().trimmed(),
          systemContextData.value(QStringLiteral("outputSummary")).toString().trimmed(),
          systemContextData.value(QStringLiteral("technologySummary")).toString().trimmed(),
@@ -456,12 +579,18 @@ ai::ArchitectureAssistantRequest buildReportRequest(
         QStringLiteral("title"),
         QStringLiteral("body"),
         4);
+    const QStringList hotspotSignals = collectStructuredPreview(
+        systemContextData.value(QStringLiteral("hotspotSignals")).toList(),
+        QStringLiteral("title"),
+        QStringLiteral("summary"),
+        4);
 
     QStringList summaryParts;
     summaryParts << systemContextData.value(QStringLiteral("headline")).toString().trimmed()
                  << systemContextData.value(QStringLiteral("purposeSummary")).toString().trimmed()
                  << systemContextData.value(QStringLiteral("projectKindSummary")).toString().trimmed()
                  << systemContextData.value(QStringLiteral("entrySummary")).toString().trimmed()
+                 << systemContextData.value(QStringLiteral("mainFlowSummary")).toString().trimmed()
                  << systemContextData.value(QStringLiteral("inputSummary")).toString().trimmed()
                  << systemContextData.value(QStringLiteral("outputSummary")).toString().trimmed()
                  << systemContextData.value(QStringLiteral("technologySummary")).toString().trimmed()
@@ -479,6 +608,8 @@ ai::ArchitectureAssistantRequest buildReportRequest(
         summaryParts.push_back(highlight);
     for (const QString& risk : riskSignals)
         summaryParts.push_back(QStringLiteral("风险线索：%1").arg(risk));
+    for (const QString& hotspot : hotspotSignals)
+        summaryParts.push_back(QStringLiteral("结构热点：%1").arg(hotspot));
     for (const QString& step : readingOrder)
         summaryParts.push_back(QStringLiteral("阅读顺序：%1").arg(step));
     if (!context.astPreviewSummary.trimmed().isEmpty()) {
@@ -556,9 +687,19 @@ ai::ArchitectureAssistantRequest buildReportRequest(
         request.diagnostics.push_back(
             QStringLiteral("ast preview summary: %1").arg(context.astPreviewSummary.trimmed()));
     }
+    const QString mainFlowSummary =
+        systemContextData.value(QStringLiteral("mainFlowSummary")).toString().trimmed();
+    if (!mainFlowSummary.isEmpty()) {
+        request.diagnostics.push_back(
+            QStringLiteral("main flow: %1").arg(mainFlowSummary));
+    }
     for (const QString& risk : riskSignals) {
         request.diagnostics.push_back(
             QStringLiteral("risk signal: %1").arg(risk));
+    }
+    for (const QString& hotspot : hotspotSignals) {
+        request.diagnostics.push_back(
+            QStringLiteral("hotspot signal: %1").arg(hotspot));
     }
     for (const QString& step : readingOrder) {
         request.diagnostics.push_back(
@@ -607,6 +748,10 @@ AiAvailabilityState AiService::inspectAvailability() {
 QString AiService::classifyNodeScope(const QVariantMap& nodeData) {
     if (nodeData.isEmpty())
         return QStringLiteral("node");
+    if (nodeData.contains(QStringLiteral("capabilityId")) &&
+        FileInsightService::isSingleFileNode(nodeData)) {
+        return QStringLiteral("file_node");
+    }
     return nodeData.contains(QStringLiteral("capabilityId"))
                ? QStringLiteral("component_node")
                : QStringLiteral("capability_map");
@@ -642,11 +787,16 @@ AiPreparedRequest AiService::prepareNodeRequest(
     prepared.pendingStatusMessage =
         prepared.scope == QStringLiteral("capability_map")
             ? QStringLiteral("正在生成当前模块的解读...")
-            : QStringLiteral("正在生成当前模块的解读...");
-    prepared.assistantRequest =
-        prepared.scope == QStringLiteral("capability_map")
-            ? buildCapabilityRequest(context, nodeData)
-            : buildComponentRequest(context, nodeData);
+            : (prepared.scope == QStringLiteral("file_node")
+                   ? QStringLiteral("正在生成当前文件的解读...")
+                   : QStringLiteral("正在生成当前模块的解读..."));
+    if (prepared.scope == QStringLiteral("capability_map")) {
+        prepared.assistantRequest = buildCapabilityRequest(context, nodeData);
+    } else if (prepared.scope == QStringLiteral("file_node")) {
+        prepared.assistantRequest = buildFileRequest(context, nodeData);
+    } else {
+        prepared.assistantRequest = buildComponentRequest(context, nodeData);
+    }
     prepared.networkRequest =
         ai::buildDeepSeekChatCompletionsRequest(loadResult.config);
     prepared.payload = ai::buildDeepSeekChatCompletionsPayload(

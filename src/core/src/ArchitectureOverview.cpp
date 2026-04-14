@@ -79,6 +79,24 @@ std::string lowerFileExtension(const std::string& path) {
     return extension;
 }
 
+bool isCppFamilyExtension(const std::string& extension) {
+    return extension == ".h" || extension == ".hh" || extension == ".hpp" ||
+           extension == ".hxx" || extension == ".h++" ||
+           extension == ".c" || extension == ".cc" || extension == ".cpp" ||
+           extension == ".cxx" || extension == ".cp" || extension == ".c++" ||
+           extension == ".ipp" || extension == ".inl" || extension == ".tpp" ||
+           extension == ".tcc" || extension == ".txx" ||
+           extension == ".ixx" || extension == ".cppm" || extension == ".ii" ||
+           extension == ".cu" || extension == ".cuh" || extension == ".mm";
+}
+
+bool isCppEntryPath(const std::string& path) {
+    return containsToken(path, {
+        "/main.cpp", "/main.cc", "/main.cxx", "/main.cp", "/main.c++",
+        "/main.cppm", "/main.ixx", "/main.mm", "/main.c"
+    });
+}
+
 void recordFileEvidence(OverviewNode& node, const std::string& relativePath) {
     node.filePaths.push_back(relativePath);
 
@@ -100,8 +118,7 @@ void recordFileEvidence(OverviewNode& node, const std::string& relativePath) {
         ++node.dataFileCount;
         return;
     }
-    if (extension == ".h" || extension == ".hh" || extension == ".hpp" || extension == ".hxx" ||
-        extension == ".c" || extension == ".cc" || extension == ".cpp" || extension == ".cxx") {
+    if (isCppFamilyExtension(extension)) {
         ++node.sourceFileCount;
     }
 }
@@ -212,7 +229,7 @@ bool isLikelyEntryModule(const OverviewNode& node) {
     }
 
     for (const std::string& path : node.filePaths) {
-        if (containsToken(path, {"/main.cpp", "/main.cc", "/main.cxx", "/main.c"})) {
+        if (isCppEntryPath(path)) {
             return true;
         }
         if (containsToken(path, {"/main.js", "/main.mjs", "/main.cjs",
@@ -596,7 +613,7 @@ ArchitectureOverview buildArchitectureOverview(const AnalysisReport& report) {
             break;
         }
 
-        if (isEntrypointSymbol(node) || containsToken(node.filePath, {"/main.cpp", "/main.cc", "/main.cxx", "/main.c"})) {
+        if (isEntrypointSymbol(node) || isCppEntryPath(node.filePath)) {
             aggregate.node.kind = OverviewNodeKind::EntryPointModule;
         }
     }

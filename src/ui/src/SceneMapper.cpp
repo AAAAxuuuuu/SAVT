@@ -276,6 +276,7 @@ ComponentSceneData SceneMapper::buildComponentSceneData(
         item.insert(QStringLiteral("folderHint"), QString::fromStdString(node.folderHint));
         item.insert(QStringLiteral("moduleNames"), toVariantStringList(node.moduleNames));
         item.insert(QStringLiteral("exampleFiles"), toVariantStringList(node.exampleFiles));
+        item.insert(QStringLiteral("primaryFilePath"), QString::fromStdString(node.primaryFilePath));
         item.insert(QStringLiteral("topSymbols"), toVariantStringList(node.topSymbols));
         item.insert(QStringLiteral("collaboratorNames"), toVariantStringList(node.collaboratorNames));
         item.insert(QStringLiteral("fileCount"), static_cast<qulonglong>(node.fileCount));
@@ -292,6 +293,9 @@ ComponentSceneData SceneMapper::buildComponentSceneData(
         item.insert(QStringLiteral("pinned"), node.defaultPinned);
         item.insert(QStringLiteral("reachableFromEntry"), node.reachableFromEntry);
         item.insert(QStringLiteral("cycleParticipant"), node.cycleParticipant);
+        item.insert(QStringLiteral("fileCluster"), node.fileCluster);
+        item.insert(QStringLiteral("fileBacked"),
+                    node.fileCluster && !node.primaryFilePath.empty());
         item.insert(QStringLiteral("stageGroupId"), static_cast<qulonglong>(node.stageGroupId));
         item.insert(QStringLiteral("x"), nodeLayout.x);
         item.insert(QStringLiteral("y"), nodeLayout.y);

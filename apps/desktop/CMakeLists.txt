@@ -17,6 +17,7 @@ qt_add_qml_module(savt_desktop
         qml/greenfield/shell/CaseRail.qml
         qml/greenfield/shell/CommandStrip.qml
         qml/greenfield/shell/DeskShell.qml
+        qml/greenfield/shell/FileFocusView.qml
         qml/greenfield/shell/FocusBrief.qml
         qml/greenfield/shell/WorkspaceStage.qml
         qml/greenfield/state/CaseState.qml

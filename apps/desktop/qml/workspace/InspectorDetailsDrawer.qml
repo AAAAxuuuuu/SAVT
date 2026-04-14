@@ -12,10 +12,21 @@ Item {
     required property QtObject analysisController
 
     readonly property bool hasSelection: root.inspectorState.kind.length > 0
+    readonly property var fileDetail: root.inspectorState.selectedNodeIsSingleFile
+                                     ? root.analysisController.describeFileNode(root.inspectorState.selectedNode)
+                                     : ({})
 
     implicitHeight: root.hasSelection ? 360 : 140
 
     function detailGroups() {
+        if (root.inspectorState.selectedNodeIsSingleFile && root.fileDetail.available) {
+            return [
+                {"title": "导入 / 依赖线索", "items": root.fileDetail.importClues || []},
+                {"title": "声明 / 主符号", "items": root.fileDetail.declarationClues || []},
+                {"title": "行为信号", "items": root.fileDetail.behaviorSignals || []},
+                {"title": "建议阅读顺序", "items": root.fileDetail.readingHints || []}
+            ]
+        }
         return [
             {"title": "事实", "items": root.inspectorState.facts},
             {"title": "规则", "items": root.inspectorState.rules},
@@ -99,24 +110,29 @@ Item {
                         }
                     }
 
-                    Label {
-                        Layout.fillWidth: true
-                        text: root.inspectorState.conclusions.length > 0
-                              ? root.inspectorState.conclusions[0]
-                              : "当前还没有可展示的结论。"
-                        wrapMode: Text.WordWrap
-                        color: root.theme.inkStrong
-                        font.family: root.theme.textFontFamily
+                        Label {
+                            Layout.fillWidth: true
+                            text: root.inspectorState.selectedNodeIsSingleFile
+                                  ? (root.fileDetail.summary || "当前还没有可展示的文件解读。")
+                                  : (root.inspectorState.conclusions.length > 0
+                                     ? root.inspectorState.conclusions[0]
+                                     : "当前还没有可展示的结论。")
+                            wrapMode: Text.WordWrap
+                            color: root.theme.inkStrong
+                            font.family: root.theme.textFontFamily
                         font.pixelSize: 12
                     }
 
-                    Label {
-                        Layout.fillWidth: true
-                        visible: (root.inspectorState.confidenceReason || "").length > 0
-                        text: root.inspectorState.confidenceReason
-                        wrapMode: Text.WordWrap
-                        color: root.theme.inkMuted
-                        font.family: root.theme.textFontFamily
+                        Label {
+                            Layout.fillWidth: true
+                            visible: root.inspectorState.selectedNodeIsSingleFile
+                                     || (root.inspectorState.confidenceReason || "").length > 0
+                            text: root.inspectorState.selectedNodeIsSingleFile
+                                  ? "这部分基于文件路径、语言、导入、声明和静态结构线索生成，不再直接复用组件模板。"
+                                  : root.inspectorState.confidenceReason
+                            wrapMode: Text.WordWrap
+                            color: root.theme.inkMuted
+                            font.family: root.theme.textFontFamily
                         font.pixelSize: 12
                     }
                 }
@@ -176,7 +192,10 @@ Item {
             AppCard {
                 Layout.fillWidth: true
                 visible: root.hasSelection
-                         && (root.inspectorState.sourceSymbols.length > 0
+                         && ((root.inspectorState.selectedNodeIsSingleFile
+                              && ((root.fileDetail.declarationClues || []).length > 0
+                                  || (root.fileDetail.importClues || []).length > 0))
+                             || root.inspectorState.sourceSymbols.length > 0
                              || root.inspectorState.sourceModules.length > 0)
                 fillColor: "#FFFFFF"
                 borderColor: root.theme.borderSubtle
@@ -188,7 +207,7 @@ Item {
                     spacing: 8
 
                     Label {
-                        text: "证据来源"
+                        text: root.inspectorState.selectedNodeIsSingleFile ? "文件线索" : "证据来源"
                         color: root.theme.inkStrong
                         font.family: root.theme.displayFontFamily
                         font.pixelSize: 15
@@ -200,7 +219,9 @@ Item {
                         spacing: 8
 
                         Repeater {
-                            model: root.inspectorState.sourceSymbols
+                            model: root.inspectorState.selectedNodeIsSingleFile
+                                   ? (root.fileDetail.declarationClues || [])
+                                   : root.inspectorState.sourceSymbols
 
                             AppChip {
                                 text: modelData
@@ -214,8 +235,12 @@ Item {
 
                     Label {
                         Layout.fillWidth: true
-                        visible: root.inspectorState.sourceModules.length > 0
-                        text: "模块线索：" + root.inspectorState.sourceModules.join("、")
+                        visible: root.inspectorState.selectedNodeIsSingleFile
+                                 ? (root.fileDetail.importClues || []).length > 0
+                                 : root.inspectorState.sourceModules.length > 0
+                        text: root.inspectorState.selectedNodeIsSingleFile
+                              ? ("导入线索：" + (root.fileDetail.importClues || []).slice(0, 3).join("；"))
+                              : ("模块线索：" + root.inspectorState.sourceModules.join("、"))
                         wrapMode: Text.WordWrap
                         color: root.theme.inkMuted
                         font.family: root.theme.textFontFamily
@@ -243,7 +268,7 @@ Item {
                         Layout.fillWidth: true
 
                         Label {
-                            text: "AI 补充说明"
+                            text: root.inspectorState.selectedNodeIsSingleFile ? "AI 文件解读" : "AI 补充说明"
                             color: root.theme.inkStrong
                             font.family: root.theme.displayFontFamily
                             font.pixelSize: 15

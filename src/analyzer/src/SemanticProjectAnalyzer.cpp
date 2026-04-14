@@ -755,8 +755,13 @@ bool argumentsContainPathValue(
 
 bool isCppLikeSourceFile(const std::filesystem::path& sourceFile) {
     const std::string extension = lowerAsciiCopy(sourceFile.extension().string());
-    return extension == ".cc" || extension == ".cpp" || extension == ".cxx" || extension == ".mm" ||
-           extension == ".hpp" || extension == ".hh" || extension == ".hxx";
+    return extension == ".cc" || extension == ".cpp" || extension == ".cxx" ||
+           extension == ".cp" || extension == ".c++" || extension == ".cppm" ||
+           extension == ".ixx" || extension == ".mm" ||
+           extension == ".hpp" || extension == ".hh" || extension == ".hxx" ||
+           extension == ".h++" || extension == ".ipp" || extension == ".inl" ||
+           extension == ".tpp" || extension == ".tcc" || extension == ".txx" ||
+           extension == ".ii" || extension == ".cuh";
 }
 
 bool commandDisablesSystemHeaderSearch(const std::vector<std::string>& arguments);

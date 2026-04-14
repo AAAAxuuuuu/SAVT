@@ -39,6 +39,7 @@ struct ComponentNode {
     std::vector<std::size_t> overviewNodeIds;
     std::vector<std::string> moduleNames;
     std::vector<std::string> exampleFiles;
+    std::string primaryFilePath;
     std::vector<std::string> topSymbols;
     std::vector<std::string> collaboratorNames;
     std::size_t fileCount = 0;
@@ -55,6 +56,7 @@ struct ComponentNode {
     bool cycleParticipant = false;
     bool defaultPinned = false;
     bool defaultVisible = true;
+    bool fileCluster = false;
     std::size_t stageGroupId = 0;
     CapabilityNode::EvidencePackage evidence;
 };

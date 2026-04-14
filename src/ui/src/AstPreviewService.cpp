@@ -41,11 +41,18 @@ std::size_t computeSyntaxDepth(const core::SyntaxNode& node, const std::size_t c
 }
 
 bool isAstPreviewablePath(const QString& relativePath) {
-    const QString lowerPath = relativePath.toLower();
-    return lowerPath.endsWith(QStringLiteral(".cpp")) || lowerPath.endsWith(QStringLiteral(".cc")) ||
-           lowerPath.endsWith(QStringLiteral(".cxx")) || lowerPath.endsWith(QStringLiteral(".c")) ||
-           lowerPath.endsWith(QStringLiteral(".hpp")) || lowerPath.endsWith(QStringLiteral(".hh")) ||
-           lowerPath.endsWith(QStringLiteral(".hxx")) || lowerPath.endsWith(QStringLiteral(".h"));
+    const QString suffix = QFileInfo(relativePath).suffix().toLower();
+    return suffix == QStringLiteral("cpp") || suffix == QStringLiteral("cc") ||
+           suffix == QStringLiteral("cxx") || suffix == QStringLiteral("cp") ||
+           suffix == QStringLiteral("c++") || suffix == QStringLiteral("c") ||
+           suffix == QStringLiteral("ixx") || suffix == QStringLiteral("cppm") ||
+           suffix == QStringLiteral("cu") || suffix == QStringLiteral("mm") ||
+           suffix == QStringLiteral("hpp") || suffix == QStringLiteral("hh") ||
+           suffix == QStringLiteral("hxx") || suffix == QStringLiteral("h++") ||
+           suffix == QStringLiteral("h") || suffix == QStringLiteral("ipp") ||
+           suffix == QStringLiteral("inl") || suffix == QStringLiteral("tpp") ||
+           suffix == QStringLiteral("tcc") || suffix == QStringLiteral("txx") ||
+           suffix == QStringLiteral("ii") || suffix == QStringLiteral("cuh");
 }
 
 int astPreviewScore(const QString& relativePath) {
@@ -56,13 +63,16 @@ int astPreviewScore(const QString& relativePath) {
     if (relativePath.startsWith(QStringLiteral("apps/"))) {
         score += 35;
     }
-    if (relativePath == QStringLiteral("main.cpp") || relativePath.endsWith(QStringLiteral("/main.cpp"))) {
+    if (relativePath == QStringLiteral("main.cpp") || relativePath.endsWith(QStringLiteral("/main.cpp")) ||
+        relativePath.endsWith(QStringLiteral("/main.ixx")) || relativePath.endsWith(QStringLiteral("/main.cppm"))) {
         score += 30;
     }
-    if (relativePath.endsWith(QStringLiteral(".cpp"))) {
+    if (relativePath.endsWith(QStringLiteral(".cpp")) || relativePath.endsWith(QStringLiteral(".ixx")) ||
+        relativePath.endsWith(QStringLiteral(".cppm"))) {
         score += 10;
     }
-    if (relativePath.endsWith(QStringLiteral(".hpp")) || relativePath.endsWith(QStringLiteral(".h"))) {
+    if (relativePath.endsWith(QStringLiteral(".hpp")) || relativePath.endsWith(QStringLiteral(".h")) ||
+        relativePath.endsWith(QStringLiteral(".ipp")) || relativePath.endsWith(QStringLiteral(".tpp"))) {
         score += 5;
     }
     if (relativePath.startsWith(QStringLiteral("tests/")) || relativePath.contains(QStringLiteral("/tests/"))) {

@@ -52,6 +52,10 @@ ScrollView {
         root.navigateTo("project.capabilityMap")
     }
 
+    function focusCard(item) {
+        root.focusCapability(item.capabilityName || item.name || "")
+    }
+
     function semanticReadiness() {
         return root.analysisController.systemContextData.semanticReadiness || ({})
     }
@@ -82,6 +86,19 @@ ScrollView {
 
     function riskSignalItems() {
         return root.analysisController.systemContextData.riskSignals || []
+    }
+
+    function contextSectionItems() {
+        return root.analysisController.systemContextData.contextSections || []
+    }
+
+    function openContextSection(item) {
+        if ((item.capabilityName || "").length > 0) {
+            root.focusCapability(item.capabilityName || "")
+            return
+        }
+        if ((item.pageId || "").length > 0)
+            root.navigateTo(item.pageId)
     }
 
     ColumnLayout {
@@ -349,7 +366,7 @@ ScrollView {
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.focusCapability(modelData.name || "")
+                                    onClicked: root.focusCard(modelData)
                                 }
                             }
                         }
@@ -377,9 +394,11 @@ ScrollView {
                     theme: root.theme
                     eyebrow: "建议路径"
                     title: "推荐阅读路径与快速动作"
-                    subtitle: (root.analysisController.systemContextData.topModules || []).length > 0
-                              ? ("先从入口建立全局认识，再依次看 " + (root.analysisController.systemContextData.topModules || []).slice(0, 3).join("、") + "，最后带着问题进入模块细节。")
-                              : "总览页不把所有信息一次性铺开，而是明确告诉你下一步从哪里继续。"
+                    subtitle: (root.analysisController.systemContextData.mainFlowSummary || "").length > 0
+                              ? (root.analysisController.systemContextData.mainFlowSummary || "")
+                              : ((root.analysisController.systemContextData.topModules || []).length > 0
+                                 ? ("先从入口建立全局认识，再依次看 " + (root.analysisController.systemContextData.topModules || []).slice(0, 3).join("、") + "，最后带着问题进入模块细节。")
+                                 : "总览页不把所有信息一次性铺开，而是明确告诉你下一步从哪里继续。")
 
                     Repeater {
                         model: root.readingOrderItems()
@@ -422,6 +441,75 @@ ScrollView {
                                     if ((modelData.pageId || "").length > 0)
                                         root.navigateTo(modelData.pageId)
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        AppCard {
+            Layout.fillWidth: true
+            visible: !root.showEntryEmptyState && root.contextSectionItems().length > 0
+            fillColor: "#FFFFFF"
+            borderColor: root.theme.borderSubtle
+            cornerRadius: root.theme.radiusXxl
+            minimumContentHeight: 220
+
+            AppSection {
+                anchors.fill: parent
+                theme: root.theme
+                eyebrow: "系统上下文"
+                title: "完整系统上下文"
+                subtitle: "把 L1 的关键判断完整展开，避免只有几张摘要卡。"
+
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: width > 1080 ? 2 : 1
+                    columnSpacing: 12
+                    rowSpacing: 12
+
+                    Repeater {
+                        model: root.contextSectionItems()
+
+                        AppCard {
+                            Layout.fillWidth: true
+                            fillColor: root.theme.surfaceSecondary
+                            borderColor: root.theme.borderSubtle
+                            cornerRadius: root.theme.radiusLg
+                            minimumContentHeight: 84
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                spacing: 6
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: modelData.title || ""
+                                    wrapMode: Text.WordWrap
+                                    color: root.theme.inkStrong
+                                    font.family: root.theme.displayFontFamily
+                                    font.pixelSize: 15
+                                    font.weight: Font.DemiBold
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: modelData.body || ""
+                                    wrapMode: Text.WordWrap
+                                    color: root.theme.inkMuted
+                                    font.family: root.theme.textFontFamily
+                                    font.pixelSize: 12
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                enabled: ((modelData.capabilityName || "").length > 0)
+                                         || ((modelData.pageId || "").length > 0)
+                                hoverEnabled: enabled
+                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                onClicked: root.openContextSection(modelData)
                             }
                         }
                     }

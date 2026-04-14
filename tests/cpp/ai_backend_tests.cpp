@@ -120,6 +120,16 @@ savt::ai::ArchitectureAssistantRequest buildSampleRequest() {
     request.exampleFiles = {QStringLiteral("App/backend/algorithm/AlgorithmLibrary.cpp")};
     request.topSymbols = {QStringLiteral("AlgorithmLibrary"), QStringLiteral("IncomingEdge")};
     request.collaboratorNames = {QStringLiteral("App Backend Facade"), QStringLiteral("App Backend Graph")};
+    request.filePath = QStringLiteral("App/backend/algorithm/AlgorithmLibrary.cpp");
+    request.fileLanguage = QStringLiteral("C++");
+    request.fileCategory = QStringLiteral("源码文件");
+    request.fileRoleHint = QStringLiteral("服务/编排");
+    request.fileSummary = QStringLiteral("围绕 AlgorithmLibrary 组织分析流程。");
+    request.codeExcerpt = QStringLiteral("class AlgorithmLibrary {\npublic:\n  void build();\n};");
+    request.fileImports = {QStringLiteral("#include \"AlgorithmLibrary.h\"")};
+    request.fileDeclarations = {QStringLiteral("AlgorithmLibrary"), QStringLiteral("IncomingEdge")};
+    request.fileSignals = {QStringLiteral("包含数据转换或序列化线索")};
+    request.fileReadingHints = {QStringLiteral("先看 AlgorithmLibrary::build")};
     request.diagnostics = {QStringLiteral("semantic analysis unavailable")};
     return request;
 }
@@ -158,6 +168,10 @@ void testRequestPayloadAndHeaders() {
            "user prompt should include the explanation goal");
     expect(containsText(userPrompt, QStringLiteral("\"guide\"")),
            "user prompt evidence package should include guide metadata");
+    expect(containsText(userPrompt, QStringLiteral("\"file\"")),
+           "user prompt evidence package should include file metadata when available");
+    expect(containsText(userPrompt, QStringLiteral("AlgorithmLibrary::build")),
+           "user prompt evidence package should include file reading hints");
     expect(containsText(userPrompt, QStringLiteral("\"uiScope\": \"l3_module_guide\"")),
            "user prompt evidence package should serialize the UI scope");
     expect(containsText(userPrompt, QStringLiteral("plain_summary")),

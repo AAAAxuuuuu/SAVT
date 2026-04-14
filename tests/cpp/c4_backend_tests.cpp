@@ -725,11 +725,11 @@ void testComponentSceneMapperPublishesCapabilityDrilldownPayload() {
 
     const auto desktopShellIt = std::find_if(
         componentGraph.nodes.begin(), componentGraph.nodes.end(), [](const savt::core::ComponentNode& node) {
-            return node.name == "DesktopShell";
+            return node.name == "DesktopShell" || containsText(node.moduleNames, "DesktopShell");
         });
     const auto snapshotStoreIt = std::find_if(
         componentGraph.nodes.begin(), componentGraph.nodes.end(), [](const savt::core::ComponentNode& node) {
-            return node.name == "SnapshotStore";
+            return node.name == "SnapshotStore" || containsText(node.moduleNames, "SnapshotStore");
         });
     expect(desktopShellIt != componentGraph.nodes.end() &&
                desktopShellIt->kind == savt::core::ComponentNodeKind::Entry,
@@ -830,11 +830,15 @@ void testSingleModuleCapabilityFallsBackToFileLevelL3Expansion() {
 
     const auto controllerNodeIt = std::find_if(
         componentGraph.nodes.begin(), componentGraph.nodes.end(), [](const savt::core::ComponentNode& node) {
-            return node.name.find("AnalysisController") != std::string::npos;
+            return node.name.find("AnalysisController") != std::string::npos ||
+                   containsText(node.topSymbols, "AnalysisController") ||
+                   containsText(node.exampleFiles, "src/analyzer/AnalysisController.cpp");
         });
     const auto sceneMapperNodeIt = std::find_if(
         componentGraph.nodes.begin(), componentGraph.nodes.end(), [](const savt::core::ComponentNode& node) {
-            return node.name.find("SceneMapper") != std::string::npos;
+            return node.name.find("SceneMapper") != std::string::npos ||
+                   containsText(node.topSymbols, "SceneMapper") ||
+                   containsText(node.exampleFiles, "src/analyzer/SceneMapper.cpp");
         });
     expect(controllerNodeIt != componentGraph.nodes.end() &&
                sceneMapperNodeIt != componentGraph.nodes.end(),
@@ -909,6 +913,176 @@ void testCollectSourceFilesSkipsToolchainDirectoriesUnderTools() {
            "downloaded tool payloads under tools/downloads should be skipped");
     expect(!containsText(relativePaths, ".qtc_clangd/index/cache.h"),
            "Qt Creator clangd cache directories should be skipped");
+
+    std::error_code errorCode;
+    fs::remove_all(tempRoot, errorCode);
+}
+
+void testCollectSourceFilesIncludesMainstreamCppAndQtProjectArtifacts() {
+    namespace fs = std::filesystem;
+
+    const fs::path tempRoot = makeTempDirectory("savt_mainstream_cpp_qt_artifacts");
+    writeTextFile(tempRoot / "src" / "TrafficMap.ixx",
+                  "export module TrafficMap;\nexport int buildTrafficMapModel() { return 1; }\n");
+    writeTextFile(tempRoot / "include" / "TrafficMap.tpp",
+                  "template <typename T> T normalizeTrafficValue(T value) { return value; }\n");
+    writeTextFile(tempRoot / "kernels" / "flow.cu",
+                  "__global__ void updateFlowKernel() {}\n");
+    writeTextFile(tempRoot / "resources" / "app.qrc",
+                  "<RCC><qresource prefix=\"/\"><file>qml/Main.qml</file></qresource></RCC>\n");
+    writeTextFile(tempRoot / "forms" / "MainWindow.ui",
+                  "<ui><class>MainWindow</class><widget class=\"QMainWindow\" name=\"MainWindow\"/></ui>\n");
+    writeTextFile(tempRoot / "cmake" / "Feature.cmake",
+                  "target_link_libraries(traffic_map PRIVATE Qt6::Quick)\n");
+    writeTextFile(tempRoot / "qmake" / "app.pro",
+                  "QT += quick\nSOURCES += src/main.cpp\n");
+    writeTextFile(tempRoot / "qml" / "qmldir",
+                  "module TrafficMap\nMain 1.0 Main.qml\n");
+    writeTextFile(tempRoot / "platform" / "startup.S",
+                  ".globl _traffic_start\n_traffic_start:\n");
+    writeTextFile(tempRoot / "platform" / "exports.def",
+                  "LIBRARY TrafficMap\nEXPORTS\n  buildTrafficMapModel @1\n");
+    writeTextFile(tempRoot / "notes" / "todo.txt",
+                  "This note is not architecture-relevant source.\n");
+
+    const auto files =
+        savt::analyzer::detail::collectSourceFiles(tempRoot, savt::analyzer::AnalyzerOptions{});
+
+    std::vector<std::string> relativePaths;
+    relativePaths.reserve(files.size());
+    for (const fs::path& filePath : files) {
+        relativePaths.push_back(savt::analyzer::detail::relativizePath(tempRoot, filePath));
+    }
+
+    expect(containsText(relativePaths, "src/TrafficMap.ixx"),
+           "C++ module interface files should be collected as architecture sources");
+    expect(containsText(relativePaths, "include/TrafficMap.tpp"),
+           "template implementation files should be collected as architecture sources");
+    expect(containsText(relativePaths, "kernels/flow.cu"),
+           "CUDA C++ files should be collected as architecture sources");
+    expect(containsText(relativePaths, "resources/app.qrc"),
+           "Qt resource collection files should be collected as architecture artifacts");
+    expect(containsText(relativePaths, "forms/MainWindow.ui"),
+           "Qt Designer UI files should be collected as architecture artifacts");
+    expect(containsText(relativePaths, "cmake/Feature.cmake"),
+           "CMake include files should be collected as C++ project artifacts");
+    expect(containsText(relativePaths, "qmake/app.pro"),
+           "qmake project files should be collected as C++ project artifacts");
+    expect(containsText(relativePaths, "qml/qmldir"),
+           "QML module descriptor files should be collected as Qt project artifacts");
+    expect(containsText(relativePaths, "platform/startup.S"),
+           "assembly bridge files should be collected as C/C++ project artifacts");
+    expect(containsText(relativePaths, "platform/exports.def"),
+           "module definition files should be collected as C/C++ project artifacts");
+    expect(!containsText(relativePaths, "notes/todo.txt"),
+           "plain notes should stay out of the architecture scan");
+
+    std::error_code errorCode;
+    fs::remove_all(tempRoot, errorCode);
+}
+
+void testCollectSourceFilesSkipsTopLevelDependencyDirectoriesByDefault() {
+    namespace fs = std::filesystem;
+
+    const fs::path tempRoot = makeTempDirectory("savt_skip_dependency_dirs");
+    writeTextFile(tempRoot / "src" / "main.cpp", "int main() { return 0; }\n");
+    writeTextFile(tempRoot / "src" / "dependencies" / "LocalAdapter.cpp",
+                  "int local_adapter() { return 1; }\n");
+    writeTextFile(tempRoot / "Dependencies" / "sdk" / "Widget.qml", "Item {}\n");
+    writeTextFile(tempRoot / "vendor" / "lib" / "xlsxdocument.cpp",
+                  "int vendor_doc() { return 0; }\n");
+    writeTextFile(tempRoot / "external" / "toolkit" / "Tool.h",
+                  "class Tool {};\n");
+
+    const auto defaultFiles =
+        savt::analyzer::detail::collectSourceFiles(tempRoot, savt::analyzer::AnalyzerOptions{});
+
+    std::vector<std::string> defaultRelativePaths;
+    defaultRelativePaths.reserve(defaultFiles.size());
+    for (const fs::path& filePath : defaultFiles) {
+        defaultRelativePaths.push_back(
+            savt::analyzer::detail::relativizePath(tempRoot, filePath));
+    }
+
+    expect(containsText(defaultRelativePaths, "src/main.cpp"),
+           "default source collection should keep project sources");
+    expect(containsText(defaultRelativePaths, "src/dependencies/LocalAdapter.cpp"),
+           "default source collection should preserve nested project directories whose names happen to contain dependencies");
+    expect(!containsText(defaultRelativePaths, "Dependencies/sdk/Widget.qml"),
+           "default source collection should skip top-level dependency folders");
+    expect(!containsText(defaultRelativePaths, "vendor/lib/xlsxdocument.cpp"),
+           "default source collection should skip top-level vendor folders");
+    expect(!containsText(defaultRelativePaths, "external/toolkit/Tool.h"),
+           "default source collection should skip top-level external folders");
+
+    savt::analyzer::AnalyzerOptions includeThirdPartyOptions;
+    includeThirdPartyOptions.includeThirdParty = true;
+    const auto fullFiles =
+        savt::analyzer::detail::collectSourceFiles(tempRoot, includeThirdPartyOptions);
+
+    std::vector<std::string> fullRelativePaths;
+    fullRelativePaths.reserve(fullFiles.size());
+    for (const fs::path& filePath : fullFiles) {
+        fullRelativePaths.push_back(
+            savt::analyzer::detail::relativizePath(tempRoot, filePath));
+    }
+
+    expect(containsText(fullRelativePaths, "Dependencies/sdk/Widget.qml"),
+           "includeThirdParty should allow top-level dependency folders back into the scan");
+    expect(containsText(fullRelativePaths, "vendor/lib/xlsxdocument.cpp"),
+           "includeThirdParty should allow vendor folders back into the scan");
+    expect(containsText(fullRelativePaths, "external/toolkit/Tool.h"),
+           "includeThirdParty should allow external folders back into the scan");
+
+    std::error_code errorCode;
+    fs::remove_all(tempRoot, errorCode);
+}
+
+void testCapabilityGraphFoldsAuxiliaryExampleAndGeneratedAreas() {
+    namespace fs = std::filesystem;
+
+    const fs::path tempRoot = makeTempDirectory("savt_fold_auxiliary_noise");
+    writeTextFile(tempRoot / "app" / "main.cpp", "int main() { return 0; }\n");
+    writeTextFile(tempRoot / "src" / "core" / "Engine.cpp", "int run_engine() { return 1; }\n");
+    writeTextFile(tempRoot / "src" / "core" / "Engine.h", "int run_engine();\n");
+    writeTextFile(tempRoot / "examples" / "gallery" / "PreviewWidget.cpp",
+                  "int preview_widget() { return 2; }\n");
+    writeTextFile(tempRoot / "generated" / "api" / "Client.cpp",
+                  "int generated_client() { return 3; }\n");
+
+    savt::analyzer::CppProjectAnalyzer analyzer;
+    savt::analyzer::AnalyzerOptions options;
+    options.precision = savt::analyzer::AnalyzerPrecision::SyntaxOnly;
+    const auto report = analyzer.analyzeProject(tempRoot, options);
+    const auto overview = savt::core::buildArchitectureOverview(report);
+    const auto capabilityGraph = savt::core::buildCapabilityGraph(report, overview);
+
+    const auto* coreCapability = findCapabilityByModule(capabilityGraph, "src/core");
+    expect(coreCapability != nullptr,
+           "core capability should still be preserved in the default graph");
+    expect(coreCapability->defaultVisible,
+           "core capability should remain visible after auxiliary folding");
+
+    const auto* exampleCapability = findCapabilityByModule(capabilityGraph, "examples");
+    expect(exampleCapability != nullptr,
+           "example-like module should still exist in the capability graph");
+    expect(!exampleCapability->defaultVisible,
+           "example-like module should be folded out of the default capability view");
+    expect(exampleCapability->defaultCollapsed,
+           "example-like module should be collapsed by default");
+
+    const auto* generatedCapability = findCapabilityByModule(capabilityGraph, "generated");
+    expect(generatedCapability != nullptr,
+           "generated module should still exist in the capability graph");
+    expect(!generatedCapability->defaultVisible,
+           "generated module should be folded out of the default capability view");
+    expect(generatedCapability->defaultCollapsed,
+           "generated module should be collapsed by default");
+
+    expect(std::any_of(capabilityGraph.diagnostics.begin(), capabilityGraph.diagnostics.end(), [](const std::string& diagnostic) {
+               return diagnostic.find("example/generated/test-support") != std::string::npos;
+           }),
+           "capability diagnostics should mention auxiliary noise folding");
 
     std::error_code errorCode;
     fs::remove_all(tempRoot, errorCode);
@@ -1605,12 +1779,15 @@ int main() {
     testProjectConfigSkipsConfiguredDirectoriesAndMergesModules();
     testProjectConfigOverridesEntryRoleAndDependencyFolding();
     testDependencyAndPrimaryEntryClassification();
+    testCollectSourceFilesSkipsToolchainDirectoriesUnderTools();
+    testCollectSourceFilesIncludesMainstreamCppAndQtProjectArtifacts();
+    testCollectSourceFilesSkipsTopLevelDependencyDirectoriesByDefault();
+    testCapabilityGraphFoldsAuxiliaryExampleAndGeneratedAreas();
     testCrossArtifactOverviewAndCapabilityGraph();
     testCapabilitySceneMapperPublishesSingleScenePayload();
     testComponentSceneMapperPublishesCapabilityDrilldownPayload();
     testSingleModuleCapabilityFallsBackToFileLevelL3Expansion();
     testAnalysisReportSerializesFactSources();
-    testCollectSourceFilesSkipsToolchainDirectoriesUnderTools();
     testLargeMixedOverviewAvoidsModuleScopedCapabilityExplosion();
     testAnalysisGraphBuilderPreservesDistinctSemanticOverloads();
     testNodeBackendRelativeImportsAndRoleClassification();

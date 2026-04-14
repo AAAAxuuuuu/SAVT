@@ -4,6 +4,7 @@
     include/savt/ui/AstPreviewService.h
     include/savt/ui/AnalysisOrchestrator.h
     include/savt/ui/AnalysisAnnotationService.h
+    include/savt/ui/FileInsightService.h
     include/savt/ui/IncrementalAnalysisPipeline.h
     include/savt/ui/ReadingGuideService.h
     include/savt/ui/ReportService.h
@@ -16,6 +17,7 @@
     src/IncrementalAnalysisPipeline.cpp
     src/AnalysisOrchestrator.cpp
     src/AnalysisAnnotationService.cpp
+    src/FileInsightService.cpp
     src/ReadingGuideService.cpp
     src/ReportService.cpp
     src/SemanticReadinessService.cpp

@@ -102,6 +102,11 @@ QtObject {
         selectedComponentNodeId = ""
     }
 
+    function clearComponentFocus() {
+        selectedComponentNodeId = ""
+        selectedComponentEdgeId = ""
+    }
+
     function clearSelection() {
         selectedCapabilityNodeId = ""
         selectedCapabilityEdgeId = ""

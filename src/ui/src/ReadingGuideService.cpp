@@ -243,6 +243,12 @@ QString inferOutputSummary(const bool hasUi) {
                  : QStringLiteral("Results are mainly written to logs, the console, or local storage.");
 }
 
+bool isDependencyCapability(const core::CapabilityNode& node) {
+    return QString::fromStdString(node.dominantRole)
+               .trimmed()
+               .compare(QStringLiteral("dependency"), Qt::CaseInsensitive) == 0;
+}
+
 struct SystemContextSignals {
     int coreModuleCount = 0;
     bool hasUi = false;
@@ -284,7 +290,15 @@ std::vector<const core::CapabilityNode*> visibleNodesForSummary(
 SystemContextSignals summarizeSystemContext(const core::CapabilityGraph& graph) {
     SystemContextSignals context;
     context.visibleNodes = visibleNodesForSummary(graph);
-    context.coreModuleCount = static_cast<int>(context.visibleNodes.size());
+    context.coreModuleCount = static_cast<int>(std::count_if(
+        context.visibleNodes.begin(),
+        context.visibleNodes.end(),
+        [](const core::CapabilityNode* node) {
+            return node != nullptr && !isDependencyCapability(*node);
+        }));
+    if (context.coreModuleCount == 0) {
+        context.coreModuleCount = static_cast<int>(context.visibleNodes.size());
+    }
 
     for (const core::CapabilityNode* node : context.visibleNodes) {
         const QString evidence = capabilityEvidenceBlob(*node);
@@ -307,7 +321,8 @@ SystemContextSignals summarizeSystemContext(const core::CapabilityGraph& graph) 
             context.hasNetwork = true;
         }
 
-        if (node->kind == core::CapabilityNodeKind::Entry) {
+        if (node->kind == core::CapabilityNodeKind::Entry ||
+            isDependencyCapability(*node)) {
             continue;
         }
 
@@ -323,6 +338,9 @@ SystemContextSignals summarizeSystemContext(const core::CapabilityGraph& graph) 
 
     if (context.topModules.isEmpty()) {
         for (const core::CapabilityNode* node : context.visibleNodes) {
+            if (isDependencyCapability(*node)) {
+                continue;
+            }
             const QString name = QString::fromStdString(node->name).trimmed();
             if (!name.isEmpty() && !context.topModules.contains(name)) {
                 context.topModules.push_back(name);
@@ -335,6 +353,61 @@ SystemContextSignals summarizeSystemContext(const core::CapabilityGraph& graph) 
     }
 
     return context;
+}
+
+QString summarizeMainFlow(
+    const core::ArchitectureOverview& overview,
+    const core::CapabilityGraph& graph) {
+    auto summarizeFlowNames = [](const auto& flow, const auto& nodes) {
+        std::unordered_map<std::size_t, QString> nodeNames;
+        for (const auto& node : nodes) {
+            nodeNames.emplace(node.id, QString::fromStdString(node.name).trimmed());
+        }
+
+        QStringList names;
+        for (const std::size_t nodeId : flow.nodeIds) {
+            const auto it = nodeNames.find(nodeId);
+            if (it == nodeNames.end()) {
+                continue;
+            }
+
+            const QString name = it->second.trimmed();
+            if (!name.isEmpty() && !names.contains(name)) {
+                names.push_back(name);
+            }
+        }
+        return names;
+    };
+
+    if (!graph.flows.empty()) {
+        const core::CapabilityFlow& flow = graph.flows.front();
+        if (!flow.summary.empty()) {
+            return QStringLiteral("Main path: %1")
+                .arg(QString::fromStdString(flow.summary).trimmed());
+        }
+
+        const QStringList names = summarizeFlowNames(flow, graph.nodes);
+        if (!names.isEmpty()) {
+            return QStringLiteral("Main path: %1")
+                .arg(names.join(QStringLiteral(" -> ")));
+        }
+    }
+
+    if (!overview.flows.empty()) {
+        const core::OverviewFlow& flow = overview.flows.front();
+        if (!flow.summary.empty()) {
+            return QStringLiteral("Main path: %1")
+                .arg(QString::fromStdString(flow.summary).trimmed());
+        }
+
+        const QStringList names = summarizeFlowNames(flow, overview.nodes);
+        if (!names.isEmpty()) {
+            return QStringLiteral("Main path: %1")
+                .arg(names.join(QStringLiteral(" -> ")));
+        }
+    }
+
+    return {};
 }
 
 QString capabilityCardSummary(const core::CapabilityNode& node) {
@@ -498,11 +571,172 @@ QVariantList buildRiskSignals(
     return riskItems;
 }
 
+struct HotspotCandidate {
+    const core::CapabilityNode* node = nullptr;
+    int score = 0;
+};
+
+std::size_t totalEdgeCount(const core::CapabilityNode& node) {
+    return node.incomingEdgeCount + node.outgoingEdgeCount;
+}
+
+int hotspotScore(const core::CapabilityNode& node) {
+    int score = 0;
+    score += std::min<int>(12, static_cast<int>(totalEdgeCount(node)));
+    score += std::min<int>(8, static_cast<int>(node.fileCount / 4));
+    score += std::min<int>(8, static_cast<int>(node.flowParticipationCount * 3));
+    score += std::min<int>(8, static_cast<int>(node.riskScore));
+    if (node.cycleParticipant) {
+        score += 10;
+    }
+
+    const QString riskLevel =
+        QString::fromStdString(node.riskLevel).trimmed().toLower();
+    if (riskLevel == QStringLiteral("high")) {
+        score += 6;
+    } else if (riskLevel == QStringLiteral("medium")) {
+        score += 3;
+    }
+
+    return score;
+}
+
+QString hotspotSeverity(const int score) {
+    if (score >= 24) {
+        return QStringLiteral("high");
+    }
+    if (score >= 14) {
+        return QStringLiteral("medium");
+    }
+    return QStringLiteral("low");
+}
+
+QString hotspotSummary(const core::CapabilityNode& node) {
+    QStringList reasons;
+    const std::size_t degree = totalEdgeCount(node);
+    if (degree >= 4) {
+        reasons.push_back(QStringLiteral("touches %1 cross-module links").arg(degree));
+    }
+    if (node.fileCount >= 8) {
+        reasons.push_back(QStringLiteral("owns %1 files").arg(node.fileCount));
+    }
+    if (node.flowParticipationCount >= 2) {
+        reasons.push_back(QStringLiteral("shows up in %1 main flows")
+                              .arg(node.flowParticipationCount));
+    }
+    if (node.cycleParticipant) {
+        reasons.push_back(QStringLiteral("participates in a dependency cycle"));
+    }
+
+    const QString riskLevel =
+        QString::fromStdString(node.riskLevel).trimmed().toLower();
+    if (riskLevel == QStringLiteral("high") || node.riskScore >= 6) {
+        reasons.push_back(QStringLiteral("already carries elevated structural risk"));
+    } else if (riskLevel == QStringLiteral("medium") || node.riskScore >= 3) {
+        reasons.push_back(QStringLiteral("already shows medium structural risk"));
+    }
+
+    if (reasons.isEmpty()) {
+        return capabilityCardSummary(node);
+    }
+
+    return QStringLiteral("Worth checking early because it %1.")
+        .arg(reasons.join(QStringLiteral(", ")));
+}
+
+QVariantList buildHotspotSignals(const core::CapabilityGraph& graph) {
+    std::vector<HotspotCandidate> candidates;
+    candidates.reserve(graph.nodes.size());
+    for (const core::CapabilityNode& node : graph.nodes) {
+        if (!node.defaultVisible ||
+            node.kind == core::CapabilityNodeKind::Entry ||
+            isDependencyCapability(node)) {
+            continue;
+        }
+
+        const int score = hotspotScore(node);
+        if (score < 10) {
+            continue;
+        }
+
+        candidates.push_back({&node, score});
+    }
+
+    std::sort(
+        candidates.begin(),
+        candidates.end(),
+        [](const HotspotCandidate& left, const HotspotCandidate& right) {
+            if (left.score != right.score) {
+                return left.score > right.score;
+            }
+            if (left.node->visualPriority != right.node->visualPriority) {
+                return left.node->visualPriority > right.node->visualPriority;
+            }
+            if (left.node->fileCount != right.node->fileCount) {
+                return left.node->fileCount > right.node->fileCount;
+            }
+            return left.node->name < right.node->name;
+        });
+
+    QVariantList items;
+    const int limit = std::min<int>(3, static_cast<int>(candidates.size()));
+    for (int index = 0; index < limit; ++index) {
+        const HotspotCandidate& candidate =
+            candidates[static_cast<std::size_t>(index)];
+        QVariantMap item;
+        item.insert(
+            QStringLiteral("title"),
+            QString::fromStdString(candidate.node->name).trimmed());
+        item.insert(QStringLiteral("summary"), hotspotSummary(*candidate.node));
+        item.insert(QStringLiteral("kind"), QStringLiteral("hotspot"));
+        item.insert(QStringLiteral("severity"), hotspotSeverity(candidate.score));
+        item.insert(
+            QStringLiteral("nodeId"),
+            QVariant::fromValue(static_cast<qulonglong>(candidate.node->id)));
+        item.insert(
+            QStringLiteral("capabilityName"),
+            QString::fromStdString(candidate.node->name).trimmed());
+        items.push_back(item);
+    }
+
+    return items;
+}
+
+QString summarizeStructuredSignals(
+    const QVariantList& items,
+    const QString& titleField,
+    const QString& bodyField,
+    const int limit) {
+    QStringList parts;
+    const int count = std::min(limit, static_cast<int>(items.size()));
+    for (int index = 0; index < count; ++index) {
+        const QVariantMap item = items[static_cast<std::size_t>(index)].toMap();
+        const QString title = item.value(titleField).toString().trimmed();
+        const QString body = item.value(bodyField).toString().trimmed();
+        QString part;
+        if (!title.isEmpty() && !body.isEmpty()) {
+            part = QStringLiteral("%1: %2").arg(title, body);
+        } else if (!title.isEmpty()) {
+            part = title;
+        } else {
+            part = body;
+        }
+
+        if (!part.isEmpty() && !parts.contains(part)) {
+            parts.push_back(part);
+        }
+    }
+
+    return parts.join(QStringLiteral("\n"));
+}
+
 QVariantList buildReadingOrder(
     const core::ArchitectureOverview& overview,
     const core::CapabilityGraph& graph,
     const SystemContextSignals& contextSignals,
-    const QVariantList& riskSignals) {
+    const QVariantList& riskSignals,
+    const QVariantList& hotspotSignals,
+    const QString& mainFlowSummary) {
     QVariantList steps;
 
     QVariantMap step1;
@@ -511,11 +745,15 @@ QVariantList buildReadingOrder(
     step1.insert(QStringLiteral("pageId"), QStringLiteral("project.overview"));
     steps.push_back(step1);
 
-    const QString coreModulesBody =
+    QString coreModulesBody =
         contextSignals.topModules.isEmpty()
             ? QStringLiteral("Next, open the capability map and lock onto the most stable primary capability before drilling down.")
             : QStringLiteral("Then read core modules such as \"%1\" and connect their responsibilities into one main path.")
                   .arg(contextSignals.topModules.join(QStringLiteral("\", \"")));
+    if (!mainFlowSummary.isEmpty()) {
+        coreModulesBody = QStringLiteral("%1 Then trace %2.")
+                              .arg(coreModulesBody, mainFlowSummary.toLower());
+    }
 
     QVariantMap step2;
     step2.insert(QStringLiteral("title"), QStringLiteral("2. Read core modules"));
@@ -533,6 +771,16 @@ QVariantList buildReadingOrder(
         if (!riskName.isEmpty() && !riskSummary.isEmpty()) {
             focusBody = QStringLiteral("Finally, pay extra attention to \"%1\": %2")
                             .arg(riskName, riskSummary);
+        }
+    } else if (!hotspotSignals.isEmpty()) {
+        const QVariantMap topHotspot = hotspotSignals.front().toMap();
+        const QString hotspotName =
+            topHotspot.value(QStringLiteral("capabilityName")).toString().trimmed();
+        const QString hotspotSummaryText =
+            topHotspot.value(QStringLiteral("summary")).toString().trimmed();
+        if (!hotspotName.isEmpty() && !hotspotSummaryText.isEmpty()) {
+            focusBody = QStringLiteral("Finally, drill into \"%1\" early: %2")
+                            .arg(hotspotName, hotspotSummaryText);
         }
     }
 
@@ -570,6 +818,8 @@ QVariantMap ReadingGuideService::buildGuide(
     const QStringList topModules = contextSignals.topModules;
     const QVariantList ruleFindings = buildRuleFindings(ruleReport);
     const QVariantList riskSignals = buildRiskSignals(ruleReport, graph);
+    const QVariantList hotspotSignals = buildHotspotSignals(graph);
+    const QString mainFlowSummary = summarizeMainFlow(overview, graph);
 
     QStringList technologyClues;
     technologyClues.push_back(QStringLiteral("implemented mainly in C++"));
@@ -586,48 +836,165 @@ QVariantMap ReadingGuideService::buildGuide(
         technologyClues.push_back(QStringLiteral("includes scripts or generation flows"));
     }
 
+    const QString audienceSummary = joinPreview(
+        inferAudienceHints(graph),
+        3,
+        QStringLiteral("developers, maintainers, or anyone onboarding to the codebase"));
+    const QString entrySummary = inferEntrySummary(overview, graph);
+    const QString inputSummary = inferInputSummary(contextSignals.hasNetwork);
+    const QString outputSummary = inferOutputSummary(contextSignals.hasUi);
+    const QString technologySummary = technologyClues.isEmpty()
+        ? QStringLiteral("No stable technology summary is available yet.")
+        : technologyClues.join(QStringLiteral("; ")) + QStringLiteral(".");
+
     QString purposeSummary = QStringLiteral("This looks like %1.").arg(projectKindSummary);
     if (!topModules.isEmpty()) {
         purposeSummary += QStringLiteral(" Start with \"%1\".")
                               .arg(topModules.join(QStringLiteral("\", \"")));
     }
+    if (!mainFlowSummary.isEmpty()) {
+        purposeSummary += QStringLiteral(" %1.").arg(mainFlowSummary);
+    }
+
+    QVariantList contextSections;
+    auto appendContextSection = [&](const QString& title,
+                                    const QString& body,
+                                    const QString& kind,
+                                    const QString& pageId = QString(),
+                                    const QString& capabilityName = QString()) {
+        const QString cleanedTitle = title.trimmed();
+        const QString cleanedBody = body.trimmed();
+        if (cleanedTitle.isEmpty() || cleanedBody.isEmpty()) {
+            return;
+        }
+
+        QVariantMap item;
+        item.insert(QStringLiteral("title"), cleanedTitle);
+        item.insert(QStringLiteral("body"), cleanedBody);
+        item.insert(QStringLiteral("kind"), kind.trimmed());
+        item.insert(QStringLiteral("pageId"), pageId.trimmed());
+        item.insert(QStringLiteral("capabilityName"), capabilityName.trimmed());
+        contextSections.push_back(item);
+    };
+
+    appendContextSection(
+        QStringLiteral("项目定位"),
+        purposeSummary,
+        QStringLiteral("summary"),
+        QStringLiteral("project.overview"));
+    appendContextSection(
+        QStringLiteral("适合谁看"),
+        audienceSummary,
+        QStringLiteral("audience"),
+        QStringLiteral("project.overview"));
+    appendContextSection(
+        QStringLiteral("入口"),
+        entrySummary,
+        QStringLiteral("entry"),
+        QStringLiteral("project.overview"));
+    appendContextSection(
+        QStringLiteral("主路径"),
+        mainFlowSummary,
+        QStringLiteral("main_flow"),
+        QStringLiteral("project.capabilityMap"));
+    appendContextSection(
+        QStringLiteral("输入 / 输出"),
+        QStringLiteral("%1\n%2")
+            .arg(inputSummary, outputSummary)
+            .trimmed(),
+        QStringLiteral("io"),
+        QStringLiteral("project.overview"));
+    appendContextSection(
+        QStringLiteral("技术线索"),
+        technologySummary,
+        QStringLiteral("technology"),
+        QStringLiteral("project.overview"));
+    appendContextSection(
+        QStringLiteral("优先模块"),
+        topModules.isEmpty()
+            ? QStringLiteral("No stable core modules have been extracted yet.")
+            : topModules.join(QStringLiteral("\n")),
+        QStringLiteral("modules"),
+        QStringLiteral("project.capabilityMap"));
+    appendContextSection(
+        QStringLiteral("结构热点"),
+        summarizeStructuredSignals(
+            hotspotSignals,
+            QStringLiteral("title"),
+            QStringLiteral("summary"),
+            3),
+        QStringLiteral("hotspots"),
+        QStringLiteral("project.capabilityMap"),
+        hotspotSignals.isEmpty()
+            ? QString()
+            : hotspotSignals.front()
+                  .toMap()
+                  .value(QStringLiteral("capabilityName"))
+                  .toString());
+    appendContextSection(
+        QStringLiteral("关键风险"),
+        summarizeStructuredSignals(
+            riskSignals,
+            QStringLiteral("title"),
+            QStringLiteral("summary"),
+            3),
+        QStringLiteral("risks"),
+        QStringLiteral("report.engineering"),
+        riskSignals.isEmpty()
+            ? QString()
+            : riskSignals.front()
+                  .toMap()
+                  .value(QStringLiteral("capabilityName"))
+                  .toString());
 
     QVariantMap data;
     data.insert(QStringLiteral("projectName"), projectName);
     data.insert(QStringLiteral("title"), QStringLiteral("L1 System Context"));
     data.insert(
         QStringLiteral("headline"),
-        QStringLiteral("The project is currently organized into %1 core modules. Start from the entry and trace the main path before diving deeper.")
-            .arg(contextSignals.coreModuleCount));
+        mainFlowSummary.isEmpty()
+            ? QStringLiteral("The project is currently organized into %1 core modules. Start from the entry and trace the main path before diving deeper.")
+                  .arg(contextSignals.coreModuleCount)
+            : QStringLiteral("The project is currently organized into %1 core modules. Start from the entry, then follow the primary path before diving deeper.")
+                  .arg(contextSignals.coreModuleCount));
     data.insert(
         QStringLiteral("audienceSummary"),
-        joinPreview(
-            inferAudienceHints(graph),
-            3,
-            QStringLiteral("developers, maintainers, or anyone onboarding to the codebase")));
+        audienceSummary);
     data.insert(QStringLiteral("purposeSummary"), purposeSummary);
     data.insert(QStringLiteral("projectKindSummary"), projectKindSummary);
-    data.insert(QStringLiteral("entrySummary"), inferEntrySummary(overview, graph));
-    data.insert(QStringLiteral("inputSummary"), inferInputSummary(contextSignals.hasNetwork));
-    data.insert(QStringLiteral("outputSummary"), inferOutputSummary(contextSignals.hasUi));
-    data.insert(
-        QStringLiteral("technologySummary"),
-        technologyClues.isEmpty()
-            ? QStringLiteral("No stable technology summary is available yet.")
-            : technologyClues.join(QStringLiteral("; ")) + QStringLiteral("."));
+    data.insert(QStringLiteral("entrySummary"), entrySummary);
+    data.insert(QStringLiteral("inputSummary"), inputSummary);
+    data.insert(QStringLiteral("outputSummary"), outputSummary);
+    data.insert(QStringLiteral("technologySummary"), technologySummary);
     data.insert(
         QStringLiteral("containerSummary"),
         topModules.isEmpty()
             ? QStringLiteral("No stable core modules have been extracted yet. Start from the entry and the main flow.")
-            : QStringLiteral("The modules most worth reading first are \"%1\". Use the capability map to connect them into one path.")
-                  .arg(topModules.join(QStringLiteral("\", \""))));
+            : QStringLiteral("The modules most worth reading first are \"%1\". Use the capability map to connect them into one path%2%3.")
+                  .arg(topModules.join(QStringLiteral("\", \"")),
+                       mainFlowSummary.isEmpty()
+                           ? QString()
+                           : QStringLiteral(", keeping %1 in view")
+                                 .arg(mainFlowSummary.toLower()),
+                       hotspotSignals.isEmpty()
+                           ? QString()
+                           : QStringLiteral("; then verify structural hotspots such as \"%1\"")
+                                 .arg(hotspotSignals.front()
+                                          .toMap()
+                                          .value(QStringLiteral("capabilityName"))
+                                          .toString()
+                                          .trimmed())));
     data.insert(QStringLiteral("containerNames"), topModules);
     data.insert(QStringLiteral("topModules"), topModules);
+    data.insert(QStringLiteral("mainFlowSummary"), mainFlowSummary);
+    data.insert(QStringLiteral("contextSections"), contextSections);
     data.insert(QStringLiteral("ruleFindings"), ruleFindings);
     data.insert(
         QStringLiteral("readingOrder"),
-        buildReadingOrder(overview, graph, contextSignals, riskSignals));
+        buildReadingOrder(
+            overview, graph, contextSignals, riskSignals, hotspotSignals, mainFlowSummary));
     data.insert(QStringLiteral("riskSignals"), riskSignals);
+    data.insert(QStringLiteral("hotspotSignals"), hotspotSignals);
     return data;
 }
 
@@ -639,17 +1006,63 @@ QVariantList ReadingGuideService::buildGuideCards(
     Q_UNUSED(overview);
 
     const auto contextSignals = summarizeSystemContext(graph);
+    const QVariantList hotspotSignals = buildHotspotSignals(graph);
     QVariantList cards;
+    auto appendCard = [&](const QString& name,
+                          const QString& summary,
+                          const QString& kind,
+                          const QString& capabilityName) {
+        if (name.trimmed().isEmpty() || summary.trimmed().isEmpty()) {
+            return;
+        }
+
+        QVariantMap card;
+        card.insert(QStringLiteral("name"), name.trimmed());
+        card.insert(QStringLiteral("summary"), summary.trimmed());
+        card.insert(QStringLiteral("kind"), kind.trimmed());
+        card.insert(
+            QStringLiteral("capabilityName"),
+            capabilityName.trimmed().isEmpty() ? name.trimmed() : capabilityName.trimmed());
+        cards.push_back(card);
+    };
+
+    if (const core::CapabilityNode* entryNode = primaryEntryNode(graph); entryNode != nullptr) {
+        const QString name = QString::fromStdString(entryNode->name).trimmed();
+        appendCard(
+            name,
+            capabilityCardSummary(*entryNode),
+            QStringLiteral("entry"),
+            name);
+    }
+
     for (const core::CapabilityNode* node : contextSignals.topNodes) {
         if (node == nullptr) {
             continue;
         }
 
-        QVariantMap card;
-        card.insert(QStringLiteral("name"), QString::fromStdString(node->name));
-        card.insert(QStringLiteral("summary"), capabilityCardSummary(*node));
-        card.insert(QStringLiteral("kind"), QString::fromUtf8(core::toString(node->kind)));
-        cards.push_back(card);
+        const QString name = QString::fromStdString(node->name).trimmed();
+        appendCard(
+            name,
+            capabilityCardSummary(*node),
+            QString::fromUtf8(core::toString(node->kind)),
+            name);
+    }
+
+    const int hotspotCardLimit = std::min<int>(2, hotspotSignals.size());
+    for (int index = 0; index < hotspotCardLimit; ++index) {
+        const QVariantMap hotspot = hotspotSignals[index].toMap();
+        const QString capabilityName =
+            hotspot.value(QStringLiteral("capabilityName")).toString().trimmed();
+        const QString summary = hotspot.value(QStringLiteral("summary")).toString().trimmed();
+        if (capabilityName.isEmpty() || summary.isEmpty()) {
+            continue;
+        }
+
+        appendCard(
+            QStringLiteral("Hotspot: %1").arg(capabilityName),
+            summary,
+            QStringLiteral("hotspot"),
+            capabilityName);
     }
 
     return cards;

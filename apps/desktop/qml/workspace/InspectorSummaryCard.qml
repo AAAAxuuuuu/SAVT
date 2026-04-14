@@ -8,13 +8,32 @@ Item {
 
     required property QtObject theme
     required property QtObject inspectorState
+    required property QtObject analysisController
 
     readonly property var summaryItems: root.buildSummaryItems()
+    readonly property var fileDetail: root.inspectorState.selectedNodeIsSingleFile
+                                     ? root.analysisController.describeFileNode(root.inspectorState.selectedNode)
+                                     : ({})
 
     implicitHeight: card.implicitHeight
 
     function buildSummaryItems() {
         var sections = []
+
+        if (root.inspectorState.selectedNodeIsSingleFile && root.fileDetail.available) {
+            sections.push({"title": "这是什么文件", "body": root.fileDetail.summary || root.inspectorState.subtitle})
+
+            if ((root.fileDetail.declarationClues || []).length > 0)
+                sections.push({"title": "主符号", "body": (root.fileDetail.declarationClues || []).slice(0, 3).join("\n")})
+
+            if ((root.fileDetail.readingHints || []).length > 0)
+                sections.push({"title": "怎么读", "body": (root.fileDetail.readingHints || []).slice(0, 2).join("\n")})
+
+            if ((root.inspectorState.relationshipItems || []).length > 0)
+                sections.push({"title": "关联关系", "body": "当前文件直接关联 " + root.inspectorState.relationshipItems.length + " 条组件关系。"})
+
+            return sections.slice(0, 4)
+        }
 
         if ((root.inspectorState.subtitle || "").length > 0)
             sections.push({"title": "这是什么", "body": root.inspectorState.subtitle})
