@@ -2133,6 +2133,17 @@ Item {
             color: root.componentMode ? Qt.rgba(1, 1, 1, 0.54) : Qt.rgba(1, 1, 1, 0.72)
             border.color: Qt.rgba(0.12, 0.18, 0.28, 0.07)
 
+            Label {
+                x: 24
+                y: 18
+                width: Math.min(parent.width * 0.48, 420)
+                text: root.componentMode ? "背景保留全部组件全景图，左右节点负责关系切换。" : "点击左右节点切换焦点；再点一次中间卡片可进入组件探测实验室。"
+                color: root.tokens.text3
+                font.family: root.tokens.textFontFamily
+                font.pixelSize: 11
+                wrapMode: Text.WordWrap
+            }
+
             Rectangle {
                 readonly property var rect: root.focusCenterRect()
                 x: rect.x - focusFrame.metrics.x
@@ -2149,48 +2160,29 @@ Item {
                     anchors.margins: 18
                     spacing: 10
 
-                    Rectangle {
-                        radius: height / 2
-                        color: root.componentMode ? Qt.rgba(0.83, 0.34, 0.92, 0.1) : Qt.rgba(0.14, 0.48, 1, 0.1)
-                        border.color: root.componentMode ? Qt.rgba(0.83, 0.34, 0.92, 0.26) : Qt.rgba(0.14, 0.48, 1, 0.24)
-                        implicitWidth: modeLabel.implicitWidth + 18
-                        implicitHeight: 26
-
-                        Label {
-                            id: modeLabel
-                            anchors.centerIn: parent
-                            text: root.componentMode ? "组件关系聚焦" : "架构关系聚焦"
-                            color: root.componentMode ? root.tokens.signalRaspberry : root.tokens.signalCobalt
-                            font.family: root.tokens.textFontFamily
-                            font.pixelSize: 11
-                            font.weight: Font.DemiBold
-                        }
-                    }
-
-                    Label {
-                        Layout.fillWidth: true
-                        text: root.selectedNode ? root.selectedNode.name || "未命名节点" : ""
-                        color: root.tokens.text1
-                        elide: Text.ElideRight
-                        font.family: root.tokens.displayFontFamily
-                        font.pixelSize: 22
-                        font.weight: Font.DemiBold
-                    }
-
-                    Label {
-                        Layout.fillWidth: true
-                        text: root.selectedNode ? (root.selectedNode.summary || root.selectedNode.responsibility || root.selectedNode.role || "当前焦点节点") : ""
-                        wrapMode: Text.WordWrap
-                        maximumLineCount: 2
-                        elide: Text.ElideRight
-                        color: root.tokens.text3
-                        font.family: root.tokens.textFontFamily
-                        font.pixelSize: 13
-                    }
-
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 8
+
+                        Rectangle {
+                            radius: height / 2
+                            color: root.componentMode ? Qt.rgba(0.83, 0.34, 0.92, 0.1) : Qt.rgba(0.14, 0.48, 1, 0.1)
+                            border.color: root.componentMode ? Qt.rgba(0.83, 0.34, 0.92, 0.26) : Qt.rgba(0.14, 0.48, 1, 0.24)
+                            implicitWidth: modeLabel.implicitWidth + 18
+                            implicitHeight: 26
+
+                            Label {
+                                id: modeLabel
+                                anchors.centerIn: parent
+                                text: root.componentMode ? "组件关系聚焦" : "架构关系聚焦"
+                                color: root.componentMode ? root.tokens.signalRaspberry : root.tokens.signalCobalt
+                                font.family: root.tokens.textFontFamily
+                                font.pixelSize: 11
+                                font.weight: Font.DemiBold
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true }
 
                         Rectangle {
                             radius: height / 2
@@ -2227,19 +2219,29 @@ Item {
                                 font.weight: Font.DemiBold
                             }
                         }
-
-                        Item { Layout.fillWidth: true }
                     }
 
                     Label {
                         Layout.fillWidth: true
-                        text: root.componentMode ? "背景保留全部组件全景图，左右节点负责关系切换。" : "点击左右节点切换焦点；再点一次中间卡片可进入组件探测实验室。"
-                        horizontalAlignment: Text.AlignRight
+                        text: root.selectedNode ? root.selectedNode.name || "未命名节点" : ""
+                        color: root.tokens.text1
+                        elide: Text.ElideRight
+                        font.family: root.tokens.displayFontFamily
+                        font.pixelSize: 22
+                        font.weight: Font.DemiBold
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: root.selectedNode ? (root.selectedNode.summary || root.selectedNode.responsibility || root.selectedNode.role || "当前焦点节点") : ""
+                        wrapMode: Text.WordWrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
                         color: root.tokens.text3
                         font.family: root.tokens.textFontFamily
-                        font.pixelSize: 11
-                        wrapMode: Text.WordWrap
+                        font.pixelSize: 13
                     }
+
                 }
 
                 MouseArea {
