@@ -49,6 +49,10 @@ struct ArchitectureAssistantRequest {
     QStringList exampleFiles;
     QStringList topSymbols;
     QStringList collaboratorNames;
+    QStringList contextClues;
+    QStringList riskSignals;
+    QStringList readingOrder;
+    QStringList reportHighlights;
     QStringList diagnostics;
 };
 

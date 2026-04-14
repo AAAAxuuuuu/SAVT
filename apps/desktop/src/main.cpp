@@ -1,4 +1,5 @@
-﻿#include "savt/ui/AnalysisController.h"
+﻿#include "MarkdownRenderer.h"
+#include "savt/ui/AnalysisController.h"
 
 #include <QDir>
 #include <QGuiApplication>
@@ -11,6 +12,7 @@ int main(int argc, char *argv[]) {
   QGuiApplication app(argc, argv);
 
   savt::ui::AnalysisController analysisController;
+  MarkdownRenderer markdownRenderer;
   if (argc > 1) {
     analysisController.setProjectRootPath(
         QDir::cleanPath(QString::fromLocal8Bit(argv[1])));
@@ -21,6 +23,8 @@ int main(int argc, char *argv[]) {
                                            &analysisController);
   engine.rootContext()->setContextProperty("analysisController",
                                            &analysisController);
+  engine.rootContext()->setContextProperty("markdownRenderer",
+                                           &markdownRenderer);
   engine.loadFromModule("SAVT.Desktop", "Main");
   if (engine.rootObjects().isEmpty()) {
     return -1;

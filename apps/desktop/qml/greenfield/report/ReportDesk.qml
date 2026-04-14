@@ -11,230 +11,334 @@ ScrollView {
     required property QtObject caseState
     required property QtObject focusState
 
+    readonly property var guide: root.analysisController.systemContextData || ({})
+    readonly property var topModules: guide.topModules || []
+    readonly property string reportHtml: renderMarkdown(root.analysisController.analysisReport)
+    readonly property string contextHtml: renderMarkdown(root.analysisController.systemContextReport)
+
     clip: true
     contentWidth: availableWidth
 
-    ColumnLayout {
-        width: parent.width
-        spacing: 16
+    function textOr(value, fallbackText) {
+        var text = String(value || "").trim()
+        return text.length > 0 ? text : (fallbackText || "")
+    }
 
-        ReportPanel {
-            Layout.fillWidth: true
-            tokens: root.tokens
-            title: "深度诊断报告"
-            subtitle: root.analysisController.analysisReport.length > 0
-                      ? "报告已由项目内核生成，可复制、审阅或继续交给 AI 解释。"
-                      : "运行分析后，这里会显示完整工程分析报告、系统上下文和 AI 诊断。"
+    function renderMarkdown(markdownText) {
+        var source = String(markdownText || "")
+        if (!source.length)
+            return ""
+        return markdownRenderer ? markdownRenderer.toHtml(source) : source
+    }
+
+    function trimmedList(listValue, maxItems) {
+        var values = []
+        var source = listValue || []
+        for (var i = 0; i < source.length; ++i) {
+            var text = String(source[i] || "").trim()
+            if (text.length === 0 || values.indexOf(text) >= 0)
+                continue
+            values.push(text)
+            if (maxItems > 0 && values.length >= maxItems)
+                break
         }
+        return values
+    }
+
+    function aiDigest() {
+        var parts = []
+        var summary = String(root.analysisController.aiSummary || "").trim()
+        var responsibility = String(root.analysisController.aiResponsibility || "").trim()
+        var uncertainty = String(root.analysisController.aiUncertainty || "").trim()
+        var nextActions = trimmedList(root.analysisController.aiNextActions, 4)
+        var evidenceItems = trimmedList(root.analysisController.aiEvidence, 4)
+        if (summary.length > 0)
+            parts.push(summary)
+        if (responsibility.length > 0)
+            parts.push(responsibility)
+        if (nextActions.length > 0)
+            parts.push("建议下一步：\n" + nextActions.map(function(item, index) {
+                return (index + 1) + ". " + item
+            }).join("\n"))
+        if (evidenceItems.length > 0)
+            parts.push("判断依据：\n" + evidenceItems.map(function(item) {
+                return "• " + item
+            }).join("\n"))
+        if (uncertainty.length > 0)
+            parts.push("判断边界：" + uncertainty)
+        return parts.join("\n\n").trim()
+    }
+
+    ColumnLayout {
+        width: root.availableWidth > 0 ? root.availableWidth : root.width
+        spacing: 16
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 86
             radius: root.tokens.radius8
             color: root.tokens.panelBase
             border.color: root.tokens.border1
+            implicitHeight: headerColumn.implicitHeight + 36
 
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: 16
-                spacing: 12
+            Column {
+                id: headerColumn
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: 18
+                spacing: 8
 
-                StatusChip { tokens: root.tokens; label: "分析状态"; value: root.analysisController.analysisPhase || "待命"; tone: "info" }
-                StatusChip { tokens: root.tokens; label: "能力节点"; value: (((root.analysisController.capabilityScene || ({})).nodes || []).length).toString(); tone: "success" }
-                StatusChip { tokens: root.tokens; label: "AI"; value: root.analysisController.aiAvailable ? "已就绪" : "未配置"; tone: root.analysisController.aiAvailable ? "ai" : "warning" }
-                StatusChip { tokens: root.tokens; label: "AST 文件"; value: (root.analysisController.astFileItems || []).length.toString(); tone: "moss" }
+                Label {
+                    width: parent.width
+                    text: "深度诊断报告"
+                    color: root.tokens.text1
+                    font.family: root.tokens.displayFontFamily
+                    font.pixelSize: 24
+                    font.weight: Font.DemiBold
+                }
             }
         }
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: Math.max(180, aiSummary.implicitHeight + 86)
             radius: root.tokens.radius8
             color: root.tokens.panelBase
             border.color: root.tokens.border1
+            implicitHeight: overviewColumn.implicitHeight + 32
 
-            ColumnLayout {
-                anchors.fill: parent
+            Column {
+                id: overviewColumn
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
                 anchors.margins: 16
-                spacing: 10
+                spacing: 12
 
-                RowLayout {
-                    Layout.fillWidth: true
+                Label {
+                    width: parent.width
+                    text: root.analysisController.statusMessage || "当前还没有生成诊断结论。"
+                    wrapMode: Text.WordWrap
+                    color: root.tokens.text1
+                    font.family: root.tokens.displayFontFamily
+                    font.pixelSize: 20
+                    font.weight: Font.DemiBold
+                }
+
+
+                Row {
+                    width: parent.width
+                    spacing: 12
+
+                    StatusChip {
+                        width: (parent.width - 36) / 4
+                        tokens: root.tokens
+                        label: "分析阶段"
+                        value: root.analysisController.analysisPhase || "待命"
+                        tone: "info"
+                    }
+
+                    StatusChip {
+                        width: (parent.width - 36) / 4
+                        tokens: root.tokens
+                        label: "可见模块"
+                        value: (((root.analysisController.capabilityScene || ({})).nodes || []).length).toString()
+                        tone: "success"
+                    }
+
+                    StatusChip {
+                        width: (parent.width - 36) / 4
+                        tokens: root.tokens
+                        label: "优先模块"
+                        value: root.topModules.length > 0 ? root.topModules.length.toString() : "0"
+                        tone: "warning"
+                    }
+
+                    StatusChip {
+                        width: (parent.width - 36) / 4
+                        tokens: root.tokens
+                        label: "AI 状态"
+                        value: root.analysisController.aiAvailable ? "已就绪" : "未配置"
+                        tone: root.analysisController.aiAvailable ? "ai" : "warning"
+                    }
+                }
+
+                Flow {
+                    width: parent.width
+                    spacing: 8
+
+                    Repeater {
+                        model: root.topModules
+
+                        Rectangle {
+                            radius: height / 2
+                            color: root.tokens.signalCobaltSoft
+                            border.color: root.tokens.signalCobalt
+                            implicitWidth: moduleChipLabel.implicitWidth + 16
+                            implicitHeight: 26
+
+                            Label {
+                                id: moduleChipLabel
+                                anchors.centerIn: parent
+                                text: modelData
+                                color: root.tokens.signalCobalt
+                                font.family: root.tokens.textFontFamily
+                                font.pixelSize: 11
+                                font.weight: Font.DemiBold
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            radius: root.tokens.radius8
+            color: root.tokens.panelBase
+            border.color: root.tokens.border1
+            implicitHeight: aiColumn.implicitHeight + 32
+
+            Column {
+                id: aiColumn
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: 16
+                spacing: 12
+
+                Row {
+                    width: parent.width
+                    spacing: 12
 
                     Label {
-                        text: "AI 洞察"
+                        width: parent.width - aiButton.width - 12
+                        text: "AI 诊断"
                         color: root.tokens.text1
                         font.family: root.tokens.displayFontFamily
                         font.pixelSize: 18
                         font.weight: Font.DemiBold
                     }
 
-                    Item { Layout.fillWidth: true }
-
                     ActionButton {
+                        id: aiButton
                         tokens: root.tokens
-                        text: "生成诊断"
+                        text: root.analysisController.aiBusy ? "正在生成..." : "生成诊断"
                         tone: "ai"
-                        enabled: root.analysisController.aiAvailable
-                        onClicked: root.analysisController.requestReportAiExplanation("基于当前报告生成架构诊断、风险和下一步建议。")
+                        compact: true
+                        enabled: root.analysisController.aiAvailable && !root.analysisController.aiBusy
+                        onClicked: root.analysisController.requestReportAiExplanation(
+                                       "基于当前报告生成更完整的中文架构诊断。请明确写出总体判断、关键风险来源、建议阅读路径、最值得先看的模块或文件，以及具体下一步动作。不要只给简短概括，要给到适合报告页阅读的展开说明，尽量达到约 200-300 字的信息量，但所有判断都必须受当前证据约束。")
                     }
                 }
 
                 Label {
-                    id: aiSummary
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    text: root.analysisController.aiBusy ? "DeepSeek 正在结合报告和证据链分析..."
-                          : (root.analysisController.aiSummary || root.analysisController.aiStatusMessage || "点击“生成诊断”后，这里会显示受证据约束的 AI 架构解释。")
+                    width: parent.width
+                    text: root.analysisController.aiBusy
+                          ? "AI 正在结合当前报告和系统上下文生成诊断。"
+                          : (root.aiDigest().length > 0
+                             ? root.aiDigest()
+                             : "点击“生成诊断”后，这里会显示面向当前报告的补充解读。")
                     wrapMode: Text.WordWrap
                     color: root.tokens.text2
                     font.family: root.tokens.textFontFamily
                     font.pixelSize: 13
+                    lineHeight: 1.2
                 }
             }
         }
 
-        Rectangle {
+        RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 380
-            radius: root.tokens.radius8
-            color: root.tokens.panelBase
-            border.color: root.tokens.border1
+            spacing: 16
 
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 16
-                spacing: 10
-
-                RowLayout {
-                    Layout.fillWidth: true
-
-                    Label {
-                        text: "完整 Markdown 报告"
-                        color: root.tokens.text1
-                        font.family: root.tokens.displayFontFamily
-                        font.pixelSize: 18
-                        font.weight: Font.DemiBold
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    ActionButton {
-                        tokens: root.tokens
-                        text: "复制报告"
-                        tone: "secondary"
-                        enabled: root.analysisController.analysisReport.length > 0
-                        onClicked: root.analysisController.copyTextToClipboard(root.analysisController.analysisReport)
-                    }
-                }
-
-                ScrollView {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    clip: true
-                    contentWidth: availableWidth
-
-                    Label {
-                        width: parent.width
-                        text: root.analysisController.analysisReport.length > 0
-                              ? root.analysisController.analysisReport
-                              : "还没有生成工程分析报告。"
-                        wrapMode: Text.WordWrap
-                        color: root.tokens.text2
-                        font.family: root.tokens.monoFontFamily
-                        font.pixelSize: 12
-                    }
-                }
-            }
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(760, Math.max(420, systemContextText.implicitHeight + 92))
-            Layout.minimumHeight: 360
-            radius: root.tokens.radius8
-            color: root.tokens.panelBase
-            border.color: root.tokens.border1
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 16
-                spacing: 10
-
-                RowLayout {
-                    Layout.fillWidth: true
-
-                    Label {
-                        text: "系统上下文"
-                        color: root.tokens.text1
-                        font.family: root.tokens.displayFontFamily
-                        font.pixelSize: 18
-                        font.weight: Font.DemiBold
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    ActionButton {
-                        tokens: root.tokens
-                        text: "复制上下文"
-                        tone: "secondary"
-                        enabled: root.analysisController.systemContextReport.length > 0
-                        onClicked: root.analysisController.copyTextToClipboard(root.analysisController.systemContextReport)
-                    }
-                }
-
-                ScrollView {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    clip: true
-                    contentWidth: availableWidth
-
-                    Label {
-                        id: systemContextText
-                        width: parent.width
-                        text: root.analysisController.systemContextReport.length > 0
-                              ? root.analysisController.systemContextReport
-                              : "运行分析后，这里会显示系统上下文报告。"
-                        wrapMode: Text.WordWrap
-                        color: root.tokens.text2
-                        font.family: root.tokens.textFontFamily
-                        font.pixelSize: 13
-                    }
-                }
-            }
-        }
-    }
-
-    component ReportPanel: Rectangle {
-        required property QtObject tokens
-        property string title: ""
-        property string subtitle: ""
-
-        implicitHeight: 104
-        radius: tokens.radius8
-        color: tokens.panelBase
-        border.color: tokens.border1
-
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 18
-            spacing: 7
-
-            Label {
-                text: title
-                color: tokens.text1
-                font.family: tokens.displayFontFamily
-                font.pixelSize: 24
-                font.weight: Font.DemiBold
-            }
-
-            Label {
+            Rectangle {
                 Layout.fillWidth: true
-                text: subtitle
-                wrapMode: Text.WordWrap
-                color: tokens.text3
-                font.family: tokens.textFontFamily
-                font.pixelSize: 13
+                Layout.preferredHeight: 640
+                radius: root.tokens.radius8
+                color: root.tokens.panelBase
+                border.color: root.tokens.border1
+
+                Label {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.leftMargin: 16
+                    anchors.topMargin: 16
+                    text: "系统上下文"
+                    color: root.tokens.text1
+                    font.family: root.tokens.displayFontFamily
+                    font.pixelSize: 18
+                    font.weight: Font.DemiBold
+                }
+
+                ActionButton {
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.rightMargin: 16
+                    anchors.topMargin: 12
+                    tokens: root.tokens
+                    text: "复制原文"
+                    tone: "secondary"
+                    compact: true
+                    enabled: root.analysisController.systemContextReport.length > 0
+                    onClicked: root.analysisController.copyTextToClipboard(root.analysisController.systemContextReport)
+                }
+
+                MarkdownPane {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 16
+                    anchors.topMargin: 54
+                    tokens: root.tokens
+                    htmlText: root.contextHtml
+                    emptyText: "运行分析后，这里会显示系统上下文报告。"
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 640
+                radius: root.tokens.radius8
+                color: root.tokens.panelBase
+                border.color: root.tokens.border1
+
+                Label {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.leftMargin: 16
+                    anchors.topMargin: 16
+                    text: "工程报告"
+                    color: root.tokens.text1
+                    font.family: root.tokens.displayFontFamily
+                    font.pixelSize: 18
+                    font.weight: Font.DemiBold
+                }
+
+                ActionButton {
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.rightMargin: 16
+                    anchors.topMargin: 12
+                    tokens: root.tokens
+                    text: "复制原文"
+                    tone: "secondary"
+                    compact: true
+                    enabled: root.analysisController.analysisReport.length > 0
+                    onClicked: root.analysisController.copyTextToClipboard(root.analysisController.analysisReport)
+                }
+
+                MarkdownPane {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 16
+                    anchors.topMargin: 54
+                    tokens: root.tokens
+                    htmlText: root.reportHtml
+                    emptyText: "还没有生成工程分析报告。"
+                }
             }
         }
     }
@@ -245,33 +349,62 @@ ScrollView {
         property string value: ""
         property string tone: "info"
 
-        Layout.fillWidth: true
-        Layout.fillHeight: true
         radius: tokens.radius8
         color: tokens.toneSoft(tone)
         border.color: tokens.toneColor(tone)
+        implicitHeight: 72
 
-        ColumnLayout {
+        Column {
             anchors.fill: parent
             anchors.margins: 10
-            spacing: 3
+            spacing: 4
 
             Label {
+                width: parent.width
                 text: label
                 color: tokens.text3
                 font.family: tokens.textFontFamily
                 font.pixelSize: 11
-                font.weight: Font.DemiBold
             }
 
             Label {
-                Layout.fillWidth: true
+                width: parent.width
                 text: value
-                color: tokens.toneColor(tone)
-                elide: Text.ElideRight
+                color: tokens.text1
                 font.family: tokens.textFontFamily
-                font.pixelSize: 14
+                font.pixelSize: 13
                 font.weight: Font.DemiBold
+                wrapMode: Text.WordWrap
+            }
+        }
+    }
+
+    component MarkdownPane: Rectangle {
+        required property QtObject tokens
+        property string htmlText: ""
+        property string emptyText: ""
+
+        radius: tokens.radius6
+        color: tokens.base1
+        border.color: tokens.border1
+
+        ScrollView {
+            anchors.fill: parent
+            anchors.margins: 1
+            clip: true
+            contentWidth: availableWidth
+
+            TextEdit {
+                width: parent.width
+                readOnly: true
+                selectByMouse: true
+                wrapMode: TextEdit.Wrap
+                textFormat: TextEdit.RichText
+                text: htmlText.length > 0 ? htmlText : "<p>" + emptyText + "</p>"
+                color: tokens.text2
+                font.family: tokens.textFontFamily
+                font.pixelSize: 13
+                padding: 14
             }
         }
     }

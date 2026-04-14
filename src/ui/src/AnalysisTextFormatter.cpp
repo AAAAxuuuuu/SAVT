@@ -90,6 +90,173 @@ QString formatNodeSummaryLine(const core::CapabilityNode& node) {
     return QStringLiteral("当前还没有提炼出稳定职责。");
 }
 
+QString capabilityKindLabel(const core::CapabilityNode& node) {
+    switch (node.kind) {
+    case core::CapabilityNodeKind::Entry:
+        return QStringLiteral("入口");
+    case core::CapabilityNodeKind::Infrastructure:
+        return QStringLiteral("支撑");
+    case core::CapabilityNodeKind::Capability:
+        return QStringLiteral("能力");
+    }
+    return QStringLiteral("模块");
+}
+
+QString capabilityRoleLabel(const core::CapabilityNode& node) {
+    const QString role = QString::fromStdString(node.dominantRole).trimmed().toLower();
+    if (role == QStringLiteral("analysis")) {
+        return QStringLiteral("分析层");
+    }
+    if (role == QStringLiteral("presentation") || role == QStringLiteral("experience")) {
+        return QStringLiteral("界面层");
+    }
+    if (role == QStringLiteral("interaction")) {
+        return QStringLiteral("交互层");
+    }
+    if (role == QStringLiteral("storage") || role == QStringLiteral("data")) {
+        return QStringLiteral("数据层");
+    }
+    if (role == QStringLiteral("foundation")) {
+        return QStringLiteral("基础层");
+    }
+    if (role == QStringLiteral("workflow")) {
+        return QStringLiteral("流程层");
+    }
+    if (role == QStringLiteral("support")) {
+        return QStringLiteral("支撑层");
+    }
+    return role.isEmpty() ? QStringLiteral("未分类") : QString::fromStdString(node.dominantRole);
+}
+
+QString edgeKindLabel(const core::CapabilityEdgeKind kind) {
+    switch (kind) {
+    case core::CapabilityEdgeKind::Activates:
+        return QStringLiteral("触发");
+    case core::CapabilityEdgeKind::Enables:
+        return QStringLiteral("协作");
+    case core::CapabilityEdgeKind::UsesInfrastructure:
+        return QStringLiteral("依赖支撑");
+    }
+    return QStringLiteral("关系");
+}
+
+QString joinPreview(const QStringList& items, const int limit) {
+    if (items.isEmpty()) {
+        return QString();
+    }
+    const int count = qMin(items.size(), limit);
+    QString preview = items.mid(0, count).join(QStringLiteral("、"));
+    if (items.size() > count) {
+        preview += QStringLiteral(" 等 %1 项").arg(items.size());
+    }
+    return preview;
+}
+
+QStringList uniqueNodeNames(
+    const std::vector<const core::CapabilityNode*>& nodes,
+    const core::CapabilityNodeKind kind) {
+    QStringList names;
+    for (const core::CapabilityNode* node : nodes) {
+        if (node->kind != kind) {
+            continue;
+        }
+        const QString name = QString::fromStdString(node->name).trimmed();
+        if (!name.isEmpty() && !names.contains(name)) {
+            names.push_back(name);
+        }
+    }
+    return names;
+}
+
+QString capabilityReadingHint(const core::CapabilityNode& node) {
+    const QStringList files = toQStringList(node.exampleFiles);
+    const QStringList symbols = toQStringList(node.topSymbols);
+    if (!files.isEmpty() && !symbols.isEmpty()) {
+        return QStringLiteral("建议先看 `%1`，再顺着 `%2` 继续向下读。")
+            .arg(files.front(), symbols.front());
+    }
+    if (!files.isEmpty()) {
+        return QStringLiteral("建议先看 `%1`。").arg(files.front());
+    }
+    if (!symbols.isEmpty()) {
+        return QStringLiteral("建议先从 `%1` 这个符号开始定位。").arg(symbols.front());
+    }
+    return QStringLiteral("建议先结合能力图和代表文件继续下钻。");
+}
+
+QStringList buildReadingOrderPreview(const std::vector<const core::CapabilityNode*>& nodes) {
+    QStringList items;
+    for (const core::CapabilityNode* node : nodes) {
+        if (node == nullptr) {
+            continue;
+        }
+        const QString name = QString::fromStdString(node->name).trimmed();
+        if (!name.isEmpty() && !items.contains(name)) {
+            items.push_back(name);
+        }
+        if (items.size() >= 3) {
+            break;
+        }
+    }
+    return items;
+}
+
+std::vector<const core::CapabilityEdge*> visibleEdgesInWeightOrder(const core::CapabilityGraph& graph) {
+    std::vector<const core::CapabilityEdge*> edges;
+    for (const core::CapabilityEdge& edge : graph.edges) {
+        if (edge.defaultVisible) {
+            edges.push_back(&edge);
+        }
+    }
+
+    std::sort(edges.begin(), edges.end(), [](const core::CapabilityEdge* left, const core::CapabilityEdge* right) {
+        if (left->weight != right->weight) {
+            return left->weight > right->weight;
+        }
+        return left->id < right->id;
+    });
+    return edges;
+}
+
+const core::CapabilityNode* findCapabilityNodeById(
+    const core::CapabilityGraph& graph,
+    const std::size_t nodeId) {
+    for (const core::CapabilityNode& node : graph.nodes) {
+        if (node.id == nodeId) {
+            return &node;
+        }
+    }
+    return nullptr;
+}
+
+QString formatEdgeSummary(
+    const core::CapabilityGraph& graph,
+    const core::CapabilityEdge& edge) {
+    const core::CapabilityNode* fromNode = findCapabilityNodeById(graph, edge.fromId);
+    const core::CapabilityNode* toNode = findCapabilityNodeById(graph, edge.toId);
+    const QString fromName = fromNode ? QString::fromStdString(fromNode->name).trimmed() : QStringLiteral("未命名模块");
+    const QString toName = toNode ? QString::fromStdString(toNode->name).trimmed() : QStringLiteral("未命名模块");
+    const QString summary = QString::fromStdString(edge.summary).trimmed();
+
+    QString line = QStringLiteral("- **%1** %2 **%3**")
+                       .arg(fromName, edgeKindLabel(edge.kind), toName);
+    if (!summary.isEmpty()) {
+        line += QStringLiteral("：%1").arg(summary);
+    }
+    return line;
+}
+
+QString formatFlowSummary(const core::CapabilityFlow& flow) {
+    const QString name = QString::fromStdString(flow.name).trimmed();
+    const QString summary = QString::fromStdString(flow.summary).trimmed();
+    QString line = QStringLiteral("- **%1**").arg(name.isEmpty() ? QStringLiteral("未命名流程") : name);
+    if (!summary.isEmpty()) {
+        line += QStringLiteral("：%1").arg(summary);
+    }
+    line += QStringLiteral("（跨度 %1，权重 %2）").arg(flow.stageSpan).arg(flow.totalWeight);
+    return line;
+}
+
 QString formatRatio(const std::size_t count, const std::size_t total) {
     const double ratio = total == 0 ? 0.0 : (100.0 * static_cast<double>(count) / static_cast<double>(total));
     return QStringLiteral("%1%").arg(QString::number(ratio, 'f', 1));
@@ -192,6 +359,7 @@ QString formatCapabilityReportMarkdown(
     const core::AnalysisReport& analysisReport,
     const core::CapabilityGraph& graph) {
     const std::vector<const core::CapabilityNode*> nodes = visibleNodesInMarkdownOrder(graph);
+    const std::vector<const core::CapabilityEdge*> edges = visibleEdgesInWeightOrder(graph);
 
     std::size_t totalFiles = 0;
     std::size_t totalModules = 0;
@@ -211,7 +379,7 @@ QString formatCapabilityReportMarkdown(
     }
 
     QString output;
-    output.reserve(4096);
+    output.reserve(8192);
     output += QStringLiteral("# 项目架构全景报告\n\n");
     output += QStringLiteral("> 由 SAVT 静态分析引擎自动生成，适合快速建立项目上下文。\n\n---\n\n");
     output += QStringLiteral("## 分析引擎状态\n\n");
@@ -236,26 +404,25 @@ QString formatCapabilityReportMarkdown(
     if (const QString actionHint = semanticActionHint(analysisReport); !actionHint.isEmpty()) {
         output += QStringLiteral("\n**处理建议：** %1\n").arg(actionHint);
     }
-    if (!analysisReport.diagnostics.empty()) {
-        output += QStringLiteral("\n**诊断日志：**\n");
-        const int limit = qMin(static_cast<int>(analysisReport.diagnostics.size()), 10);
-        for (int index = 0; index < limit; ++index) {
-            output += QStringLiteral("- %1\n")
-                          .arg(QString::fromStdString(analysisReport.diagnostics[static_cast<std::size_t>(index)]));
-        }
-        if (static_cast<int>(analysisReport.diagnostics.size()) > limit) {
-            output += QStringLiteral("- *...共 %1 条诊断*\n").arg(analysisReport.diagnostics.size());
-        }
-    }
     output += QStringLiteral("\n---\n\n");
 
     if (nodes.empty()) {
         output += QStringLiteral("## 暂无模块结果\n\n");
-        output += QStringLiteral("当前还没有提炼出可显示的模块视图。请先检查上面的分析引擎状态、编译数据库和诊断日志。\n");
+        output += QStringLiteral("当前还没有提炼出可显示的模块视图。请先检查上面的分析引擎状态和编译数据库。\n");
         return output;
     }
 
+    const QStringList readingPreview = buildReadingOrderPreview(nodes);
+
     output += QStringLiteral("## 项目概览\n\n");
+    output += QStringLiteral("当前共识别出 **%1 个可见能力模块**，覆盖 **%2 个源码文件**。")
+                  .arg(nodes.size())
+                  .arg(totalFiles);
+    if (!readingPreview.isEmpty()) {
+        output += QStringLiteral(" 建议先从 **%1** 开始，顺着主路径逐步下钻。")
+                      .arg(readingPreview.join(QStringLiteral(" → ")));
+    }
+    output += QStringLiteral("\n\n");
     output += QStringLiteral("| 指标 | 数值 |\n| --- | --- |\n");
     output += QStringLiteral("| 识别模块数 | **%1 个** |\n").arg(nodes.size());
     output += QStringLiteral("| 涉及源码文件 | **%1 个** |\n").arg(totalFiles);
@@ -268,10 +435,43 @@ QString formatCapabilityReportMarkdown(
     }
     output += QStringLiteral("\n---\n\n");
 
+    output += QStringLiteral("## 建议先读\n\n");
+    const int readLimit = qMin(static_cast<int>(nodes.size()), 3);
+    for (int index = 0; index < readLimit; ++index) {
+        const core::CapabilityNode& node = *nodes[static_cast<std::size_t>(index)];
+        const QString name = QString::fromStdString(node.name).trimmed();
+        output += QStringLiteral("%1. **%2**（%3 / %4）\n")
+                      .arg(index + 1)
+                      .arg(name.isEmpty() ? QStringLiteral("未命名模块") : name,
+                           capabilityKindLabel(node),
+                           capabilityRoleLabel(node));
+        output += QStringLiteral("   - %1\n").arg(formatNodeSummaryLine(node));
+        output += QStringLiteral("   - %1\n").arg(capabilityReadingHint(node));
+    }
+    output += QStringLiteral("\n---\n\n");
+
+    if (!edges.empty()) {
+        output += QStringLiteral("## 关键协作关系\n\n");
+        const int edgeLimit = qMin(static_cast<int>(edges.size()), 8);
+        for (int index = 0; index < edgeLimit; ++index) {
+            output += formatEdgeSummary(graph, *edges[static_cast<std::size_t>(index)]) + QStringLiteral("\n");
+        }
+        output += QStringLiteral("\n---\n\n");
+    }
+
+    if (!graph.flows.empty()) {
+        output += QStringLiteral("## 主要协作路径\n\n");
+        const int flowLimit = qMin(static_cast<int>(graph.flows.size()), 4);
+        for (int index = 0; index < flowLimit; ++index) {
+            output += formatFlowSummary(graph.flows[static_cast<std::size_t>(index)]) + QStringLiteral("\n");
+        }
+        output += QStringLiteral("\n---\n\n");
+    }
+
     output += QStringLiteral("## 模块详情\n\n");
     for (const core::CapabilityNode* node : nodes) {
         const QString name = QString::fromStdString(node->name).trimmed();
-        const QString role = formatNodeHeadingRole(*node);
+        const QString role = capabilityRoleLabel(*node);
         const QString responsibility = QString::fromStdString(node->responsibility).trimmed();
         const QString summary = QString::fromStdString(node->summary).trimmed();
         const QString folderHint = QString::fromStdString(node->folderHint).trimmed();
@@ -295,8 +495,14 @@ QString formatCapabilityReportMarkdown(
         output += QStringLiteral("- 被依赖：**%1 次** / 依赖他人：**%2 次**\n")
                       .arg(node->incomingEdgeCount)
                       .arg(node->outgoingEdgeCount);
+        output += QStringLiteral("- 类型：**%1** / 角色：**%2**\n")
+                      .arg(capabilityKindLabel(*node), capabilityRoleLabel(*node));
         if (!collaboratorNames.isEmpty()) {
             output += QStringLiteral("- 协作模块：%1\n").arg(collaboratorNames.join(QStringLiteral("、")));
+        }
+        if (!node->riskSignals.empty()) {
+            output += QStringLiteral("- 风险提示：%1\n")
+                          .arg(toQStringList(node->riskSignals).join(QStringLiteral("、")));
         }
 
         if (!topSymbols.isEmpty()) {
@@ -326,15 +532,52 @@ QString formatCapabilityReportMarkdown(
 
 QString formatSystemContextReportMarkdown(const core::CapabilityGraph& graph) {
     const std::vector<const core::CapabilityNode*> nodes = visibleNodesInSceneOrder(graph);
+    const std::vector<const core::CapabilityEdge*> edges = visibleEdgesInWeightOrder(graph);
     QString report = QStringLiteral("# 系统上下文 (L1)\n\n");
 
     QStringList entries;
     QStringList capabilities;
     QStringList infrastructures;
+    QStringList entryNames = uniqueNodeNames(nodes, core::CapabilityNodeKind::Entry);
+    QStringList capabilityNames = uniqueNodeNames(nodes, core::CapabilityNodeKind::Capability);
+    QStringList infrastructureNames = uniqueNodeNames(nodes, core::CapabilityNodeKind::Infrastructure);
+
+    report += QStringLiteral("当前系统被提炼为 **%1 个默认可见模块**。").arg(nodes.size());
+    if (!entryNames.isEmpty()) {
+        report += QStringLiteral(" 入口主要落在 **%1**。").arg(joinPreview(entryNames, 2));
+    }
+    if (!capabilityNames.isEmpty()) {
+        report += QStringLiteral(" 主要能力集中在 **%1**。").arg(joinPreview(capabilityNames, 3));
+    }
+    if (!infrastructureNames.isEmpty()) {
+        report += QStringLiteral(" 后台支撑主要包括 **%1**。").arg(joinPreview(infrastructureNames, 2));
+    }
+    report += QStringLiteral("\n\n");
+
+    if (!entryNames.isEmpty() || !capabilityNames.isEmpty()) {
+        report += QStringLiteral("## 建议阅读顺序\n");
+        int step = 1;
+        if (!entryNames.isEmpty()) {
+            report += QStringLiteral("%1. 先从入口模块 **%2** 开始，确认系统是从哪里发起的。\n")
+                          .arg(step++)
+                          .arg(joinPreview(entryNames, 2));
+        }
+        if (!capabilityNames.isEmpty()) {
+            report += QStringLiteral("%1. 再进入核心能力 **%2**，把主路径串起来。\n")
+                          .arg(step++)
+                          .arg(joinPreview(capabilityNames, 3));
+        }
+        if (!infrastructureNames.isEmpty()) {
+            report += QStringLiteral("%1. 最后回看支撑模块 **%2**，确认共享依赖和基础设施边界。\n")
+                          .arg(step)
+                          .arg(joinPreview(infrastructureNames, 2));
+        }
+        report += QStringLiteral("\n");
+    }
 
     for (const core::CapabilityNode* node : nodes) {
         const QString name = QString::fromStdString(node->name).trimmed();
-        const QString role = QString::fromStdString(node->dominantRole).trimmed();
+        const QString role = capabilityRoleLabel(*node);
         const QString summary = formatNodeSummaryLine(*node);
 
         QString line = QStringLiteral("- **%1**").arg(name.isEmpty() ? QStringLiteral("未命名模块") : name);
@@ -357,6 +600,15 @@ QString formatSystemContextReportMarkdown(const core::CapabilityGraph& graph) {
             infrastructures.push_back(line);
             break;
         }
+    }
+
+    if (!edges.empty()) {
+        report += QStringLiteral("## 主要模块关系\n");
+        const int edgeLimit = qMin(static_cast<int>(edges.size()), 6);
+        for (int index = 0; index < edgeLimit; ++index) {
+            report += formatEdgeSummary(graph, *edges[static_cast<std::size_t>(index)]) + QStringLiteral("\n");
+        }
+        report += QStringLiteral("\n");
     }
 
     if (!entries.isEmpty()) {

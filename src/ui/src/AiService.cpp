@@ -123,6 +123,34 @@ QStringList collectNodeFieldValues(const QVariantList& nodeItems,
     return items;
 }
 
+QStringList collectStructuredPreview(const QVariantList& items,
+                                     const QString& titleField,
+                                     const QString& bodyField,
+                                     const int maxItems) {
+    QStringList previewItems;
+    for (const QVariant& value : items) {
+        const QVariantMap item = value.toMap();
+        const QString title = item.value(titleField).toString().trimmed();
+        const QString body = item.value(bodyField).toString().trimmed();
+
+        QString preview;
+        if (!title.isEmpty() && !body.isEmpty()) {
+            preview = QStringLiteral("%1：%2").arg(title, body);
+        } else if (!title.isEmpty()) {
+            preview = title;
+        } else {
+            preview = body;
+        }
+
+        if (preview.isEmpty() || previewItems.contains(preview))
+            continue;
+        previewItems.push_back(preview);
+        if (previewItems.size() >= maxItems)
+            break;
+    }
+    return previewItems;
+}
+
 QString buildAiSetupMessage(const ai::DeepSeekConfigLoadResult& loadResult) {
     if (!loadResult.hasConfig())
         return QStringLiteral("AI 未就绪：%1").arg(loadResult.errorMessage);
@@ -405,14 +433,38 @@ ai::ArchitectureAssistantRequest buildReportRequest(
     request.learningStage = QStringLiteral("L4");
     request.audience = QStringLiteral("beginner");
     request.explanationGoal = QStringLiteral(
-        "Help a beginner connect the current findings to concrete next steps, important modules, and the best reading order.");
-    request.nodeName = QStringLiteral("%1 / 深入阅读建议").arg(request.projectName);
-    request.nodeKind = QStringLiteral("engineering_report");
-    request.nodeRole = QStringLiteral("report_context");
+        "Help a beginner understand the real system architecture, the current risk picture, the best reading order, and the next concrete inspection steps.");
+    request.nodeName = request.projectName;
+    request.nodeKind = QStringLiteral("project_diagnosis");
+    request.nodeRole = QStringLiteral("architecture_context");
+
+    const QStringList contextClues = deduplicateQStringList(
+        {systemContextData.value(QStringLiteral("projectKindSummary")).toString().trimmed(),
+         systemContextData.value(QStringLiteral("purposeSummary")).toString().trimmed(),
+         systemContextData.value(QStringLiteral("entrySummary")).toString().trimmed(),
+         systemContextData.value(QStringLiteral("inputSummary")).toString().trimmed(),
+         systemContextData.value(QStringLiteral("outputSummary")).toString().trimmed(),
+         systemContextData.value(QStringLiteral("technologySummary")).toString().trimmed(),
+         systemContextData.value(QStringLiteral("containerSummary")).toString().trimmed()});
+    const QStringList riskSignals = collectStructuredPreview(
+        systemContextData.value(QStringLiteral("riskSignals")).toList(),
+        QStringLiteral("title"),
+        QStringLiteral("summary"),
+        5);
+    const QStringList readingOrder = collectStructuredPreview(
+        systemContextData.value(QStringLiteral("readingOrder")).toList(),
+        QStringLiteral("title"),
+        QStringLiteral("body"),
+        4);
 
     QStringList summaryParts;
     summaryParts << systemContextData.value(QStringLiteral("headline")).toString().trimmed()
                  << systemContextData.value(QStringLiteral("purposeSummary")).toString().trimmed()
+                 << systemContextData.value(QStringLiteral("projectKindSummary")).toString().trimmed()
+                 << systemContextData.value(QStringLiteral("entrySummary")).toString().trimmed()
+                 << systemContextData.value(QStringLiteral("inputSummary")).toString().trimmed()
+                 << systemContextData.value(QStringLiteral("outputSummary")).toString().trimmed()
+                 << systemContextData.value(QStringLiteral("technologySummary")).toString().trimmed()
                  << systemContextData.value(QStringLiteral("containerSummary")).toString().trimmed();
     for (const QVariant& value : systemContextCards) {
         const QVariantMap item = value.toMap();
@@ -422,20 +474,32 @@ ai::ArchitectureAssistantRequest buildReportRequest(
             summaryParts << QStringLiteral("%1：%2").arg(name, summary);
     }
     const QStringList reportHighlights =
-        extractMarkdownHighlights(context.analysisReport, 6);
+        extractMarkdownHighlights(context.analysisReport, 10);
     for (const QString& highlight : reportHighlights)
         summaryParts.push_back(highlight);
+    for (const QString& risk : riskSignals)
+        summaryParts.push_back(QStringLiteral("风险线索：%1").arg(risk));
+    for (const QString& step : readingOrder)
+        summaryParts.push_back(QStringLiteral("阅读顺序：%1").arg(step));
     if (!context.astPreviewSummary.trimmed().isEmpty()) {
         summaryParts.push_back(
             QStringLiteral("当前 AST 聚焦：%1").arg(context.astPreviewSummary.trimmed()));
     }
     request.nodeSummary = deduplicateQStringList(summaryParts).join(QStringLiteral(" "));
+    request.contextClues = contextClues;
+    request.riskSignals = riskSignals;
+    request.readingOrder = readingOrder;
+    request.reportHighlights = reportHighlights;
     request.userTask =
         context.userTask.trimmed().isEmpty()
             ? QStringLiteral(
-                  "Explain the current engineering report to a beginner. "
-                  "Summarize the most important conclusions in plain language, explain what they mean for actual code changes, "
-                  "point out the best files or modules to inspect next, and keep the answer grounded in the supplied evidence package.")
+                  "Explain the actual architecture of the current system to a beginner, not the value of the report page itself. "
+                  "Use plain Chinese to cover the overall diagnosis, the main modules, the main risk sources, the best reading order, "
+                  "the modules or files worth inspecting first, and the concrete next actions a reader should take. "
+                  "Do not write meta commentary such as 'this report is important' or 'this report shows'. "
+                  "Instead, directly describe the system, its responsibilities, its risks, and what the reader should inspect next. "
+                  "Give enough detail for a report page, roughly 200-300 Chinese characters of useful substance across the answer, "
+                  "while keeping every claim grounded in the supplied evidence package.")
             : context.userTask.trimmed();
 
     request.moduleNames = mergeQStringLists(
@@ -460,6 +524,22 @@ ai::ArchitectureAssistantRequest buildReportRequest(
         QStringLiteral("ai scope: engineering_report"),
         QStringLiteral("audience: beginner"),
         QStringLiteral("learning stage: L4"),
+        QStringLiteral("project kind: %1")
+            .arg(systemContextData.value(QStringLiteral("projectKindSummary"))
+                     .toString()
+                     .trimmed()),
+        QStringLiteral("entry summary: %1")
+            .arg(systemContextData.value(QStringLiteral("entrySummary"))
+                     .toString()
+                     .trimmed()),
+        QStringLiteral("input summary: %1")
+            .arg(systemContextData.value(QStringLiteral("inputSummary"))
+                     .toString()
+                     .trimmed()),
+        QStringLiteral("output summary: %1")
+            .arg(systemContextData.value(QStringLiteral("outputSummary"))
+                     .toString()
+                     .trimmed()),
         QStringLiteral("technology summary: %1")
             .arg(systemContextData.value(QStringLiteral("technologySummary"))
                      .toString()
@@ -475,6 +555,14 @@ ai::ArchitectureAssistantRequest buildReportRequest(
     if (!context.astPreviewSummary.trimmed().isEmpty()) {
         request.diagnostics.push_back(
             QStringLiteral("ast preview summary: %1").arg(context.astPreviewSummary.trimmed()));
+    }
+    for (const QString& risk : riskSignals) {
+        request.diagnostics.push_back(
+            QStringLiteral("risk signal: %1").arg(risk));
+    }
+    for (const QString& step : readingOrder) {
+        request.diagnostics.push_back(
+            QStringLiteral("reading order: %1").arg(step));
     }
     for (const QString& highlight : reportHighlights) {
         request.diagnostics.push_back(

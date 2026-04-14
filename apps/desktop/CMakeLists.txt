@@ -1,5 +1,6 @@
 qt_add_executable(savt_desktop
     src/main.cpp
+    src/MarkdownRenderer.cpp
 )
 
 qt_add_qml_module(savt_desktop
