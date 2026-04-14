@@ -27,9 +27,9 @@ Item {
     readonly property real componentOverviewGapY: 26
     readonly property real componentOverviewSectionGap: 34
     readonly property real componentOverviewHeaderHeight: 34
-    readonly property real componentOverviewCardWidth: Math.max(220, Math.min(272,
+    readonly property real componentOverviewCardWidth: Math.max(244, Math.min(308,
                                                                                (Math.max(860, width - 220) - 144 - Math.max(0, componentOverviewGroups.length - 1) * componentOverviewGapX) / Math.max(1, componentOverviewGroups.length)))
-    readonly property real componentOverviewCardHeight: 126
+    readonly property real componentOverviewCardHeight: 148
     readonly property real sceneWidth: componentOverviewMode
                                        ? Math.max(980, 72 * 2 + componentOverviewGroups.length * componentOverviewCardWidth + Math.max(0, componentOverviewGroups.length - 1) * componentOverviewGapX)
                                        : Math.max(980, overviewMindMapLayout.width || 0, bounds.width || 980)
@@ -537,6 +537,70 @@ Item {
         if (key === "report_context")
             return "报告上下文"
         return raw
+    }
+
+    function normalizedPathText(value) {
+        return String(value || "").replace(/\s*\/\s*/g, "/").replace(/\s+/g, " ").trim()
+    }
+
+    function fileBaseName(path) {
+        var normalized = normalizedPathText(path)
+        if (!normalized.length)
+            return ""
+        var slashIndex = normalized.lastIndexOf("/")
+        return slashIndex >= 0 ? normalized.slice(slashIndex + 1) : normalized
+    }
+
+    function fileDirName(path) {
+        var normalized = normalizedPathText(path)
+        if (!normalized.length)
+            return ""
+        var slashIndex = normalized.lastIndexOf("/")
+        return slashIndex > 0 ? normalized.slice(0, slashIndex) : ""
+    }
+
+    function componentNodeTitle(item) {
+        if (!item)
+            return "未命名节点"
+
+        var exampleFiles = item.exampleFiles || []
+        if (exampleFiles.length > 0) {
+            var baseName = fileBaseName(exampleFiles[0])
+            if (baseName.length > 0)
+                return baseName
+        }
+
+        var raw = normalizedPathText(item.name || "")
+        var markerIndex = raw.indexOf("·")
+        if (markerIndex > 0)
+            raw = raw.slice(0, markerIndex).trim()
+        if (raw.indexOf("/") >= 0)
+            raw = raw.slice(raw.lastIndexOf("/") + 1).trim()
+        return raw.length > 0 ? raw : "未命名节点"
+    }
+
+    function componentNodeScopeText(item) {
+        if (!item)
+            return ""
+
+        var exampleFiles = item.exampleFiles || []
+        if (exampleFiles.length > 0) {
+            var dirName = fileDirName(exampleFiles[0])
+            if (dirName.length > 0)
+                return dirName
+        }
+
+        var candidates = [
+            item.scopeLabel || "",
+            item.folderHint || "",
+            (item.moduleNames && item.moduleNames.length > 0) ? item.moduleNames[0] : ""
+        ]
+        for (var index = 0; index < candidates.length; ++index) {
+            var candidate = normalizedPathText(candidates[index])
+            if (candidate.length > 0)
+                return candidate
+        }
+        return ""
     }
 
     function cardMetaLabel(item) {
@@ -1842,6 +1906,8 @@ Item {
                         font.weight: Font.DemiBold
                     }
 
+                    Item { Layout.fillWidth: true }
+
                     Rectangle {
                         radius: height / 2
                         color: Qt.rgba(0.14, 0.48, 1, 0.08)
@@ -1858,24 +1924,6 @@ Item {
                             font.pixelSize: 11
                             font.weight: Font.DemiBold
                         }
-                    }
-
-                    Label {
-                        text: modelData.key === "entry"
-                              ? "优先看到入口与触发点"
-                              : modelData.key === "experience"
-                                ? "界面、交互和展示层"
-                                : modelData.key === "core"
-                                  ? "核心处理与业务能力"
-                                  : modelData.key === "support"
-                                    ? "基础设施与通用支撑"
-                                    : "暂未归类的剩余组件"
-                        color: root.tokens.text3
-                        font.family: root.tokens.textFontFamily
-                        font.pixelSize: 11
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                        horizontalAlignment: Text.AlignRight
                     }
                 }
             }
@@ -1949,6 +1997,7 @@ Item {
                         Rectangle {
                             Layout.preferredWidth: 10
                             Layout.preferredHeight: 10
+                            Layout.alignment: Qt.AlignTop
                             radius: width / 2
                             color: modelData.reachableFromEntry ? root.tokens.signalTeal
                                    : root.componentMode ? root.tokens.signalRaspberry
@@ -1957,18 +2006,23 @@ Item {
 
                         Label {
                             Layout.fillWidth: true
-                            text: modelData.name || "未命名节点"
+                            text: root.componentMode
+                                  ? root.componentNodeTitle(modelData)
+                                  : (modelData.name || "未命名节点")
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 2
                             elide: Text.ElideRight
                             color: root.tokens.text1
                             font.family: root.tokens.textFontFamily
                             font.pixelSize: 14
                             font.weight: Font.DemiBold
+                            lineHeight: 1.12
                         }
                     }
 
                     Label {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 50
+                        Layout.preferredHeight: 58
                         text: root.previewText(
                                   modelData.summary || modelData.responsibility || modelData.role,
                                   "暂无描述。")
@@ -1992,7 +2046,7 @@ Item {
                         spacing: 8
 
                         Rectangle {
-                            visible: root.componentMode && (modelData.scopeLabel || "").length > 0
+                            visible: root.componentMode && root.componentNodeScopeText(modelData).length > 0
                             radius: height / 2
                             color: Qt.rgba(0.14, 0.48, 1, 0.08)
                             border.color: Qt.rgba(0.14, 0.48, 1, 0.16)
@@ -2002,7 +2056,7 @@ Item {
                             Label {
                                 id: scopeLabel
                                 anchors.centerIn: parent
-                                text: modelData.scopeLabel || ""
+                                text: root.componentNodeScopeText(modelData)
                                 color: root.tokens.signalCobalt
                                 font.family: root.tokens.textFontFamily
                                 font.pixelSize: 10
@@ -2012,6 +2066,7 @@ Item {
                         }
 
                         Label {
+                            visible: !root.componentMode
                             text: root.cardMetaLabel(modelData)
                             color: root.tokens.text3
                             font.family: root.tokens.textFontFamily
