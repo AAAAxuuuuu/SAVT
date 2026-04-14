@@ -55,6 +55,32 @@ Item {
     signal nodeDrilled(var node)
     signal blankClicked()
 
+    function previewText(rawText, fallbackText) {
+        var text = String(rawText || "").trim()
+        if (text.length === 0)
+            return fallbackText || ""
+
+        var stopMarkers = [
+            "\n👉",
+            "👉",
+            "核心类/函数",
+            "核心函数",
+            "Core classes/functions",
+            "Core classes",
+            "Top symbols"
+        ]
+        for (var i = 0; i < stopMarkers.length; ++i) {
+            var markerIndex = text.indexOf(stopMarkers[i])
+            if (markerIndex > 0) {
+                text = text.slice(0, markerIndex).trim()
+                break
+            }
+        }
+
+        text = text.replace(/\s+/g, " ").trim()
+        return text.length > 0 ? text : (fallbackText || "")
+    }
+
     function resetView() {
         zoom = 1.0
         panX = 0
@@ -1906,7 +1932,9 @@ Item {
                     Label {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 50
-                        text: modelData.summary || modelData.responsibility || modelData.role || "暂无描述。"
+                        text: root.previewText(
+                                  modelData.summary || modelData.responsibility || modelData.role,
+                                  "暂无描述。")
                         wrapMode: Text.WordWrap
                         maximumLineCount: 3
                         elide: Text.ElideRight
@@ -2233,7 +2261,11 @@ Item {
 
                     Label {
                         Layout.fillWidth: true
-                        text: root.selectedNode ? (root.selectedNode.summary || root.selectedNode.responsibility || root.selectedNode.role || "当前焦点节点") : ""
+                        text: root.selectedNode
+                              ? root.previewText(
+                                    root.selectedNode.summary || root.selectedNode.responsibility || root.selectedNode.role,
+                                    "当前焦点节点")
+                              : ""
                         wrapMode: Text.WordWrap
                         maximumLineCount: 2
                         elide: Text.ElideRight
@@ -2287,7 +2319,9 @@ Item {
 
                         Label {
                             Layout.fillWidth: true
-                            text: relationNode.summary || relationNode.responsibility || relationNode.role || "上游关系节点"
+                            text: root.previewText(
+                                      relationNode.summary || relationNode.responsibility || relationNode.role,
+                                      "上游关系节点")
                             maximumLineCount: 2
                             elide: Text.ElideRight
                             wrapMode: Text.WordWrap
@@ -2338,7 +2372,9 @@ Item {
 
                         Label {
                             Layout.fillWidth: true
-                            text: relationNode.summary || relationNode.responsibility || relationNode.role || "下游关系节点"
+                            text: root.previewText(
+                                      relationNode.summary || relationNode.responsibility || relationNode.role,
+                                      "下游关系节点")
                             maximumLineCount: 2
                             elide: Text.ElideRight
                             wrapMode: Text.WordWrap
@@ -2357,67 +2393,6 @@ Item {
                 }
             }
 
-        }
-    }
-
-    Rectangle {
-        visible: root.componentOverviewMode && root.nodes.length > 0 && !root.relationshipFocusActive
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.margins: 18
-        width: 332
-        height: 102
-        radius: root.tokens.radiusXl
-        color: Qt.rgba(1, 1, 1, 0.9)
-        border.color: Qt.rgba(0.12, 0.18, 0.28, 0.08)
-        z: 24
-
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            spacing: 8
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 8
-
-                Label {
-                    text: "组件全景图"
-                    color: root.tokens.text1
-                    font.family: root.tokens.displayFontFamily
-                    font.pixelSize: 16
-                    font.weight: Font.DemiBold
-                }
-
-                Rectangle {
-                    radius: height / 2
-                    color: Qt.rgba(0.14, 0.48, 1, 0.08)
-                    border.color: Qt.rgba(0.14, 0.48, 1, 0.18)
-                    implicitWidth: idleComponentCount.implicitWidth + 16
-                    implicitHeight: 24
-
-                    Label {
-                        id: idleComponentCount
-                        anchors.centerIn: parent
-                        text: root.componentCount + " 个"
-                        color: root.tokens.signalCobalt
-                        font.family: root.tokens.textFontFamily
-                        font.pixelSize: 11
-                        font.weight: Font.DemiBold
-                    }
-                }
-
-                Item { Layout.fillWidth: true }
-            }
-
-            Label {
-                Layout.fillWidth: true
-                text: "当前是无连线组件全景图，并按入口、界面、核心、支撑分区展示；先扫全貌，再点组件进入关系聚焦。"
-                color: root.tokens.text3
-                font.family: root.tokens.textFontFamily
-                font.pixelSize: 11
-                wrapMode: Text.WordWrap
-            }
         }
     }
 

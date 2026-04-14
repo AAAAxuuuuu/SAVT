@@ -16,6 +16,32 @@ Item {
 
     signal chooseProjectRequested()
 
+    function normalizedPreviewText(rawText, fallbackText) {
+        var text = String(rawText || "").trim()
+        if (text.length === 0)
+            return fallbackText || ""
+
+        var stopMarkers = [
+            "\n👉",
+            "👉",
+            "核心类/函数",
+            "核心函数",
+            "Core classes/functions",
+            "Core classes",
+            "Top symbols"
+        ]
+        for (var i = 0; i < stopMarkers.length; ++i) {
+            var markerIndex = text.indexOf(stopMarkers[i])
+            if (markerIndex > 0) {
+                text = text.slice(0, markerIndex).trim()
+                break
+            }
+        }
+
+        text = text.replace(/\s+/g, " ").trim()
+        return text.length > 0 ? text : (fallbackText || "")
+    }
+
     function componentSceneForFocus() {
         if (!root.focusState.focusedCapability || root.focusState.focusedCapability.id === undefined)
             return ({})
@@ -115,16 +141,18 @@ Item {
                 anchors.left: parent.left
                 anchors.top: parent.top
                 anchors.margins: 18
-                width: Math.min(parent.width - 36, 520)
-                height: 74
+                width: Math.min(parent.width - 36, 560)
+                height: Math.max(88, componentHeaderLayout.implicitHeight + 24)
                 radius: root.tokens.radius8
                 color: root.tokens.panelBase
                 border.color: root.tokens.border1
 
                 RowLayout {
+                    id: componentHeaderLayout
                     anchors.fill: parent
                     anchors.margins: 12
                     spacing: 10
+                    layoutDirection: Qt.LeftToRight
 
                     ColumnLayout {
                         Layout.fillWidth: true
@@ -142,11 +170,16 @@ Item {
 
                         Label {
                             Layout.fillWidth: true
-                            text: root.componentSceneForFocus().summary || "双击全景图节点后，SAVT 会接入 componentSceneCatalog 展开组件关系。"
+                            text: root.normalizedPreviewText(
+                                      root.componentSceneForFocus().summary,
+                                      "双击全景图节点后，SAVT 会接入 componentSceneCatalog 展开组件关系。")
                             color: root.tokens.text3
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 2
                             elide: Text.ElideRight
                             font.family: root.tokens.textFontFamily
                             font.pixelSize: 12
+                            lineHeight: 1.15
                         }
                     }
 
@@ -154,6 +187,7 @@ Item {
                         tokens: root.tokens
                         text: "返回全景"
                         tone: "secondary"
+                        Layout.alignment: Qt.AlignVCenter
                         onClicked: root.caseState.navigate("overview")
                     }
                 }
