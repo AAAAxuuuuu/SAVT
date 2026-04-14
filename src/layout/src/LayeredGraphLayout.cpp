@@ -559,7 +559,7 @@ CapabilitySceneLayoutResult LayeredGraphLayout::layoutCapabilityScene(
     double currentX = options.marginX;
     std::size_t absoluteLaneIndex = 0;
     const std::size_t maxRowsPerColumn = 3;
-    const double wrappedColumnGap = options.columnGap * 0.72;
+    const double wrappedColumnGap = options.columnGap * 0.82;
 
     for (std::size_t layerIndex = 0; layerIndex < buckets.size(); ++layerIndex) {
         auto& bucket = buckets[layerIndex];

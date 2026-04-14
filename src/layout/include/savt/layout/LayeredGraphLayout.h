@@ -29,14 +29,14 @@ struct LayoutResult {
 struct CapabilitySceneLayoutOptions {
     double baseNodeWidth = 272.0;
     double baseNodeHeight = 132.0;
-    double columnGap = 118.0;
-    double rowGap = 52.0;
-    double marginX = 44.0;
-    double marginY = 72.0;
-    double minSceneHeight = 460.0;
-    double groupPadding = 44.0;
-    double edgeStub = 28.0;
-    double sameLaneRailOffset = 38.0;
+    double columnGap = 136.0;
+    double rowGap = 68.0;
+    double marginX = 52.0;
+    double marginY = 78.0;
+    double minSceneHeight = 500.0;
+    double groupPadding = 52.0;
+    double edgeStub = 34.0;
+    double sameLaneRailOffset = 48.0;
     double collaboratorScaleDivisor = 10.0;
     double maxImportanceBoost = 0.26;
 };

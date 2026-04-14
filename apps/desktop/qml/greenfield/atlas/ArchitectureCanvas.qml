@@ -48,6 +48,8 @@ Item {
     property real zoom: 1.0
     property real panX: 0
     property real panY: 0
+    property var manualNodePositions: ({})
+    property bool draggingNodeCard: false
 
     signal nodeSelected(var node)
     signal nodeDrilled(var node)
@@ -57,6 +59,32 @@ Item {
         zoom = 1.0
         panX = 0
         panY = 0
+        manualNodePositions = ({})
+        draggingNodeCard = false
+    }
+
+    function nodePositionKey(nodeId) {
+        return String(nodeId)
+    }
+
+    function manualNodePosition(nodeId) {
+        if (nodeId === undefined || nodeId === null)
+            return null
+        var key = nodePositionKey(nodeId)
+        return manualNodePositions && manualNodePositions[key] ? manualNodePositions[key] : null
+    }
+
+    function setManualNodePosition(nodeId, x, y, width, height) {
+        if (nodeId === undefined || nodeId === null)
+            return
+
+        var nextPositions = Object.assign({}, manualNodePositions || ({}))
+        nextPositions[nodePositionKey(nodeId)] = {"x": x, "y": y}
+        manualNodePositions = nextPositions
+    }
+
+    function clearManualNodePositions() {
+        manualNodePositions = ({})
     }
 
     function zoomAt(viewX, viewY, factor) {
@@ -408,6 +436,9 @@ Item {
     }
 
     function sceneX(item, fallbackIndex) {
+        var manualPosition = item ? manualNodePosition(item.id) : null
+        if (manualPosition)
+            return manualPosition.x
         if (componentOverviewMode) {
             return componentOverviewPlacement(item ? item.id : fallbackIndex, fallbackIndex).x
         }
@@ -419,6 +450,9 @@ Item {
     }
 
     function sceneY(item, fallbackIndex) {
+        var manualPosition = item ? manualNodePosition(item.id) : null
+        if (manualPosition)
+            return manualPosition.y
         if (componentOverviewMode) {
             return componentOverviewPlacement(item ? item.id : fallbackIndex, fallbackIndex).y
         }
@@ -667,6 +701,24 @@ Item {
         if (!route)
             return false
         return routeHitsModules([route.p0, route.p1, route.p2, route.p3], edge)
+    }
+
+    function routeMetric(route) {
+        if (!route)
+            return 999999
+        return pointDistance(route.p0, route.p1)
+               + pointDistance(route.p1, route.p2)
+               + pointDistance(route.p2, route.p3)
+    }
+
+    function orthogonalRouteObject(points) {
+        return {
+            "p0": points[0],
+            "p1": points[1],
+            "p2": points[2],
+            "p3": points[3],
+            "style": "orthogonal"
+        }
     }
 
     function endpointPeerOffset(edge, endpointKey, step) {
@@ -1199,60 +1251,56 @@ Item {
                             : 1
         var outgoingOffset = outgoingSlot ? (outgoingSlot.index - (outgoingCount - 1) / 2) * 14 : 0
         var incomingOffset = incomingSlot ? (incomingSlot.index - (incomingCount - 1) / 2) * 14 : 0
-        var vertical = Math.abs(toCenter.y - fromCenter.y) >= Math.abs(toCenter.x - fromCenter.x) * 0.72
+        var preferVertical = Math.abs(toCenter.y - fromCenter.y) >= Math.abs(toCenter.x - fromCenter.x) * 0.72
+        var candidates = []
 
-        if (isOverviewPrimaryEdge(edge)) {
-            if (vertical) {
-                var startSide = toCenter.y >= fromCenter.y ? "bottom" : "top"
-                var endSide = toCenter.y >= fromCenter.y ? "top" : "bottom"
-                var primaryStart = portPoint(fromRect, startSide, outgoingOffset)
-                var primaryEnd = portPoint(toRect, endSide, incomingOffset)
-                var midY = (primaryStart.y + primaryEnd.y) / 2
-                var directVertical = {
-                    "p0": primaryStart,
-                    "p1": Qt.point(primaryStart.x, midY),
-                    "p2": Qt.point(primaryEnd.x, midY),
-                    "p3": primaryEnd,
-                    "style": "orthogonal"
-                }
-                if (!routeObjectHitsModules(directVertical, edge))
-                    return directVertical
-
-                var bypassVertical = bypassRoute(fromRect, toRect, laneIndex, true)
-                return {
-                    "p0": bypassVertical[0],
-                    "p1": bypassVertical[1],
-                    "p2": bypassVertical[2],
-                    "p3": bypassVertical[3],
-                    "style": "orthogonal"
-                }
-            }
-
-            var horizontalDirection = toCenter.x >= fromCenter.x ? 1 : -1
-            var fallbackStart = portPoint(fromRect, horizontalDirection > 0 ? "right" : "left", outgoingOffset)
-            var fallbackEnd = portPoint(toRect, horizontalDirection > 0 ? "left" : "right", incomingOffset)
-            var midX = (fallbackStart.x + fallbackEnd.x) / 2
-            var directHorizontal = {
-                "p0": fallbackStart,
-                "p1": Qt.point(midX, fallbackStart.y),
-                "p2": Qt.point(midX, fallbackEnd.y),
-                "p3": fallbackEnd,
+        var startVerticalSide = toCenter.y >= fromCenter.y ? "bottom" : "top"
+        var endVerticalSide = toCenter.y >= fromCenter.y ? "top" : "bottom"
+        var verticalStart = portPoint(fromRect, startVerticalSide, outgoingOffset)
+        var verticalEnd = portPoint(toRect, endVerticalSide, incomingOffset)
+        var verticalMidY = (verticalStart.y + verticalEnd.y) / 2
+        candidates.push({
+            "route": {
+                "p0": verticalStart,
+                "p1": Qt.point(verticalStart.x, verticalMidY),
+                "p2": Qt.point(verticalEnd.x, verticalMidY),
+                "p3": verticalEnd,
                 "style": "orthogonal"
-            }
-            if (!routeObjectHitsModules(directHorizontal, edge))
-                return directHorizontal
+            },
+            "preferred": preferVertical ? 0 : 1
+        })
 
-            var bypassHorizontal = bypassRoute(fromRect, toRect, laneIndex, false)
-            return {
-                "p0": bypassHorizontal[0],
-                "p1": bypassHorizontal[1],
-                "p2": bypassHorizontal[2],
-                "p3": bypassHorizontal[3],
+        var horizontalDirection = toCenter.x >= fromCenter.x ? 1 : -1
+        var horizontalStart = portPoint(fromRect, horizontalDirection > 0 ? "right" : "left", outgoingOffset)
+        var horizontalEnd = portPoint(toRect, horizontalDirection > 0 ? "left" : "right", incomingOffset)
+        var horizontalMidX = (horizontalStart.x + horizontalEnd.x) / 2
+        candidates.push({
+            "route": {
+                "p0": horizontalStart,
+                "p1": Qt.point(horizontalMidX, horizontalStart.y),
+                "p2": Qt.point(horizontalMidX, horizontalEnd.y),
+                "p3": horizontalEnd,
                 "style": "orthogonal"
-            }
-        }
+            },
+            "preferred": preferVertical ? 1 : 0
+        })
 
-        return null
+        var bypassHorizontal = orthogonalRouteObject(bypassRoute(fromRect, toRect, laneIndex, false))
+        var bypassVertical = orthogonalRouteObject(bypassRoute(fromRect, toRect, laneIndex, true))
+        candidates.push({"route": bypassHorizontal, "preferred": preferVertical ? 3 : 2})
+        candidates.push({"route": bypassVertical, "preferred": preferVertical ? 2 : 3})
+
+        candidates.sort(function(left, right) {
+            var leftHits = routeObjectHitsModules(left.route, edge) ? 1 : 0
+            var rightHits = routeObjectHitsModules(right.route, edge) ? 1 : 0
+            if (leftHits !== rightHits)
+                return leftHits - rightHits
+            if (left.preferred !== right.preferred)
+                return left.preferred - right.preferred
+            return routeMetric(left.route) - routeMetric(right.route)
+        })
+
+        return candidates.length > 0 ? candidates[0].route : null
     }
 
     function routeEdge(edge, laneIndex) {
@@ -1334,15 +1382,14 @@ Item {
     }
 
     function overviewEdgeBaseColor(edge) {
-        var base = Qt.rgba(0.12, 0.46, 0.98, 0.9)
         var kind = String(edge && edge.kind ? edge.kind : "").toLowerCase()
         if (kind === "activates")
-            return mixColor(base, tokens.signalTeal, 0.52)
+            return Qt.rgba(0.20, 0.64, 0.74, 0.9)
         if (kind === "uses_infrastructure")
-            return mixColor(Qt.rgba(0.42, 0.46, 0.54, 0.86), tokens.signalAmber, 0.38)
+            return Qt.rgba(0.60, 0.55, 0.46, 0.88)
         if (kind === "enables")
-            return mixColor(base, tokens.signalMoss, 0.28)
-        return base
+            return Qt.rgba(0.14, 0.47, 0.98, 0.9)
+        return Qt.rgba(0.24, 0.49, 0.86, 0.88)
     }
 
     function edgeColor(edge) {
@@ -1400,6 +1447,7 @@ Item {
         id: canvasMouse
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton
+        enabled: !root.draggingNodeCard
         property real lastX: 0
         property real lastY: 0
         property bool dragged: false
@@ -1870,7 +1918,16 @@ Item {
                 MouseArea {
                     anchors.fill: parent
                     hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
+                    acceptedButtons: Qt.LeftButton
+                    pressAndHoldInterval: 260
+                    cursorShape: dragArmed ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                    property bool dragArmed: false
+                    property bool dragMoved: false
+                    property real pressSceneX: 0
+                    property real pressSceneY: 0
+                    property real pressCardX: 0
+                    property real pressCardY: 0
+                    onPressed: dragMoved = false
                     onEntered: {
                         card.hovered = true
                         root.hoverNode = modelData
@@ -1880,8 +1937,47 @@ Item {
                         if (root.hoverNode && root.hoverNode.id === modelData.id)
                             root.hoverNode = null
                     }
-                    onClicked: root.nodeSelected(modelData)
-                    onDoubleClicked: root.nodeDrilled(modelData)
+                    onPressAndHold: function(mouse) {
+                        if (root.componentMode || root.relationshipFocusActive)
+                            return
+                        var scenePoint = card.mapToItem(contentLayer, mouse.x, mouse.y)
+                        dragArmed = true
+                        dragMoved = true
+                        pressSceneX = scenePoint.x
+                        pressSceneY = scenePoint.y
+                        pressCardX = card.x
+                        pressCardY = card.y
+                        root.draggingNodeCard = true
+                    }
+                    onPositionChanged: function(mouse) {
+                        if (!dragArmed || !pressed)
+                            return
+
+                        var scenePoint = card.mapToItem(contentLayer, mouse.x, mouse.y)
+                        var nextX = pressCardX + (scenePoint.x - pressSceneX)
+                        var nextY = pressCardY + (scenePoint.y - pressSceneY)
+                        if (Math.abs(nextX - pressCardX) + Math.abs(nextY - pressCardY) > 1)
+                            dragMoved = true
+                        root.setManualNodePosition(modelData.id, nextX, nextY, card.width, card.height)
+                    }
+                    onReleased: {
+                        dragArmed = false
+                        root.draggingNodeCard = false
+                    }
+                    onCanceled: {
+                        dragArmed = false
+                        root.draggingNodeCard = false
+                    }
+                    onClicked: function(mouse) {
+                        if (dragMoved || dragArmed)
+                            return
+                        root.nodeSelected(modelData)
+                    }
+                    onDoubleClicked: function(mouse) {
+                        if (dragMoved || dragArmed)
+                            return
+                        root.nodeDrilled(modelData)
+                    }
                 }
             }
         }
