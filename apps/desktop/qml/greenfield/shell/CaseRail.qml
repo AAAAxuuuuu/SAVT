@@ -6,7 +6,9 @@ Rectangle {
     id: root
 
     required property QtObject tokens
+    required property QtObject analysisController
     required property QtObject caseState
+    required property QtObject focusState
 
     radius: tokens.radiusXxl + 4
     color: tokens.sidebarBase
@@ -28,6 +30,24 @@ Rectangle {
 
     function itemIconColor(route) {
         return root.caseState.route === route ? "#FFFFFF" : root.tokens.text3
+    }
+
+    function searchCapability(queryText) {
+        var query = String(queryText || "").trim().toLowerCase()
+        if (query.length === 0)
+            return
+
+        var nodes = ((root.analysisController.capabilityScene || ({})).nodes || [])
+        for (var index = 0; index < nodes.length; ++index) {
+            var node = nodes[index]
+            var text = ((node.name || "") + " " + (node.role || "") + " "
+                        + (node.summary || "") + " " + ((node.moduleNames || []).join(" "))).toLowerCase()
+            if (text.indexOf(query) >= 0) {
+                root.focusState.setCapability(node)
+                root.caseState.navigate("overview")
+                return
+            }
+        }
     }
 
     ColumnLayout {
@@ -129,8 +149,82 @@ Rectangle {
 
         Item { Layout.fillHeight: true }
 
+        TextField {
+            id: searchField
+            Layout.fillWidth: true
+            Layout.topMargin: 8
+            Layout.preferredHeight: 38
+            placeholderText: "架构搜索..."
+            selectByMouse: true
+            color: root.tokens.text1
+            placeholderTextColor: root.tokens.text3
+            font.family: root.tokens.textFontFamily
+            font.pixelSize: 12
+            onAccepted: root.searchCapability(text)
+
+            background: Rectangle {
+                radius: root.tokens.radiusLg
+                color: root.tokens.searchBase
+                border.color: searchField.activeFocus ? root.tokens.signalCobalt : root.tokens.border1
+
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0.0
+                        color: searchField.activeFocus
+                               ? Qt.rgba(1, 1, 1, 0.96)
+                               : Qt.rgba(1, 1, 1, 0.9)
+                    }
+                    GradientStop {
+                        position: 1.0
+                        color: searchField.activeFocus
+                               ? Qt.rgba(1, 1, 1, 0.82)
+                               : Qt.rgba(1, 1, 1, 0.72)
+                    }
+                }
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.topMargin: 6
+            spacing: 8
+
+            ActionButton {
+                Layout.fillWidth: true
+                tokens: root.tokens
+                text: root.analysisController.analyzing ? "停止" : "分析"
+                compact: true
+                tone: root.analysisController.analyzing ? "danger" : "primary"
+                enabled: root.caseState.hasProject
+                onClicked: {
+                    if (root.analysisController.analyzing)
+                        root.analysisController.stopAnalysis()
+                    else
+                        root.analysisController.analyzeCurrentProject()
+                }
+            }
+
+            ActionButton {
+                Layout.fillWidth: true
+                tokens: root.tokens
+                text: "AI"
+                compact: true
+                tone: "ai"
+                enabled: root.analysisController.aiAvailable
+                onClicked: {
+                    if (root.focusState.focusedNode)
+                        root.analysisController.requestAiExplanation(root.focusState.focusedNode,
+                                                                     "请解释当前架构节点，并给出下一步建议。")
+                    else
+                        root.analysisController.requestProjectAiExplanation("请用架构工作台视角总结当前项目。")
+                    root.caseState.navigate("report")
+                }
+            }
+        }
+
         Rectangle {
             Layout.fillWidth: true
+            Layout.topMargin: 10
             Layout.preferredHeight: 1
             color: root.tokens.border1
         }
@@ -166,6 +260,24 @@ Rectangle {
                     elide: Text.ElideRight
                     font.family: root.tokens.textFontFamily
                     font.pixelSize: 12
+                }
+
+                Rectangle {
+                    Layout.preferredHeight: 28
+                    Layout.preferredWidth: trustLabel.implicitWidth + 18
+                    radius: height / 2
+                    color: root.tokens.toneSoft(root.caseState.trustTone())
+                    border.color: root.tokens.toneColor(root.caseState.trustTone())
+
+                    Label {
+                        id: trustLabel
+                        anchors.centerIn: parent
+                        text: root.caseState.trustLabel()
+                        color: root.tokens.toneColor(root.caseState.trustTone())
+                        font.family: root.tokens.textFontFamily
+                        font.pixelSize: 11
+                        font.weight: Font.DemiBold
+                    }
                 }
             }
         }

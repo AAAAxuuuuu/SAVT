@@ -27,7 +27,9 @@ Item {
             Layout.preferredWidth: 264
             Layout.fillHeight: true
             tokens: root.tokens
+            analysisController: root.analysisController
             caseState: root.caseState
+            focusState: root.focusState
         }
 
         Rectangle {
@@ -83,16 +85,6 @@ Item {
             ColumnLayout {
                 anchors.fill: contentHost
                 spacing: 0
-
-                CommandStrip {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 60
-                    tokens: root.tokens
-                    analysisController: root.analysisController
-                    caseState: root.caseState
-                    focusState: root.focusState
-                    onChooseProjectRequested: root.chooseProjectRequested()
-                }
 
                 WorkspaceStage {
                     Layout.fillWidth: true
