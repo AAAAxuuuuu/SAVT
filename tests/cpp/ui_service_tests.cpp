@@ -3,13 +3,16 @@
 #include "savt/ui/AstPreviewService.h"
 #include "savt/ui/FileInsightService.h"
 #include "savt/ui/IncrementalAnalysisPipeline.h"
+#include "savt/ui/ProjectConfigRecommendationService.h"
 #include "savt/ui/ReportService.h"
 
 #include "savt/core/ArchitectureOverview.h"
 #include "savt/core/CapabilityGraph.h"
+#include "savt/core/ProjectAnalysisConfig.h"
 #include "savt/layout/LayeredGraphLayout.h"
 
 #include <QCoreApplication>
+#include <QDir>
 #include <QVariantMap>
 
 #include <cstdlib>
@@ -41,6 +44,16 @@ std::filesystem::path makeTempDirectory(const std::string& prefix) {
     fs::remove_all(tempRoot, errorCode);
     fs::create_directories(tempRoot, errorCode);
     return tempRoot;
+}
+
+QVariantMap findChoiceById(const QVariantList& choices, const QString& id) {
+    for (const QVariant& item : choices) {
+        const QVariantMap choice = item.toMap();
+        if (choice.value(QStringLiteral("id")).toString().trimmed() == id) {
+            return choice;
+        }
+    }
+    return {};
 }
 
 void testAstPreviewServiceBuildsItemsAndParsesCppPreview() {
@@ -176,6 +189,15 @@ void testReportServiceBuildsReadableSystemContextPayload() {
            "system context should publish core container names");
     expect(systemContext.value(QStringLiteral("mainFlowSummary")).toString().contains(QStringLiteral("Desktop Shell")),
            "system context should publish the primary collaboration path");
+    const QString projectOverview =
+        systemContext.value(QStringLiteral("projectOverview")).toString().trimmed();
+    expect(!projectOverview.isEmpty(),
+           "system context should publish a notebook-style project overview paragraph");
+    expect(projectOverview.contains(QStringLiteral("demo_workspace")),
+           "project overview should mention the analyzed project name");
+    expect(projectOverview.contains(QStringLiteral("Analyzer Pipeline")) ||
+               projectOverview.contains(QStringLiteral("Desktop Shell")),
+           "project overview should mention the key entry or core module");
     expect(!systemContext.value(QStringLiteral("contextSections")).toList().isEmpty(),
            "system context should publish complete structured context sections");
     expect(!systemContext.value(QStringLiteral("hotspotSignals")).toList().isEmpty(),
@@ -204,6 +226,110 @@ void testAnalysisControllerStartsFromStableDefaultState() {
            "analysis controller should start with an empty component catalog");
     expect(controller.astPreviewTitle() == QStringLiteral("AST 预览"),
            "analysis controller should initialize the AST preview through AstPreviewService");
+}
+
+void testProjectConfigRecommendationServiceBuildsWritableDraft() {
+    namespace fs = std::filesystem;
+
+    const fs::path tempRoot = makeTempDirectory("savt_ui_project_config_recommendation");
+    fs::create_directories(tempRoot / "TrafficMapContent");
+    fs::create_directories(tempRoot / "Resources" / "web");
+    fs::create_directories(tempRoot / "Generated");
+    fs::create_directories(tempRoot / "Dependencies");
+    fs::create_directories(tempRoot / "cmake-build-debug");
+    fs::create_directories(tempRoot / ".idea");
+
+    writeTextFile(tempRoot / "TrafficMap.qmlproject",
+                  "import QmlProject\n"
+                  "Project {\n"
+                  "    mainFile: \"TrafficMapContent/App.qml\"\n"
+                  "    mainUiFile: \"TrafficMapContent/Screen01.ui.qml\"\n"
+                  "}\n");
+    writeTextFile(tempRoot / "TrafficMapContent" / "App.qml", "import QtQuick\nItem {}\n");
+    writeTextFile(tempRoot / "TrafficMapContent" / "Screen01.ui.qml", "import QtQuick\nItem {}\n");
+    writeTextFile(tempRoot / "Resources" / "web" / "map.html", "<html><body>Map</body></html>\n");
+    writeTextFile(tempRoot / "Resources" / "web" / "app.js", "console.log('map');\n");
+    writeTextFile(tempRoot / "Generated" / "Generated.ui.qml", "import QtQuick\nItem {}\n");
+    writeTextFile(tempRoot / "Dependencies" / "vendor.txt", "third party\n");
+
+    savt::core::AnalysisReport report;
+    report.rootPath = tempRoot.generic_string();
+    report.nodes = {
+        {1, savt::core::SymbolKind::File, "App.qml", "TrafficMapContent/App.qml", "file:app", "TrafficMapContent/App.qml", 0},
+        {2, savt::core::SymbolKind::File, "Screen01.ui.qml", "TrafficMapContent/Screen01.ui.qml", "file:screen", "TrafficMapContent/Screen01.ui.qml", 0},
+        {3, savt::core::SymbolKind::File, "map.html", "Resources/web/map.html", "file:web", "Resources/web/map.html", 0},
+        {4, savt::core::SymbolKind::File, "app.js", "Resources/web/app.js", "file:web-js", "Resources/web/app.js", 0},
+        {5, savt::core::SymbolKind::File, "Generated.ui.qml", "Generated/Generated.ui.qml", "file:generated", "Generated/Generated.ui.qml", 0}
+    };
+
+    savt::core::CapabilityGraph capabilityGraph;
+    savt::core::CapabilityNode entryNode;
+    entryNode.id = 1;
+    entryNode.kind = savt::core::CapabilityNodeKind::Entry;
+    entryNode.name = "TrafficMapContent";
+    entryNode.moduleNames = {"TrafficMapContent"};
+    capabilityGraph.nodes.push_back(entryNode);
+
+    const QVariantMap recommendation =
+        savt::ui::ProjectConfigRecommendationService::buildRecommendation(
+            QString::fromStdString(tempRoot.generic_string()),
+            report,
+            {},
+            capabilityGraph);
+    expect(recommendation.value(QStringLiteral("available")).toBool(),
+           "project config recommendation should be available for a valid workspace");
+    expect(recommendation.value(QStringLiteral("draftJson")).toString().contains(QStringLiteral("\"version\": 1")),
+           "project config recommendation should render a JSON draft");
+    expect(recommendation.value(QStringLiteral("targetPath")).toString().contains(QStringLiteral(".savt")),
+           "project config recommendation should default to writing under .savt when no config exists");
+    expect(recommendation.value(QStringLiteral("draftCounts")).toMap().value(QStringLiteral("fold")).toULongLong() >= 1,
+           "project config recommendation should fold dependency-like directories by default");
+
+    const QVariantMap generatedChoice = findChoiceById(
+        recommendation.value(QStringLiteral("choiceItems")).toList(),
+        QStringLiteral("generated:Generated"));
+    expect(!generatedChoice.isEmpty(),
+           "project config recommendation should surface a user choice for ambiguous generated folders");
+
+    const QVariantMap keepGenerated =
+        savt::ui::ProjectConfigRecommendationService::selectChoice(
+            recommendation,
+            QStringLiteral("generated:Generated"),
+            QStringLiteral("keep"));
+    const QVariantList keepGeneratedIgnoreDirs =
+        keepGenerated.value(QStringLiteral("draftConfig")).toMap()
+            .value(QStringLiteral("ignoreDirectories")).toList();
+    bool generatedIgnored = false;
+    for (const QVariant& item : keepGeneratedIgnoreDirs) {
+        if (item.toString().trimmed() == QStringLiteral("Generated")) {
+            generatedIgnored = true;
+            break;
+        }
+    }
+    expect(!generatedIgnored,
+           "changing the generated-folder choice should update the emitted ignore rules");
+
+    QString writtenPath;
+    QString errorMessage;
+    const bool wrote = savt::ui::ProjectConfigRecommendationService::writeRecommendation(
+        QString::fromStdString(tempRoot.generic_string()),
+        recommendation,
+        &writtenPath,
+        &errorMessage);
+    expect(wrote,
+           "project config recommendation should write the generated draft to disk");
+    expect(errorMessage.isEmpty(),
+           "project config recommendation should not report an error when writing succeeds");
+    expect(fs::exists(fs::path(QDir::fromNativeSeparators(writtenPath).toStdString())),
+           "written config path should exist on disk");
+
+    const auto loadedConfig =
+        savt::core::loadProjectAnalysisConfig(tempRoot);
+    expect(loadedConfig.loaded,
+           "written project config draft should be parseable by the core loader");
+
+    std::error_code errorCode;
+    fs::remove_all(tempRoot, errorCode);
 }
 
 void testAiServiceClassifiesCapabilityAndComponentScopes() {
@@ -692,6 +818,7 @@ int main(int argc, char** argv) {
     testAstPreviewServiceBuildsItemsAndParsesCppPreview();
     testReportServiceBuildsReadableSystemContextPayload();
     testAnalysisControllerStartsFromStableDefaultState();
+    testProjectConfigRecommendationServiceBuildsWritableDraft();
     testAiServiceClassifiesCapabilityAndComponentScopes();
     testFileInsightServiceBuildsPortableSingleFileSummary();
     testAiServiceParseReplyUsesScopeSpecificStatusMessages();

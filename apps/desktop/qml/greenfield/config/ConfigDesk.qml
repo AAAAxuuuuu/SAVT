@@ -24,6 +24,15 @@ ScrollView {
     readonly property var dependencyFoldRules: projectConfig.dependencyFoldRules || []
     readonly property var configDiagnostics: projectConfig.diagnostics || []
     readonly property var configSearchPaths: projectConfig.searchPaths || []
+    readonly property var configRecommendation: systemData.projectConfigRecommendation || ({})
+    readonly property var draftConfig: configRecommendation.draftConfig || ({})
+    readonly property var draftCounts: configRecommendation.draftCounts || ({})
+    readonly property var draftIgnoreDirectories: draftConfig.ignoreDirectories || []
+    readonly property var draftModuleMerges: draftConfig.moduleMerges || []
+    readonly property var draftRoleOverrides: draftConfig.roleOverrides || []
+    readonly property var draftEntryOverrides: draftConfig.entryOverrides || []
+    readonly property var draftDependencyFoldRules: draftConfig.dependencyFoldRules || []
+    readonly property var configChoiceItems: configRecommendation.choiceItems || []
 
     clip: true
     contentWidth: availableWidth
@@ -46,6 +55,26 @@ ScrollView {
                 lines.push(String(line).trim())
         }
         return lines
+    }
+
+    function selectedChoiceDescription(choice) {
+        var selectedId = textOr(choice.selectedOptionId, "")
+        var options = choice.options || []
+        for (var i = 0; i < options.length; ++i) {
+            if (textOr(options[i].id, "") === selectedId)
+                return textOr(options[i].description, "")
+        }
+        return ""
+    }
+
+    function selectedChoiceLabel(choice) {
+        var selectedId = textOr(choice.selectedOptionId, "")
+        var options = choice.options || []
+        for (var i = 0; i < options.length; ++i) {
+            if (textOr(options[i].id, "") === selectedId)
+                return textOr(options[i].label, "")
+        }
+        return ""
     }
 
     function configStatusTone() {
@@ -81,7 +110,7 @@ ScrollView {
         Rectangle {
             Layout.fillWidth: true
             radius: root.tokens.radius8
-            color: root.tokens.panelBase
+            color: root.tokens.panelStrong
             border.color: root.tokens.border1
             implicitHeight: headerColumn.implicitHeight + 36
 
@@ -182,7 +211,7 @@ ScrollView {
             Rectangle {
                 Layout.fillWidth: true
                 radius: root.tokens.radius8
-                color: root.tokens.panelBase
+                color: root.tokens.panelStrong
                 border.color: root.tokens.border1
                 implicitHeight: projectConfigColumn.implicitHeight + 36
 
@@ -280,7 +309,7 @@ ScrollView {
             Rectangle {
                 Layout.fillWidth: true
                 radius: root.tokens.radius8
-                color: root.tokens.panelBase
+                color: root.tokens.panelStrong
                 border.color: root.tokens.border1
                 implicitHeight: runtimeColumn.implicitHeight + 36
 
@@ -322,9 +351,317 @@ ScrollView {
             }
         }
 
+        Rectangle {
+            Layout.fillWidth: true
+            radius: root.tokens.radius8
+            color: root.tokens.panelStrong
+            border.color: root.tokens.border1
+            implicitHeight: suggestedConfigColumn.implicitHeight + 36
+
+            ColumnLayout {
+                id: suggestedConfigColumn
+                anchors.fill: parent
+                anchors.margins: 18
+                spacing: 14
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: "推荐草案"
+                        color: root.tokens.text1
+                        font.family: root.tokens.displayFontFamily
+                        font.pixelSize: 18
+                        font.weight: Font.DemiBold
+                    }
+
+                    TonePill {
+                        tokens: root.tokens
+                        tone: root.textOr(configRecommendation.tone, "info")
+                        text: root.configChoiceItems.length > 0
+                              ? ("待确认 " + root.configChoiceItems.length)
+                              : "可直接生成"
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: root.textOr(configRecommendation.summary,
+                                      "分析完成后，这里会整理出一份可落盘的 SAVT 配置草案。")
+                    wrapMode: Text.WordWrap
+                    color: root.tokens.text2
+                    font.family: root.tokens.textFontFamily
+                    font.pixelSize: 13
+                }
+
+                InfoRow {
+                    tokens: root.tokens
+                    label: "写入位置"
+                    value: root.textOr(configRecommendation.targetPath,
+                                       ".savt/project.json")
+                    mono: true
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+
+                    ActionButton {
+                        tokens: root.tokens
+                        text: "刷新草案"
+                        tone: "secondary"
+                        enabled: root.caseState.hasProject && !root.analysisController.analyzing
+                        onClicked: root.analysisController.refreshProjectConfigRecommendation()
+                    }
+
+                    ActionButton {
+                        tokens: root.tokens
+                        text: root.textOr(configRecommendation.writeActionLabel, "生成配置")
+                        tone: "primary"
+                        enabled: root.caseState.hasProject
+                                 && !root.analysisController.analyzing
+                                 && configRecommendation.canGenerate !== false
+                        onClicked: root.analysisController.generateRecommendedProjectConfig()
+                    }
+                }
+
+                Flow {
+                    Layout.fillWidth: true
+                    width: suggestedConfigColumn.width
+                    spacing: 10
+
+                    MetricChip {
+                        tokens: root.tokens
+                        tone: "info"
+                        label: "忽略目录"
+                        value: root.countOr(draftCounts.ignore)
+                        fixedWidth: 94
+                    }
+
+                    MetricChip {
+                        tokens: root.tokens
+                        tone: "success"
+                        label: "模块归并"
+                        value: root.countOr(draftCounts.merge)
+                        fixedWidth: 94
+                    }
+
+                    MetricChip {
+                        tokens: root.tokens
+                        tone: "warning"
+                        label: "角色覆盖"
+                        value: root.countOr(draftCounts.role)
+                        fixedWidth: 94
+                    }
+
+                    MetricChip {
+                        tokens: root.tokens
+                        tone: "moss"
+                        label: "入口覆盖"
+                        value: root.countOr(draftCounts.entry)
+                        fixedWidth: 94
+                    }
+
+                    MetricChip {
+                        tokens: root.tokens
+                        tone: "secondary"
+                        label: "依赖折叠"
+                        value: root.countOr(draftCounts.fold)
+                        fixedWidth: 94
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    visible: root.textOr(configRecommendation.decisionHint, "").length > 0
+                    text: root.textOr(configRecommendation.decisionHint, "")
+                    wrapMode: Text.WordWrap
+                    color: root.tokens.text3
+                    font.family: root.tokens.textFontFamily
+                    font.pixelSize: 12
+                }
+
+                Repeater {
+                    model: root.configChoiceItems
+
+                    Rectangle {
+                        required property var modelData
+
+                        readonly property var choiceData: modelData || ({})
+
+                        Layout.fillWidth: true
+                        width: suggestedConfigColumn.width
+                        radius: root.tokens.radius6
+                        color: root.tokens.base1
+                        border.color: root.tokens.border1
+                        implicitHeight: choiceColumn.implicitHeight + 24
+
+                        ColumnLayout {
+                            id: choiceColumn
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            spacing: 10
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: root.textOr(parent.parent.choiceData.title, "")
+                                wrapMode: Text.WordWrap
+                                color: root.tokens.text1
+                                font.family: root.tokens.displayFontFamily
+                                font.pixelSize: 15
+                                font.weight: Font.DemiBold
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: root.textOr(parent.parent.choiceData.summary, "")
+                                wrapMode: Text.WordWrap
+                                color: root.tokens.text2
+                                font.family: root.tokens.textFontFamily
+                                font.pixelSize: 12
+                            }
+
+                            Flow {
+                                Layout.fillWidth: true
+                                width: choiceColumn.width
+                                spacing: 8
+
+                                Repeater {
+                                    model: parent.parent.parent.choiceData.options || []
+
+                                    ActionButton {
+                                        required property var modelData
+
+                                        tokens: root.tokens
+                                        compact: true
+                                        text: root.textOr(modelData.label, "")
+                                        tone: root.textOr(modelData.id, "")
+                                              === root.textOr(parent.parent.parent.choiceData.selectedOptionId, "")
+                                              ? "primary"
+                                              : "secondary"
+                                        onClicked: root.analysisController.selectProjectConfigRecommendationOption(
+                                                       root.textOr(parent.parent.parent.choiceData.id, ""),
+                                                       root.textOr(modelData.id, ""))
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                TonePill {
+                                    tokens: root.tokens
+                                    tone: "info"
+                                    text: "当前选择"
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: root.selectedChoiceLabel(parent.parent.choiceData)
+                                    wrapMode: Text.WordWrap
+                                    color: root.tokens.text1
+                                    font.family: root.tokens.textFontFamily
+                                    font.pixelSize: 12
+                                    font.weight: Font.DemiBold
+                                }
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: root.selectedChoiceDescription(parent.parent.choiceData)
+                                wrapMode: Text.WordWrap
+                                color: root.tokens.text3
+                                font.family: root.tokens.textFontFamily
+                                font.pixelSize: 12
+                            }
+                        }
+                    }
+                }
+
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: width >= 1560 ? 3 : 2
+                    columnSpacing: 16
+                    rowSpacing: 16
+
+                    RuleGroupCard {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        tokens: root.tokens
+                        title: "忽略目录"
+                        subtitle: "草案"
+                        items: root.draftIgnoreDirectories
+                        emptyText: "草案里还没有忽略目录。"
+                        formatter: function(item) { return String(item || "").trim() }
+                    }
+
+                    RuleGroupCard {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        tokens: root.tokens
+                        title: "模块归并"
+                        subtitle: "草案"
+                        items: root.draftModuleMerges
+                        emptyText: "草案里还没有模块归并。"
+                        formatter: function(item) {
+                            return String(item.match || "").trim() + " -> " + String(item.target || "").trim()
+                        }
+                    }
+
+                    RuleGroupCard {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        tokens: root.tokens
+                        title: "角色覆盖"
+                        subtitle: "草案"
+                        items: root.draftRoleOverrides
+                        emptyText: "草案里还没有角色覆盖。"
+                        formatter: function(item) {
+                            return String(item.match || "").trim() + " -> " + String(item.role || "").trim()
+                        }
+                    }
+
+                    RuleGroupCard {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        tokens: root.tokens
+                        title: "入口覆盖"
+                        subtitle: "草案"
+                        items: root.draftEntryOverrides
+                        emptyText: "草案里还没有入口覆盖。"
+                        formatter: function(item) {
+                            var label = item.entry ? "入口" : "非入口"
+                            return String(item.match || "").trim() + " -> " + label
+                        }
+                    }
+
+                    RuleGroupCard {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        tokens: root.tokens
+                        title: "依赖折叠"
+                        subtitle: "草案"
+                        items: root.draftDependencyFoldRules
+                        emptyText: "草案里还没有依赖折叠。"
+                        formatter: function(item) {
+                            var flags = []
+                            if (item.collapse)
+                                flags.push("默认折叠")
+                            if (item.hideByDefault)
+                                flags.push("默认隐藏")
+                            return String(item.match || "").trim() + " -> " + (flags.length > 0 ? flags.join(" / ") : "保留显示")
+                        }
+                    }
+                }
+            }
+        }
+
         Label {
             Layout.fillWidth: true
-            text: "配置规则"
+            text: "当前已生效规则"
             color: root.tokens.text1
             font.family: root.tokens.displayFontFamily
             font.pixelSize: 20
@@ -421,7 +758,7 @@ ScrollView {
         Rectangle {
             Layout.fillWidth: true
             radius: root.tokens.radius8
-            color: root.tokens.panelBase
+            color: root.tokens.panelStrong
             border.color: root.tokens.border1
             implicitHeight: diagnosticsColumn.implicitHeight + 32
 
@@ -575,7 +912,7 @@ ScrollView {
         property string detail: ""
 
         radius: tokens.radius6
-        color: tokens.base1
+        color: tokens.panelStrong
         border.color: tokens.toneColor(tone)
         implicitHeight: infoColumn.implicitHeight + 24
 
@@ -623,7 +960,7 @@ ScrollView {
         property var formatter
 
         radius: tokens.radius8
-        color: tokens.panelBase
+        color: tokens.panelStrong
         border.color: tokens.border1
         implicitHeight: Math.max(172, ruleColumn.implicitHeight + 28)
 

@@ -11,8 +11,23 @@ Rectangle {
     required property QtObject caseState
     required property QtObject focusState
 
-    color: tokens.panelBase
+    radius: tokens.radiusXxl + 4
+    color: tokens.panelSoft
     border.color: tokens.border1
+    clip: true
+
+    gradient: Gradient {
+        GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.76) }
+        GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.56) }
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        radius: parent.radius
+        color: "transparent"
+        border.color: root.tokens.shineBorder
+        border.width: 1
+    }
 
     readonly property var node: focusState.focusedNode || ({})
     readonly property var evidence: node.evidence || ({})
@@ -528,7 +543,7 @@ Rectangle {
                 Layout.preferredHeight: 72
                 visible: !root.showAiCard && !!root.focusState.focusedNode
                 radius: root.tokens.radius8
-                color: Qt.rgba(1, 1, 1, 0.92)
+                color: root.tokens.panelStrong
                 border.color: root.tokens.border1
 
                 ActionButton {
@@ -623,7 +638,7 @@ Rectangle {
                 Layout.preferredHeight: 72
                 visible: !root.showAiCard && !!root.focusState.focusedNode
                 radius: root.tokens.radius8
-                color: Qt.rgba(1, 1, 1, 0.92)
+                color: root.tokens.panelStrong
                 border.color: root.tokens.border1
 
                 ActionButton {
@@ -711,14 +726,14 @@ Rectangle {
         implicitHeight: 26
         implicitWidth: chipLabel.implicitWidth + 16
         color: tone === "brand"
-               ? Qt.rgba(0.00, 0.48, 1.00, 0.10)
+               ? Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.12)
                : (tone === "success"
-                  ? Qt.rgba(0.20, 0.78, 0.34, 0.12)
-                  : Qt.rgba(0.12, 0.18, 0.28, 0.06))
+                  ? Qt.rgba(root.tokens.signalTeal.r, root.tokens.signalTeal.g, root.tokens.signalTeal.b, 0.14)
+                  : Qt.rgba(1, 1, 1, 0.62))
         border.color: tone === "brand"
-                      ? Qt.rgba(0.00, 0.48, 1.00, 0.20)
+                      ? Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.24)
                       : (tone === "success"
-                         ? Qt.rgba(0.20, 0.78, 0.34, 0.18)
+                         ? Qt.rgba(root.tokens.signalTeal.r, root.tokens.signalTeal.g, root.tokens.signalTeal.b, 0.22)
                          : tokens.border1)
 
         Label {
@@ -743,14 +758,14 @@ Rectangle {
 
         radius: tokens.radius8
         color: tone === "brand"
-               ? Qt.rgba(0.00, 0.48, 1.00, 0.08)
+               ? Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.08)
                : (tone === "ai"
-                  ? Qt.rgba(0.69, 0.32, 0.87, 0.08)
-                  : Qt.rgba(1, 1, 1, 0.92))
+                  ? Qt.rgba(root.tokens.signalRaspberry.r, root.tokens.signalRaspberry.g, root.tokens.signalRaspberry.b, 0.08)
+                  : tokens.panelStrong)
         border.color: tone === "brand"
-                      ? Qt.rgba(0.00, 0.48, 1.00, 0.18)
+                      ? Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.18)
                       : (tone === "ai"
-                         ? Qt.rgba(0.69, 0.32, 0.87, 0.18)
+                         ? Qt.rgba(root.tokens.signalRaspberry.r, root.tokens.signalRaspberry.g, root.tokens.signalRaspberry.b, 0.2)
                          : tokens.border1)
         implicitHeight: contentColumn.implicitHeight + 28
 
@@ -806,7 +821,7 @@ Rectangle {
             Layout.fillWidth: true
             implicitHeight: rowsColumn.implicitHeight + 8
             radius: tokens.radius8
-            color: Qt.rgba(1, 1, 1, 0.92)
+            color: tokens.panelStrong
             border.color: tokens.border1
 
             ColumnLayout {

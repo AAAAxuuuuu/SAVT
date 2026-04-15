@@ -20,33 +20,57 @@ Item {
 
     RowLayout {
         anchors.fill: parent
-        spacing: 0
+        anchors.margins: 18
+        spacing: 18
 
         CaseRail {
-            Layout.preferredWidth: 250
+            Layout.preferredWidth: 264
             Layout.fillHeight: true
             tokens: root.tokens
             caseState: root.caseState
         }
 
         Rectangle {
-            Layout.preferredWidth: 1
-            Layout.fillHeight: true
-            color: root.tokens.border1
-        }
-
-        Item {
             id: mainContainer
             Layout.fillWidth: true
             Layout.fillHeight: true
+            radius: root.tokens.radiusXxl + 4
+            color: root.tokens.panelSoft
+            border.color: root.tokens.border1
             clip: true
+
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.72) }
+                GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.46) }
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: parent.radius
+                color: "transparent"
+                border.color: root.tokens.shineBorder
+                border.width: 1
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: 180
+                radius: parent.radius
+                color: "transparent"
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.32) }
+                    GradientStop { position: 1.0; color: "transparent" }
+                }
+            }
 
             Item {
                 id: contentHost
                 anchors.left: parent.left
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
-                width: parent.width - (root.focusState.inspectorOpen ? inspector.width : 0)
+                width: parent.width - (root.focusState.inspectorOpen ? inspector.width + 12 : 0)
 
                 Behavior on width {
                     NumberAnimation {
@@ -83,10 +107,10 @@ Item {
 
             FocusBrief {
                 id: inspector
-                width: 320
-                height: parent.height
-                x: root.focusState.inspectorOpen ? parent.width - width : parent.width + 20
-                y: 0
+                width: 336
+                height: parent.height - 16
+                x: root.focusState.inspectorOpen ? parent.width - width - 8 : parent.width + 28
+                y: 8
                 tokens: root.tokens
                 analysisController: root.analysisController
                 caseState: root.caseState

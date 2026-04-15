@@ -6,6 +6,7 @@
     include/savt/ui/AnalysisAnnotationService.h
     include/savt/ui/FileInsightService.h
     include/savt/ui/IncrementalAnalysisPipeline.h
+    include/savt/ui/ProjectConfigRecommendationService.h
     include/savt/ui/ReadingGuideService.h
     include/savt/ui/ReportService.h
     include/savt/ui/SemanticReadinessService.h
@@ -19,6 +20,7 @@
     src/AnalysisAnnotationService.cpp
     src/FileInsightService.cpp
     src/ReadingGuideService.cpp
+    src/ProjectConfigRecommendationService.cpp
     src/ReportService.cpp
     src/SemanticReadinessService.cpp
     src/SceneMapper.cpp

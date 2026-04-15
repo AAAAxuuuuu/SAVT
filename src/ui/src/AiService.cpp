@@ -3,6 +3,7 @@
 
 #include <QDebug>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -96,6 +97,551 @@ QStringList extractMarkdownHighlights(const QString& text,
             break;
     }
     return items;
+}
+
+QString trimTrailingWhitespace(QString text) {
+    while (!text.isEmpty()) {
+        const QChar last = text.back();
+        if (last != QLatin1Char(' ') && last != QLatin1Char('\t')) {
+            break;
+        }
+        text.chop(1);
+    }
+    return text;
+}
+
+QString normalizedRepositoryPreview(QString text,
+                                    const int maxLines,
+                                    const int maxChars,
+                                    const bool preserveIndentation) {
+    text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    text.replace(QLatin1Char('\r'), QLatin1Char('\n'));
+
+    const QStringList rawLines = text.split(QLatin1Char('\n'));
+    QStringList lines;
+    lines.reserve(std::min(static_cast<int>(rawLines.size()), maxLines));
+
+    int blankRun = 0;
+    for (const QString& rawLine : rawLines) {
+        QString line = preserveIndentation ? trimTrailingWhitespace(rawLine)
+                                           : rawLine.simplified();
+        if (line.isEmpty()) {
+            if (lines.isEmpty() || blankRun >= 1) {
+                continue;
+            }
+            ++blankRun;
+            lines.push_back(QString());
+        } else {
+            blankRun = 0;
+            lines.push_back(line);
+        }
+
+        if (lines.size() >= maxLines) {
+            break;
+        }
+    }
+
+    QString preview = lines.join(QStringLiteral("\n")).trimmed();
+    if (preview.isEmpty()) {
+        return {};
+    }
+
+    if (preview.size() > maxChars) {
+        preview = preview.left(maxChars).trimmed();
+    }
+    return preview;
+}
+
+QString readRepositoryFilePreview(const QString& absolutePath,
+                                  const int maxChars,
+                                  const int maxLines,
+                                  const bool preserveIndentation) {
+    QFile file(absolutePath);
+    if (!file.exists() ||
+        !file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return {};
+    }
+
+    const qint64 maxBytes = std::max(4096, maxChars * 6);
+    const QByteArray bytes = file.read(maxBytes);
+    const bool truncated = !file.atEnd();
+    QString preview = normalizedRepositoryPreview(
+        QString::fromUtf8(bytes.constData(), bytes.size()),
+        maxLines,
+        maxChars,
+        preserveIndentation);
+    if (preview.isEmpty()) {
+        return {};
+    }
+
+    if (truncated) {
+        preview += preserveIndentation
+                       ? QStringLiteral("\n...[truncated]")
+                       : QStringLiteral(" ...[truncated]");
+    }
+    return preview;
+}
+
+QString lowerFileName(const QString& path) {
+    return QFileInfo(path).fileName().trimmed().toLower();
+}
+
+QString lowerSuffix(const QString& path) {
+    return QFileInfo(path).suffix().trimmed().toLower();
+}
+
+bool isRepositoryReadmeFile(const QString& path) {
+    const QString fileName = lowerFileName(path);
+    return fileName == QStringLiteral("readme") ||
+           fileName.startsWith(QStringLiteral("readme."));
+}
+
+bool isRepositoryDocFile(const QString& path) {
+    const QString fileName = lowerFileName(path);
+    const QString suffix = lowerSuffix(path);
+    if (suffix != QStringLiteral("md") &&
+        suffix != QStringLiteral("markdown") &&
+        suffix != QStringLiteral("txt") &&
+        suffix != QStringLiteral("rst") &&
+        suffix != QStringLiteral("adoc")) {
+        return false;
+    }
+
+    if (isRepositoryReadmeFile(path)) {
+        return true;
+    }
+
+    return fileName.contains(QStringLiteral("overview")) ||
+           fileName.contains(QStringLiteral("architecture")) ||
+           fileName.contains(QStringLiteral("introduction")) ||
+           fileName.contains(QStringLiteral("intro")) ||
+           fileName.contains(QStringLiteral("quickstart")) ||
+           fileName.contains(QStringLiteral("getting-started")) ||
+           fileName.contains(QStringLiteral("guide"));
+}
+
+int repositoryDocumentPriority(const QString& path) {
+    const QString fileName = lowerFileName(path);
+    if (isRepositoryReadmeFile(fileName)) {
+        return 300;
+    }
+    if (fileName.contains(QStringLiteral("overview"))) {
+        return 220;
+    }
+    if (fileName.contains(QStringLiteral("architecture"))) {
+        return 210;
+    }
+    if (fileName.contains(QStringLiteral("introduction")) ||
+        fileName.contains(QStringLiteral("intro"))) {
+        return 200;
+    }
+    if (fileName.contains(QStringLiteral("quickstart")) ||
+        fileName.contains(QStringLiteral("getting-started"))) {
+        return 190;
+    }
+    if (fileName.contains(QStringLiteral("guide"))) {
+        return 180;
+    }
+    return 100;
+}
+
+bool isRepositoryManifestFile(const QString& path) {
+    const QString fileName = lowerFileName(path);
+    const QString suffix = lowerSuffix(path);
+    static const QStringList exactFileNames = {
+        QStringLiteral("package.json"),
+        QStringLiteral("pyproject.toml"),
+        QStringLiteral("cargo.toml"),
+        QStringLiteral("go.mod"),
+        QStringLiteral("pom.xml"),
+        QStringLiteral("build.gradle"),
+        QStringLiteral("build.gradle.kts"),
+        QStringLiteral("settings.gradle"),
+        QStringLiteral("settings.gradle.kts"),
+        QStringLiteral("cmakelists.txt"),
+        QStringLiteral("cmakepresets.json"),
+        QStringLiteral("requirements.txt"),
+        QStringLiteral("setup.py"),
+        QStringLiteral("makefile"),
+        QStringLiteral("meson.build"),
+        QStringLiteral("composer.json"),
+        QStringLiteral("pubspec.yaml"),
+        QStringLiteral("pubspec.yml"),
+        QStringLiteral("gemfile"),
+        QStringLiteral("mix.exs")
+    };
+    if (exactFileNames.contains(fileName)) {
+        return true;
+    }
+    return suffix == QStringLiteral("pro") ||
+           suffix == QStringLiteral("pri") ||
+           suffix == QStringLiteral("qbs") ||
+           suffix == QStringLiteral("sln");
+}
+
+int repositoryManifestPriority(const QString& path) {
+    const QString fileName = lowerFileName(path);
+    if (fileName == QStringLiteral("package.json")) {
+        return 240;
+    }
+    if (fileName == QStringLiteral("pyproject.toml")) {
+        return 235;
+    }
+    if (fileName == QStringLiteral("cargo.toml")) {
+        return 230;
+    }
+    if (fileName == QStringLiteral("go.mod")) {
+        return 225;
+    }
+    if (fileName == QStringLiteral("pom.xml")) {
+        return 220;
+    }
+    if (fileName == QStringLiteral("build.gradle.kts") ||
+        fileName == QStringLiteral("build.gradle")) {
+        return 210;
+    }
+    if (fileName == QStringLiteral("cmakelists.txt")) {
+        return 205;
+    }
+    if (fileName == QStringLiteral("cmakepresets.json")) {
+        return 200;
+    }
+    if (fileName == QStringLiteral("requirements.txt") ||
+        fileName == QStringLiteral("setup.py")) {
+        return 195;
+    }
+    if (fileName == QStringLiteral("makefile") ||
+        fileName == QStringLiteral("meson.build")) {
+        return 190;
+    }
+    return 150;
+}
+
+bool isRepositorySnippetFile(const QString& path) {
+    const QString fileName = lowerFileName(path);
+    const QString suffix = lowerSuffix(path);
+    if (fileName == QStringLiteral("cmakelists.txt")) {
+        return true;
+    }
+
+    static const QStringList snippetSuffixes = {
+        QStringLiteral("c"),   QStringLiteral("cc"),  QStringLiteral("cpp"),
+        QStringLiteral("cxx"), QStringLiteral("h"),   QStringLiteral("hh"),
+        QStringLiteral("hpp"), QStringLiteral("hxx"), QStringLiteral("ixx"),
+        QStringLiteral("cppm"), QStringLiteral("qml"), QStringLiteral("js"),
+        QStringLiteral("mjs"), QStringLiteral("cjs"), QStringLiteral("ts"),
+        QStringLiteral("tsx"), QStringLiteral("py"),  QStringLiteral("java"),
+        QStringLiteral("kt"),  QStringLiteral("go"),  QStringLiteral("rs"),
+        QStringLiteral("cs"),  QStringLiteral("swift")
+    };
+    return snippetSuffixes.contains(suffix);
+}
+
+int repositorySnippetPriority(const QString& path) {
+    const QString normalizedPath =
+        QDir::fromNativeSeparators(path).trimmed().toLower();
+    const QString fileName = QFileInfo(normalizedPath).fileName();
+    const QString suffix = QFileInfo(normalizedPath).suffix().trimmed().toLower();
+    int score = 0;
+
+    if (fileName == QStringLiteral("main.cpp") ||
+        fileName == QStringLiteral("main.cc") ||
+        fileName == QStringLiteral("main.cxx") ||
+        fileName == QStringLiteral("main.c") ||
+        fileName == QStringLiteral("main.py") ||
+        fileName == QStringLiteral("main.go") ||
+        fileName == QStringLiteral("main.rs") ||
+        fileName == QStringLiteral("main.qml") ||
+        fileName == QStringLiteral("program.cs")) {
+        score += 240;
+    } else if (fileName == QStringLiteral("app.py") ||
+               fileName == QStringLiteral("server.js") ||
+               fileName == QStringLiteral("server.ts") ||
+               fileName == QStringLiteral("index.js") ||
+               fileName == QStringLiteral("index.ts") ||
+               fileName == QStringLiteral("index.tsx") ||
+               fileName == QStringLiteral("app.qml")) {
+        score += 210;
+    }
+
+    if (normalizedPath.contains(QStringLiteral("/apps/"))) {
+        score += 60;
+    }
+    if (normalizedPath.contains(QStringLiteral("/src/"))) {
+        score += 45;
+    }
+    if (normalizedPath.contains(QStringLiteral("/app/")) ||
+        normalizedPath.contains(QStringLiteral("/cmd/")) ||
+        normalizedPath.contains(QStringLiteral("/server/")) ||
+        normalizedPath.contains(QStringLiteral("/client/"))) {
+        score += 35;
+    }
+
+    if (suffix == QStringLiteral("qml")) {
+        score += 20;
+    } else if (suffix == QStringLiteral("cpp") ||
+               suffix == QStringLiteral("cc") ||
+               suffix == QStringLiteral("cxx") ||
+               suffix == QStringLiteral("py") ||
+               suffix == QStringLiteral("ts") ||
+               suffix == QStringLiteral("tsx") ||
+               suffix == QStringLiteral("js")) {
+        score += 12;
+    } else if (suffix == QStringLiteral("h") ||
+               suffix == QStringLiteral("hh") ||
+               suffix == QStringLiteral("hpp") ||
+               suffix == QStringLiteral("hxx")) {
+        score -= 8;
+    }
+
+    if (normalizedPath.contains(QStringLiteral("/tests/")) ||
+        normalizedPath.contains(QStringLiteral("/test/")) ||
+        normalizedPath.contains(QStringLiteral("/spec/")) ||
+        normalizedPath.contains(QStringLiteral("/example/")) ||
+        normalizedPath.contains(QStringLiteral("/examples/"))) {
+        score -= 80;
+    }
+    if (normalizedPath.contains(QStringLiteral("/third_party/")) ||
+        normalizedPath.contains(QStringLiteral("/vendor/")) ||
+        normalizedPath.contains(QStringLiteral("/external/"))) {
+        score -= 120;
+    }
+
+    return score;
+}
+
+QString formatRepositoryContextEntry(const QString& kind,
+                                     const QString& relativePath,
+                                     const QString& previewText) {
+    return QStringLiteral("%1 | %2\n%3")
+        .arg(kind.trimmed(), QDir::fromNativeSeparators(relativePath.trimmed()), previewText.trimmed());
+}
+
+void appendRepositoryContextEntry(QStringList* entries,
+                                  QStringList* seenPaths,
+                                  const QString& rootPath,
+                                  const QString& filePath,
+                                  const QString& kind,
+                                  const int maxChars,
+                                  const int maxLines,
+                                  const bool preserveIndentation) {
+    if (!entries || !seenPaths) {
+        return;
+    }
+
+    const QFileInfo fileInfo(filePath);
+    if (!fileInfo.exists() || !fileInfo.isFile()) {
+        return;
+    }
+
+    const QString absolutePath = fileInfo.absoluteFilePath();
+    const QString relativePath =
+        QDir::fromNativeSeparators(QDir(rootPath).relativeFilePath(absolutePath));
+    if (relativePath.isEmpty() || relativePath.startsWith(QStringLiteral("../"))) {
+        return;
+    }
+    if (seenPaths->contains(relativePath)) {
+        return;
+    }
+
+    const QString preview = readRepositoryFilePreview(
+        absolutePath, maxChars, maxLines, preserveIndentation);
+    if (preview.isEmpty()) {
+        return;
+    }
+
+    entries->push_back(formatRepositoryContextEntry(kind, relativePath, preview));
+    seenPaths->push_back(relativePath);
+}
+
+QStringList collectProjectOverviewDocuments(const QString& projectRootPath) {
+    QStringList entries;
+    QStringList seenPaths;
+    const QDir rootDir(projectRootPath);
+    if (!rootDir.exists()) {
+        return entries;
+    }
+
+    QFileInfoList rootFiles =
+        rootDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+    std::stable_sort(rootFiles.begin(), rootFiles.end(), [](const QFileInfo& left,
+                                                            const QFileInfo& right) {
+        return repositoryDocumentPriority(left.fileName()) >
+               repositoryDocumentPriority(right.fileName());
+    });
+
+    int readmeCount = 0;
+    for (const QFileInfo& fileInfo : rootFiles) {
+        if (!isRepositoryReadmeFile(fileInfo.fileName())) {
+            continue;
+        }
+        appendRepositoryContextEntry(
+            &entries,
+            &seenPaths,
+            projectRootPath,
+            fileInfo.absoluteFilePath(),
+            QStringLiteral("README 摘录"),
+            1400,
+            42,
+            false);
+        ++readmeCount;
+        if (readmeCount >= 1) {
+            break;
+        }
+    }
+
+    const QDir docsDir(rootDir.filePath(QStringLiteral("docs")));
+    if (docsDir.exists()) {
+        QFileInfoList docsFiles =
+            docsDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+        std::stable_sort(docsFiles.begin(), docsFiles.end(), [](const QFileInfo& left,
+                                                                const QFileInfo& right) {
+            return repositoryDocumentPriority(left.fileName()) >
+                   repositoryDocumentPriority(right.fileName());
+        });
+
+        int docsCount = 0;
+        for (const QFileInfo& fileInfo : docsFiles) {
+            if (!isRepositoryDocFile(fileInfo.fileName())) {
+                continue;
+            }
+            appendRepositoryContextEntry(
+                &entries,
+                &seenPaths,
+                projectRootPath,
+                fileInfo.absoluteFilePath(),
+                QStringLiteral("项目文档"),
+                900,
+                28,
+                false);
+            ++docsCount;
+            if (docsCount >= 1) {
+                break;
+            }
+        }
+    }
+
+    std::stable_sort(rootFiles.begin(), rootFiles.end(), [](const QFileInfo& left,
+                                                            const QFileInfo& right) {
+        return repositoryManifestPriority(left.fileName()) >
+               repositoryManifestPriority(right.fileName());
+    });
+
+    int manifestCount = 0;
+    for (const QFileInfo& fileInfo : rootFiles) {
+        if (!isRepositoryManifestFile(fileInfo.fileName())) {
+            continue;
+        }
+        appendRepositoryContextEntry(
+            &entries,
+            &seenPaths,
+            projectRootPath,
+            fileInfo.absoluteFilePath(),
+            QStringLiteral("工程清单"),
+            700,
+            28,
+            true);
+        ++manifestCount;
+        if (manifestCount >= 2) {
+            break;
+        }
+    }
+
+    return entries;
+}
+
+QStringList fallbackProjectOverviewSnippetPaths(const QString& projectRootPath) {
+    QStringList candidates;
+    const QDir rootDir(projectRootPath);
+    const QStringList directories = {
+        QString(),
+        QStringLiteral("src"),
+        QStringLiteral("app"),
+        QStringLiteral("apps"),
+        QStringLiteral("cmd"),
+        QStringLiteral("server"),
+        QStringLiteral("client")
+    };
+    const QStringList fileNames = {
+        QStringLiteral("main.cpp"),
+        QStringLiteral("main.cc"),
+        QStringLiteral("main.c"),
+        QStringLiteral("main.py"),
+        QStringLiteral("main.go"),
+        QStringLiteral("main.rs"),
+        QStringLiteral("main.qml"),
+        QStringLiteral("app.qml"),
+        QStringLiteral("index.js"),
+        QStringLiteral("index.ts"),
+        QStringLiteral("index.tsx"),
+        QStringLiteral("server.js"),
+        QStringLiteral("server.ts"),
+        QStringLiteral("Program.cs")
+    };
+
+    for (const QString& directoryName : directories) {
+        const QDir directory(directoryName.isEmpty()
+                                 ? rootDir
+                                 : QDir(rootDir.filePath(directoryName)));
+        if (!directory.exists()) {
+            continue;
+        }
+
+        for (const QString& fileName : fileNames) {
+            const QString absolutePath = directory.filePath(fileName);
+            if (QFileInfo::exists(absolutePath)) {
+                candidates.push_back(
+                    QDir::fromNativeSeparators(rootDir.relativeFilePath(absolutePath)));
+            }
+        }
+    }
+
+    return deduplicateQStringList(candidates);
+}
+
+QStringList collectProjectOverviewSnippets(const QString& projectRootPath,
+                                           const QStringList& candidatePaths) {
+    QStringList entries;
+    QStringList seenPaths;
+    const QDir rootDir(projectRootPath);
+    if (!rootDir.exists()) {
+        return entries;
+    }
+
+    QStringList prioritizedPaths = deduplicateQStringList(candidatePaths);
+    std::stable_sort(prioritizedPaths.begin(), prioritizedPaths.end(), [](const QString& left,
+                                                                          const QString& right) {
+        return repositorySnippetPriority(left) > repositorySnippetPriority(right);
+    });
+    prioritizedPaths = mergeQStringLists(
+        prioritizedPaths, fallbackProjectOverviewSnippetPaths(projectRootPath));
+
+    for (const QString& candidatePath : prioritizedPaths) {
+        const QString cleanedPath =
+            QDir::fromNativeSeparators(candidatePath).trimmed();
+        if (cleanedPath.isEmpty() || !isRepositorySnippetFile(cleanedPath)) {
+            continue;
+        }
+
+        const QFileInfo candidateInfo(cleanedPath);
+        const QString absolutePath = candidateInfo.isAbsolute()
+                                         ? candidateInfo.absoluteFilePath()
+                                         : rootDir.filePath(cleanedPath);
+        appendRepositoryContextEntry(
+            &entries,
+            &seenPaths,
+            projectRootPath,
+            absolutePath,
+            QStringLiteral("关键源码"),
+            900,
+            34,
+            true);
+        if (entries.size() >= 2) {
+            break;
+        }
+    }
+
+    return entries;
 }
 
 QStringList collectNodeFieldValues(const QVariantList& nodeItems,
@@ -196,6 +742,9 @@ QString extractApiErrorMessage(const QByteArray& bytes) {
 }
 
 QString publicScopeLabel(const QString& scope) {
+    if (scope == QStringLiteral("project_overview")) {
+        return QStringLiteral("项目总览");
+    }
     if (scope == QStringLiteral("system_context")) {
         return QStringLiteral("项目导览");
     }
@@ -541,6 +1090,100 @@ ai::ArchitectureAssistantRequest buildProjectRequest(
     return request;
 }
 
+ai::ArchitectureAssistantRequest buildProjectOverviewRequest(
+    const AiRequestContext& context,
+    const QVariantMap& systemContextData,
+    const QVariantList& systemContextCards,
+    const QVariantList& capabilityNodeItems) {
+    ai::ArchitectureAssistantRequest request = buildProjectRequest(
+        context, systemContextData, systemContextCards, capabilityNodeItems);
+    request.uiScope = QStringLiteral("l1_project_overview");
+    request.explanationGoal = QStringLiteral(
+        "Read the supplied repository context and explain in plain Chinese what this repository actually does.");
+    request.nodeName = QStringLiteral("%1 / 项目总览").arg(request.projectName);
+
+    const QString projectKindSummary =
+        systemContextData.value(QStringLiteral("projectKindSummary")).toString().trimmed();
+    const QString purposeSummary =
+        systemContextData.value(QStringLiteral("purposeSummary")).toString().trimmed();
+    const QString entrySummary =
+        systemContextData.value(QStringLiteral("entrySummary")).toString().trimmed();
+    const QString mainFlowSummary =
+        systemContextData.value(QStringLiteral("mainFlowSummary")).toString().trimmed();
+    const QString inputSummary =
+        systemContextData.value(QStringLiteral("inputSummary")).toString().trimmed();
+    const QString outputSummary =
+        systemContextData.value(QStringLiteral("outputSummary")).toString().trimmed();
+    const QString technologySummary =
+        systemContextData.value(QStringLiteral("technologySummary")).toString().trimmed();
+    const QString containerSummary =
+        systemContextData.value(QStringLiteral("containerSummary")).toString().trimmed();
+
+    request.nodeSummary = deduplicateQStringList(
+                              {projectKindSummary,
+                               purposeSummary,
+                               entrySummary,
+                               mainFlowSummary,
+                               inputSummary,
+                               outputSummary,
+                               technologySummary})
+                              .join(QStringLiteral(" "));
+    request.contextClues = deduplicateQStringList(
+        {projectKindSummary,
+         entrySummary,
+         mainFlowSummary,
+         inputSummary,
+         outputSummary,
+         technologySummary,
+         containerSummary});
+    request.moduleNames = request.moduleNames.mid(0, 3);
+    request.collaboratorNames = request.collaboratorNames.mid(0, 3);
+    request.exampleFiles = request.exampleFiles.mid(0, 3);
+    request.topSymbols = request.topSymbols.mid(0, 4);
+    request.repositoryDocuments =
+        collectProjectOverviewDocuments(context.projectRootPath);
+    request.repositorySnippets =
+        collectProjectOverviewSnippets(context.projectRootPath, request.exampleFiles);
+    request.userTask =
+        context.userTask.trimmed().isEmpty()
+            ? QStringLiteral(
+                  "先读 README、项目文档、工程清单和关键源码摘录，再直接说明这个仓库是做什么的、给谁用、核心模块、入口主路径和输入输出。"
+                  " README 不清楚时，再按工程结构和代码谨慎归纳。"
+                  " 结果写进 plain_summary，控制在 120 到 200 个中文字符。"
+                  " 不要写“从当前结构看”“整体来看”“这个项目很重要”“这个页面展示了什么”这类套话。")
+            : context.userTask.trimmed();
+    request.diagnostics = {
+        QStringLiteral("analysis phase: %1")
+            .arg(context.analysisPhase.trimmed().isEmpty()
+                     ? QStringLiteral("unknown")
+                     : context.analysisPhase.trimmed()),
+        QStringLiteral("ai scope: project_overview"),
+        QStringLiteral("audience: beginner"),
+        QStringLiteral("learning stage: L1")
+    };
+    if (!mainFlowSummary.isEmpty()) {
+        request.diagnostics.push_back(
+            QStringLiteral("main flow: %1").arg(mainFlowSummary));
+    }
+    request.diagnostics.push_back(
+        request.repositoryDocuments.isEmpty()
+            ? QStringLiteral("repository documents: none found")
+            : QStringLiteral("repository documents: %1 excerpt(s)")
+                  .arg(request.repositoryDocuments.size()));
+    request.diagnostics.push_back(
+        request.repositorySnippets.isEmpty()
+            ? QStringLiteral("repository snippets: none found")
+            : QStringLiteral("repository snippets: %1 excerpt(s)")
+                  .arg(request.repositorySnippets.size()));
+    request.diagnostics.push_back(
+        request.repositoryDocuments.join(QStringLiteral("\n")).contains(
+            QStringLiteral("README"),
+            Qt::CaseInsensitive)
+            ? QStringLiteral("readme status: detected")
+            : QStringLiteral("readme status: missing or unreadable; infer from code"));
+    return request;
+}
+
 ai::ArchitectureAssistantRequest buildReportRequest(
     const AiRequestContext& context,
     const QVariantMap& systemContextData,
@@ -850,6 +1493,48 @@ AiPreparedRequest AiService::prepareProjectRequest(
     return prepared;
 }
 
+AiPreparedRequest AiService::prepareProjectOverviewRequest(
+    const AiRequestContext& context,
+    const QVariantMap& systemContextData,
+    const QVariantList& systemContextCards,
+    const QVariantList& capabilityNodeItems) {
+    AiPreparedRequest prepared;
+    prepared.scope = QStringLiteral("project_overview");
+    prepared.availability = inspectAvailability();
+
+    if (context.projectRootPath.trimmed().isEmpty()) {
+        prepared.failureStatusMessage =
+            QStringLiteral("先绑定项目目录，再生成项目总览。");
+        return prepared;
+    }
+
+    prepared.targetName = QStringLiteral("%1 / 项目总览")
+                              .arg(projectNameFromRootPath(context.projectRootPath));
+    if (!prepared.availability.available) {
+        prepared.failureStatusMessage = prepared.availability.setupMessage;
+        return prepared;
+    }
+
+    const ai::DeepSeekConfigLoadResult loadResult = ai::loadDeepSeekConfig();
+    if (!loadResult.hasConfig() || !loadResult.config.isUsable()) {
+        prepared.availability.available = false;
+        prepared.availability.setupMessage = buildAiSetupMessage(loadResult);
+        prepared.failureStatusMessage = prepared.availability.setupMessage;
+        return prepared;
+    }
+
+    prepared.ready = true;
+    prepared.pendingStatusMessage =
+        QStringLiteral("正在生成项目总览...");
+    prepared.assistantRequest = buildProjectOverviewRequest(
+        context, systemContextData, systemContextCards, capabilityNodeItems);
+    prepared.networkRequest =
+        ai::buildDeepSeekChatCompletionsRequest(loadResult.config);
+    prepared.payload = ai::buildDeepSeekChatCompletionsPayload(
+        loadResult.config, prepared.assistantRequest);
+    return prepared;
+}
+
 AiPreparedRequest AiService::prepareReportRequest(
     const AiRequestContext& context,
     const QVariantMap& systemContextData,
@@ -941,8 +1626,11 @@ AiReplyState AiService::parseReply(
         mergeQStringLists(insight.evidence, insight.glossary));
     state.nextActions = toVariantStringList(
         mergeQStringLists(insight.whereToStart, insight.nextActions));
-    state.statusMessage = QStringLiteral("AI 已基于当前证据生成%1。")
-                              .arg(publicScopeLabel(scope));
+    state.statusMessage =
+        scope == QStringLiteral("project_overview")
+            ? QStringLiteral("AI 已基于 README、工程清单和关键源码生成项目总览。")
+            : QStringLiteral("AI 已基于当前证据生成%1。")
+                  .arg(publicScopeLabel(scope));
     return state;
 }
 

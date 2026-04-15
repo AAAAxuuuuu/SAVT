@@ -4,6 +4,7 @@
 #include "savt/ui/AnalysisOrchestrator.h"
 #include "savt/ui/AstPreviewService.h"
 #include "savt/ui/FileInsightService.h"
+#include "savt/ui/ProjectConfigRecommendationService.h"
 #include "savt/core/ComponentGraph.h"
 
 #include <QtGui/QClipboard>
@@ -12,6 +13,7 @@
 #include <QtGui/QGuiApplication>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QRegularExpression>
 #include <QVariantMap>
 
 #include <QtConcurrent/qtconcurrentrun.h>
@@ -76,6 +78,82 @@ QString copyContextKindLabel(const QString& kind) {
         return QStringLiteral("服务模块（Service）");
     }
     return QStringLiteral("核心模块（Core）");
+}
+
+QString collapseWhitespace(QString text) {
+    text.replace(QStringLiteral("\r"), QString());
+    text.replace(QStringLiteral("\n"), QStringLiteral(" "));
+    return text.simplified();
+}
+
+QString stripLeadingSectionLabel(QString text, const QString& label) {
+    text = text.trimmed();
+    text.replace(label, QString());
+    return text.trimmed();
+}
+
+QString defaultProjectOverviewPrompt() {
+    return QStringLiteral(
+        "先阅读当前项目的 README、工程配置、关键源码和静态分析线索，再写一段中文项目总览。"
+        " 直接说明这个仓库是做什么的、给谁用、核心模块、入口主路径和输入输出。"
+        " 如果 README 缺失或说得不清楚，就根据工程结构和代码行为谨慎归纳。"
+        " 不要写“从当前结构看”“整体来看”“这个项目很重要”这类套话。"
+        " 控制在 120 到 200 个中文字符之间；证据不够时只点出真正的不确定点。");
+}
+
+QString stripProjectOverviewBoilerplate(QString text) {
+    text = collapseWhitespace(text);
+    if (text.isEmpty()) {
+        return {};
+    }
+
+    static const QList<QRegularExpression> patterns = {
+        QRegularExpression(QStringLiteral(
+            R"(^(从当前(?:仓库|项目|静态结构|代码结构|目录结构)(?:[^，。]*?)(?:看|来看)[，,、\s]*)")),
+        QRegularExpression(QStringLiteral(R"(^(整体来看[，,、\s]*))")),
+        QRegularExpression(QStringLiteral(R"(^(总体来看[，,、\s]*))")),
+        QRegularExpression(QStringLiteral(R"(^(大体上看[，,、\s]*))")),
+        QRegularExpression(QStringLiteral(R"(^(简单来说[，,、\s]*))")),
+        QRegularExpression(QStringLiteral(R"(^(可以把它理解成[，,、\s]*))")),
+        QRegularExpression(QStringLiteral(R"(^(可以理解为[，,、\s]*))"))
+    };
+
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (const QRegularExpression& pattern : patterns) {
+            QString updated = text;
+            updated.replace(pattern, QString());
+            updated = updated.trimmed();
+            if (updated != text) {
+                text = updated;
+                changed = true;
+            }
+        }
+    }
+    return text;
+}
+
+QVariantMap recommendationChoiceById(const QVariantMap& recommendation, const QString& choiceId) {
+    const QVariantList choices = recommendation.value(QStringLiteral("choiceItems")).toList();
+    for (const QVariant& item : choices) {
+        const QVariantMap choice = item.toMap();
+        if (choice.value(QStringLiteral("id")).toString().trimmed() == choiceId.trimmed()) {
+            return choice;
+        }
+    }
+    return {};
+}
+
+QVariantMap recommendationOptionById(const QVariantMap& choice, const QString& optionId) {
+    const QVariantList options = choice.value(QStringLiteral("options")).toList();
+    for (const QVariant& item : options) {
+        const QVariantMap option = item.toMap();
+        if (option.value(QStringLiteral("id")).toString().trimmed() == optionId.trimmed()) {
+            return option;
+        }
+    }
+    return {};
 }
 
 }  // namespace
@@ -404,6 +482,95 @@ QVariantMap AnalysisController::describeFileNode(const QVariantMap& nodeData) co
     return FileInsightService::buildDetail(m_projectRootPath, nodeData);
 }
 
+void AnalysisController::refreshProjectConfigRecommendation() {
+    setProjectConfigRecommendation(
+        ProjectConfigRecommendationService::buildRecommendation(
+            m_projectRootPath,
+            m_lastReport,
+            m_lastOverview,
+            m_lastCapabilityGraph));
+}
+
+void AnalysisController::selectProjectConfigRecommendationOption(
+    const QString& choiceId,
+    const QString& optionId) {
+    const QVariantMap recommendation =
+        m_systemContextData.value(QStringLiteral("projectConfigRecommendation")).toMap();
+    if (recommendation.isEmpty()) {
+        refreshProjectConfigRecommendation();
+        return;
+    }
+
+    const QVariantMap currentChoice = recommendationChoiceById(recommendation, choiceId);
+    const QVariantMap targetOption = recommendationOptionById(currentChoice, optionId);
+    if (currentChoice.isEmpty() || targetOption.isEmpty()) {
+        setStatusMessage(QStringLiteral("这个推荐项暂时没切换成功，请再点一次试试。"));
+        return;
+    }
+
+    const QString currentSelectionId =
+        currentChoice.value(QStringLiteral("selectedOptionId")).toString().trimmed();
+    const QString choiceTitle =
+        currentChoice.value(QStringLiteral("title")).toString().trimmed();
+    const QString optionLabel =
+        targetOption.value(QStringLiteral("label")).toString().trimmed();
+    if (currentSelectionId == optionId.trimmed()) {
+        setStatusMessage(
+            choiceTitle.isEmpty()
+                ? QStringLiteral("当前已经是这个选择了。")
+                : QStringLiteral("已保持：%1 -> %2").arg(choiceTitle, optionLabel));
+        return;
+    }
+
+    setProjectConfigRecommendation(
+        ProjectConfigRecommendationService::selectChoice(
+            recommendation,
+            choiceId,
+            optionId));
+    setStatusMessage(
+        choiceTitle.isEmpty()
+            ? QStringLiteral("已更新推荐草案。")
+            : QStringLiteral("已更新：%1 -> %2").arg(choiceTitle, optionLabel));
+}
+
+void AnalysisController::generateRecommendedProjectConfig() {
+    if (m_analyzing) {
+        setStatusMessage(QStringLiteral("当前正在分析，请等这一轮结束后再生成配置。"));
+        return;
+    }
+
+    QVariantMap recommendation =
+        m_systemContextData.value(QStringLiteral("projectConfigRecommendation")).toMap();
+    if (recommendation.isEmpty()) {
+        recommendation =
+            ProjectConfigRecommendationService::buildRecommendation(
+                m_projectRootPath,
+                m_lastReport,
+                m_lastOverview,
+                m_lastCapabilityGraph);
+        setProjectConfigRecommendation(recommendation);
+    }
+
+    QString writtenPath;
+    QString errorMessage;
+    if (!ProjectConfigRecommendationService::writeRecommendation(
+            m_projectRootPath,
+            recommendation,
+            &writtenPath,
+            &errorMessage)) {
+        setStatusMessage(
+            errorMessage.isEmpty()
+                ? QStringLiteral("生成配置文件时失败了。")
+                : errorMessage);
+        return;
+    }
+
+    setStatusMessage(
+        QStringLiteral("已写入配置文件：%1，正在重新分析项目。")
+            .arg(writtenPath));
+    analyzeCurrentProject();
+}
+
 void AnalysisController::refreshAiAvailability() {
     applyAiAvailability(AiService::inspectAvailability());
     if (!m_aiBusy && !m_aiHasResult) {
@@ -414,6 +581,10 @@ void AnalysisController::refreshAiAvailability() {
 void AnalysisController::clearAiExplanation() {
     cancelActiveAiReply();
     resetAiState(true);
+}
+
+void AnalysisController::requestProjectOverviewRefresh(const QString& userTask) {
+    requestProjectOverviewRefreshInternal(userTask);
 }
 
 void AnalysisController::requestAiExplanation(
@@ -491,6 +662,85 @@ void AnalysisController::requestProjectAiExplanation(const QString& userTask) {
     setAiNodeName(prepared.targetName);
     setAiBusy(true);
     setAiStatusMessage(prepared.pendingStatusMessage);
+    AiService::logRequest(prepared, prepared.targetName);
+    m_aiReply = m_aiNetworkManager->post(prepared.networkRequest, prepared.payload);
+    connect(
+        m_aiReply,
+        &QNetworkReply::finished,
+        this,
+        [this, reply = m_aiReply]() { finishAiReply(reply); });
+}
+
+void AnalysisController::requestProjectOverviewRefreshInternal(const QString& userTask) {
+    if (m_aiBusy) {
+        updateProjectOverviewState(
+            m_systemContextData.value(QStringLiteral("projectOverview")).toString(),
+            false,
+            m_systemContextData.value(QStringLiteral("projectOverviewSource"))
+                .toString()
+                .trimmed()
+                .isEmpty()
+                ? QStringLiteral("heuristic")
+                : m_systemContextData.value(QStringLiteral("projectOverviewSource"))
+                      .toString()
+                      .trimmed(),
+            QStringLiteral("AI 正在处理其他请求，请稍后再刷新项目总览。"));
+        setAiStatusMessage(QStringLiteral("AI 正在生成，请等待当前请求完成。"));
+        return;
+    }
+
+    const QString effectiveTask =
+        userTask.trimmed().isEmpty() ? defaultProjectOverviewPrompt()
+                                     : userTask.trimmed();
+    const AiPreparedRequest prepared = AiService::prepareProjectOverviewRequest(
+        AiRequestContext{
+            m_projectRootPath,
+            m_analysisReport,
+            m_statusMessage,
+            m_analysisPhase,
+            effectiveTask,
+            m_selectedAstFilePath,
+            m_astPreviewTitle,
+            m_astPreviewSummary
+        },
+        m_systemContextData,
+        m_systemContextCards,
+        m_capabilityScene.nodeItems);
+    applyAiAvailability(prepared.availability);
+    if (!prepared.ready) {
+        updateProjectOverviewState(
+            m_systemContextData.value(QStringLiteral("projectOverview")).toString(),
+            false,
+            m_systemContextData.value(QStringLiteral("projectOverviewSource"))
+                .toString()
+                .trimmed()
+                .isEmpty()
+                ? QStringLiteral("heuristic")
+                : m_systemContextData.value(QStringLiteral("projectOverviewSource"))
+                      .toString()
+                      .trimmed(),
+            prepared.failureStatusMessage);
+        return;
+    }
+
+    cancelActiveAiReply();
+    resetAiState(false);
+    setAiScope(prepared.scope);
+    setAiNodeName(prepared.targetName);
+    setAiBusy(true);
+    setAiStatusMessage(prepared.pendingStatusMessage);
+    updateProjectOverviewState(
+        m_systemContextData.value(QStringLiteral("projectOverview")).toString(),
+        true,
+        m_systemContextData.value(QStringLiteral("projectOverviewSource"))
+            .toString()
+            .trimmed()
+            .isEmpty()
+            ? QStringLiteral("heuristic")
+            : m_systemContextData.value(QStringLiteral("projectOverviewSource"))
+                  .toString()
+                  .trimmed(),
+        prepared.pendingStatusMessage);
     AiService::logRequest(prepared, prepared.targetName);
     m_aiReply = m_aiNetworkManager->post(prepared.networkRequest, prepared.payload);
     connect(
@@ -611,6 +861,9 @@ void AnalysisController::finishAnalysis() {
     }
     setSystemContextData(result->systemContextData);
     setSystemContextCards(result->systemContextCards);
+    if (!canceled && !result->canceled && !m_systemContextData.isEmpty()) {
+        requestProjectOverviewRefreshInternal({});
+    }
 }
 
 void AnalysisController::clearVisualizationState() {
@@ -782,6 +1035,75 @@ void AnalysisController::setSystemContextData(QVariantMap value) {
     }
     m_systemContextData = std::move(value);
     emit systemContextDataChanged();
+}
+
+void AnalysisController::setProjectConfigRecommendation(QVariantMap value) {
+    QVariantMap updated = m_systemContextData;
+    if (updated.value(QStringLiteral("projectConfigRecommendation")).toMap() == value) {
+        return;
+    }
+    updated.insert(QStringLiteral("projectConfigRecommendation"), std::move(value));
+    setSystemContextData(std::move(updated));
+}
+
+void AnalysisController::updateProjectOverviewState(
+    QString overviewText,
+    const bool busy,
+    QString source,
+    QString statusMessage) {
+    if (m_systemContextData.isEmpty()) {
+        return;
+    }
+
+    overviewText = overviewText.trimmed();
+    source = source.trimmed();
+    statusMessage = statusMessage.trimmed();
+
+    QVariantMap updated = m_systemContextData;
+    updated.insert(QStringLiteral("projectOverview"), overviewText);
+    updated.insert(QStringLiteral("projectOverviewBusy"), busy);
+    updated.insert(
+        QStringLiteral("projectOverviewSource"),
+        source.isEmpty() ? QStringLiteral("heuristic") : source);
+    updated.insert(QStringLiteral("projectOverviewStatus"), statusMessage);
+    setSystemContextData(std::move(updated));
+}
+
+QString AnalysisController::formatProjectOverviewText(const AiReplyState& state) const {
+    QStringList parts;
+
+    const QString summary =
+        stripProjectOverviewBoilerplate(state.summary);
+    if (!summary.isEmpty()) {
+        parts.push_back(summary);
+    }
+
+    QString responsibility = state.responsibility;
+    responsibility = stripLeadingSectionLabel(responsibility, QStringLiteral("为什么重要："));
+    responsibility = stripLeadingSectionLabel(responsibility, QStringLiteral("具体职责："));
+    responsibility = stripProjectOverviewBoilerplate(responsibility);
+    if (!responsibility.isEmpty() && !parts.contains(responsibility) && summary.size() < 96) {
+        QString clippedResponsibility = responsibility;
+        const int remainingBudget = 240 - summary.size();
+        if (remainingBudget > 48 && clippedResponsibility.size() > remainingBudget) {
+            clippedResponsibility =
+                clippedResponsibility.left(remainingBudget - 3).trimmed() +
+                QStringLiteral("...");
+        }
+        if (!clippedResponsibility.isEmpty() &&
+            clippedResponsibility != summary &&
+            clippedResponsibility.size() <= std::max(remainingBudget, 0)) {
+            parts.push_back(clippedResponsibility);
+        }
+    }
+
+    const QString uncertainty = collapseWhitespace(state.uncertainty);
+    if (!uncertainty.isEmpty() &&
+        parts.join(QStringLiteral(" ")).size() < 170) {
+        parts.push_back(QStringLiteral("当前仍有不确定点：%1").arg(uncertainty));
+    }
+
+    return parts.join(QStringLiteral(" "));
 }
 
 void AnalysisController::setSystemContextCards(QVariantList value) {
@@ -974,12 +1296,29 @@ void AnalysisController::finishAiReply(QNetworkReply* reply) {
     }
 
     setAiBusy(false);
-    AiService::logResponse(responseBytes, m_aiScope);
-    applyAiReplyState(AiService::parseReply(
+    const QString completedScope = m_aiScope;
+    AiService::logResponse(responseBytes, completedScope);
+    const AiReplyState state = AiService::parseReply(
         responseBytes,
-        m_aiScope,
+        completedScope,
         reply->error() != QNetworkReply::NoError,
-        reply->errorString()));
+        reply->errorString());
+    applyAiReplyState(state);
+    if (completedScope == QStringLiteral("project_overview")) {
+        const QString currentSource =
+            m_systemContextData.value(QStringLiteral("projectOverviewSource"))
+                .toString()
+                .trimmed();
+        updateProjectOverviewState(
+            state.hasResult
+                ? formatProjectOverviewText(state)
+                : m_systemContextData.value(QStringLiteral("projectOverview")).toString(),
+            false,
+            state.hasResult
+                ? QStringLiteral("ai")
+                : (currentSource.isEmpty() ? QStringLiteral("heuristic") : currentSource),
+            state.statusMessage);
+    }
     cleanup();
 }
 

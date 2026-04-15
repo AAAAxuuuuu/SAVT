@@ -8,7 +8,23 @@ Rectangle {
     required property QtObject tokens
     required property QtObject caseState
 
+    radius: tokens.radiusXxl + 4
     color: tokens.sidebarBase
+    border.color: tokens.border1
+    clip: true
+
+    gradient: Gradient {
+        GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.74) }
+        GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.54) }
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        radius: parent.radius
+        color: "transparent"
+        border.color: root.tokens.shineBorder
+        border.width: 1
+    }
 
     function itemIconColor(route) {
         return root.caseState.route === route ? "#FFFFFF" : root.tokens.text3
@@ -18,12 +34,13 @@ Rectangle {
         anchors.fill: parent
         anchors.topMargin: 24
         anchors.bottomMargin: 24
-        anchors.leftMargin: 12
-        anchors.rightMargin: 12
-        spacing: 4
+        anchors.leftMargin: 14
+        anchors.rightMargin: 14
+        spacing: 6
 
         Label {
             Layout.leftMargin: 8
+            Layout.topMargin: 2
             Layout.bottomMargin: 12
             text: "SAVT WORKSPACE"
             color: root.tokens.text3
@@ -41,10 +58,39 @@ Rectangle {
             ]
 
             Rectangle {
+                id: navItem
+                property bool active: root.caseState.route === modelData.route
+                property bool hovered: navMouse.containsMouse
                 Layout.fillWidth: true
-                Layout.preferredHeight: 40
-                radius: root.tokens.radius8
-                color: root.caseState.route === modelData.route ? root.tokens.signalCobalt : "transparent"
+                Layout.preferredHeight: 46
+                radius: root.tokens.radiusLg
+                color: "transparent"
+                border.color: active
+                              ? Qt.rgba(1, 1, 1, 0.24)
+                              : (hovered ? root.tokens.border1 : "transparent")
+
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0.0
+                        color: navItem.active
+                               ? root.tokens.signalCobalt
+                               : (navItem.hovered ? Qt.rgba(1, 1, 1, 0.46) : "transparent")
+                    }
+
+                    GradientStop {
+                        position: 1.0
+                        color: navItem.active
+                               ? Qt.rgba(root.tokens.signalRaspberry.r,
+                                         root.tokens.signalRaspberry.g,
+                                         root.tokens.signalRaspberry.b,
+                                         0.92)
+                               : (navItem.hovered ? Qt.rgba(1, 1, 1, 0.18) : "transparent")
+                    }
+                }
+
+                Behavior on border.color {
+                    ColorAnimation { duration: 120 }
+                }
 
                 RowLayout {
                     anchors.fill: parent
@@ -63,7 +109,7 @@ Rectangle {
                     Label {
                         Layout.fillWidth: true
                         text: modelData.label
-                        color: root.caseState.route === modelData.route ? "#FFFFFF" : root.tokens.text1
+                        color: navItem.active ? "#FFFFFF" : root.tokens.text1
                         font.family: root.tokens.textFontFamily
                         font.pixelSize: 14
                         font.weight: Font.Medium
@@ -72,7 +118,9 @@ Rectangle {
                 }
 
                 MouseArea {
+                    id: navMouse
                     anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.caseState.navigate(modelData.route)
                 }
@@ -87,27 +135,39 @@ Rectangle {
             color: root.tokens.border1
         }
 
-        Label {
-            Layout.leftMargin: 8
-            Layout.topMargin: 8
-            text: "当前项目"
-            color: root.tokens.text3
-            font.family: root.tokens.textFontFamily
-            font.pixelSize: 12
-            font.weight: Font.DemiBold
-        }
-
-        Label {
+        Rectangle {
             Layout.fillWidth: true
-            Layout.leftMargin: 8
-            Layout.rightMargin: 8
-            text: root.caseState.projectName()
-            color: root.tokens.text2
-            wrapMode: Text.WordWrap
-            maximumLineCount: 2
-            elide: Text.ElideRight
-            font.family: root.tokens.textFontFamily
-            font.pixelSize: 12
+            Layout.topMargin: 6
+            radius: root.tokens.radiusLg
+            color: root.tokens.panelStrong
+            border.color: root.tokens.border1
+            implicitHeight: projectColumn.implicitHeight + 24
+
+            ColumnLayout {
+                id: projectColumn
+                anchors.fill: parent
+                anchors.margins: 12
+                spacing: 6
+
+                Label {
+                    text: "当前项目"
+                    color: root.tokens.text3
+                    font.family: root.tokens.textFontFamily
+                    font.pixelSize: 12
+                    font.weight: Font.DemiBold
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: root.caseState.projectName()
+                    color: root.tokens.text2
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                    font.family: root.tokens.textFontFamily
+                    font.pixelSize: 12
+                }
+            }
         }
     }
 }

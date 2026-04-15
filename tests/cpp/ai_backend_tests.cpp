@@ -37,6 +37,8 @@ void testPromptGuardrails() {
            "system prompt should forbid fabricated architecture facts");
     expect(containsText(prompt, QStringLiteral("audience is beginner")),
            "system prompt should explain how to adapt output for beginners");
+    expect(containsText(prompt, QStringLiteral("l1_project_overview")),
+           "system prompt should describe the repository-onboarding exception for project overview");
 }
 
 void testOfficialConfigParsing() {
@@ -170,6 +172,8 @@ void testRequestPayloadAndHeaders() {
            "user prompt evidence package should include guide metadata");
     expect(containsText(userPrompt, QStringLiteral("\"file\"")),
            "user prompt evidence package should include file metadata when available");
+    expect(containsText(userPrompt, QStringLiteral("\"repository\"")),
+           "user prompt evidence package should include repository context metadata");
     expect(containsText(userPrompt, QStringLiteral("AlgorithmLibrary::build")),
            "user prompt evidence package should include file reading hints");
     expect(containsText(userPrompt, QStringLiteral("\"uiScope\": \"l3_module_guide\"")),
@@ -198,6 +202,36 @@ void testCompatibleRequestHeaders() {
            "compatible request URL should point to the inferred v1 chat completions endpoint");
     expect(networkRequest.rawHeader("Authorization") == QByteArray("Bearer sk-demo-compatible-key"),
            "compatible request should still use bearer token authorization");
+}
+
+void testProjectOverviewPromptUsesRepositoryPackage() {
+    savt::ai::ArchitectureAssistantRequest request = buildSampleRequest();
+    request.uiScope = QStringLiteral("l1_project_overview");
+    request.learningStage = QStringLiteral("L1");
+    request.explanationGoal = QStringLiteral("Write a plain-language project overview.");
+    request.userTask = QStringLiteral("请概括这个仓库到底是做什么的。");
+    request.repositoryDocuments = {
+        QStringLiteral("README 摘录 | README.md\nSAVT is a Qt/C++ software architecture visualization tool.")
+    };
+    request.repositorySnippets = {
+        QStringLiteral("关键源码 | apps/desktop/src/main.cpp\nint main(int argc, char** argv) { return runDesktop(argc, argv); }")
+    };
+
+    const QString userPrompt = savt::ai::deepSeekSavtUserPrompt(request);
+    expect(containsText(userPrompt, QStringLiteral("repository overview")),
+           "project overview prompt should switch to repository-overview task wording");
+    expect(containsText(userPrompt, QStringLiteral("Read README or project docs first")),
+           "project overview prompt should instruct the model to prioritize README and docs");
+    expect(containsText(userPrompt, QStringLiteral("\"plain_summary\"")),
+           "project overview prompt should require the final overview in plain_summary");
+    expect(!containsText(userPrompt, QStringLiteral("4-7 sentences")),
+           "project overview prompt should use a lighter response contract");
+    expect(!containsText(userPrompt, QStringLiteral("这个项目很重要")),
+           "project overview prompt should explicitly reject stock boilerplate");
+    expect(containsText(userPrompt, QStringLiteral("README.md")),
+           "project overview prompt should serialize repository document excerpts");
+    expect(containsText(userPrompt, QStringLiteral("apps/desktop/src/main.cpp")),
+           "project overview prompt should serialize key source snippets");
 }
 
 void testResponseParsing() {
@@ -331,6 +365,7 @@ int main() {
     testExplicitEndpointOverride();
     testRequestPayloadAndHeaders();
     testCompatibleRequestHeaders();
+    testProjectOverviewPromptUsesRepositoryPackage();
     testResponseParsing();
     testResponsesApiStyleResponseParsing();
     testErrorResponseMessageExtraction();

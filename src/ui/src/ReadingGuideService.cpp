@@ -40,6 +40,60 @@ QStringList deduplicateQStringList(const QStringList& values) {
     return items;
 }
 
+QString stripTrailingPunctuation(QString text) {
+    text = text.trimmed();
+    const QString punctuation = QStringLiteral("。.!！?？;；,，:：");
+    while (!text.isEmpty() && punctuation.contains(text.back())) {
+        text.chop(1);
+    }
+    return text.trimmed();
+}
+
+QString ensureSentence(QString text) {
+    text = text.trimmed();
+    if (text.isEmpty()) {
+        return {};
+    }
+
+    if (text.endsWith(QStringLiteral("。")) || text.endsWith(QStringLiteral("！")) ||
+        text.endsWith(QStringLiteral("？")) || text.endsWith(QLatin1Char('.')) ||
+        text.endsWith(QLatin1Char('!')) || text.endsWith(QLatin1Char('?'))) {
+        return text;
+    }
+    return text + QStringLiteral("。");
+}
+
+QString quoteValue(const QString& value) {
+    const QString cleaned = value.trimmed();
+    return cleaned.isEmpty() ? QString() : QStringLiteral("「%1」").arg(cleaned);
+}
+
+QString joinChinesePreview(
+    const QStringList& values,
+    const int limit,
+    const QString& emptyText = QString(),
+    const bool quoteItems = false) {
+    const QStringList items = deduplicateQStringList(values);
+    if (items.isEmpty()) {
+        return emptyText;
+    }
+
+    const int count = std::min(limit, static_cast<int>(items.size()));
+    QStringList previewItems;
+    previewItems.reserve(count);
+    for (int index = 0; index < count; ++index) {
+        const QString item = items[index].trimmed();
+        previewItems.push_back(quoteItems ? quoteValue(item) : item);
+    }
+
+    QString preview = previewItems.join(QStringLiteral("、"));
+    if (items.size() > count) {
+        preview += quoteItems ? QStringLiteral("等 %1 个模块").arg(items.size())
+                              : QStringLiteral("等 %1 项").arg(items.size());
+    }
+    return preview;
+}
+
 QString joinPreview(
     const QStringList& values,
     const int limit,
@@ -176,6 +230,42 @@ QStringList inferAudienceHints(const core::CapabilityGraph& graph) {
     return deduplicateQStringList(hints);
 }
 
+QStringList inferAudienceHintsZh(const core::CapabilityGraph& graph) {
+    const QString evidence = graphEvidenceBlob(graph);
+    QStringList hints;
+
+    if (textContainsAnyToken(
+            evidence,
+            {QStringLiteral("admin"), QStringLiteral("editor"), QStringLiteral("manage"),
+             QStringLiteral("management"), QStringLiteral("config")})) {
+        hints.push_back(QStringLiteral("管理员或配置维护者"));
+    }
+    if (textContainsAnyToken(
+            evidence,
+            {QStringLiteral("qml"), QStringLiteral("ui"), QStringLiteral("screen"),
+             QStringLiteral("window"), QStringLiteral("page"), QStringLiteral("dialog"),
+             QStringLiteral("map"), QStringLiteral("webview")})) {
+        hints.push_back(QStringLiteral("终端用户或操作人员"));
+    }
+    if (textContainsAnyToken(
+            evidence,
+            {QStringLiteral("tool"), QStringLiteral("build"), QStringLiteral("script"),
+             QStringLiteral("generator"), QStringLiteral("cmake")})) {
+        hints.push_back(QStringLiteral("开发者或构建维护者"));
+    }
+
+    if (hints.isEmpty()) {
+        hints.push_back(graphContainsRole(
+                            graph,
+                            {QStringLiteral("presentation"), QStringLiteral("experience"),
+                             QStringLiteral("web")})
+                            ? QStringLiteral("终端用户或操作人员")
+                            : QStringLiteral("开发者或维护者"));
+    }
+
+    return deduplicateQStringList(hints);
+}
+
 QString inferProjectKindSummary(
     const core::AnalysisReport&,
     const core::ArchitectureOverview& overview,
@@ -216,6 +306,46 @@ QString inferProjectKindSummary(
     return QStringLiteral("a project that still needs more evidence before its shape is clear");
 }
 
+QString inferProjectKindSummaryZh(
+    const core::AnalysisReport&,
+    const core::ArchitectureOverview& overview,
+    const core::CapabilityGraph& graph) {
+    const auto totals = summarizeOverviewFiles(overview);
+    const bool hasPresentation = graphContainsRole(
+        graph,
+        {QStringLiteral("presentation"), QStringLiteral("experience"), QStringLiteral("web")});
+    const bool hasBackend = graphContainsRole(
+        graph,
+        {QStringLiteral("interaction"), QStringLiteral("analysis"), QStringLiteral("workflow")});
+    const bool hasStorage = graphContainsRole(
+        graph,
+        {QStringLiteral("storage"), QStringLiteral("data"), QStringLiteral("foundation")});
+
+    if (totals.qmlFiles > 0 && totals.sourceFiles > 0 &&
+        (totals.webFiles > 0 || hasPresentation)) {
+        return QStringLiteral("带界面、后端处理和资源数据的 Qt/QML 应用");
+    }
+    if (totals.qmlFiles > 0 && totals.sourceFiles > 0) {
+        return QStringLiteral("带 QML 界面和 C++ 后端的桌面应用");
+    }
+    if (totals.webFiles > 0 && totals.sourceFiles > 0) {
+        return QStringLiteral("本地后端和 Web 前端混合的项目");
+    }
+    if (totals.sourceFiles > 0 && hasBackend && hasStorage) {
+        return QStringLiteral("带核心处理层和数据支撑层的本地应用");
+    }
+    if (totals.sourceFiles > 0 && totals.scriptFiles > 0) {
+        return QStringLiteral("以 C/C++ 为核心、并配有脚本工具链的项目");
+    }
+    if (totals.sourceFiles > 0) {
+        return QStringLiteral("以 C/C++ 为核心的项目");
+    }
+    if (totals.scriptFiles > 0) {
+        return QStringLiteral("以脚本和资源为主的项目");
+    }
+    return QStringLiteral("还需要更多证据才能判断形态的项目");
+}
+
 QString inferEntrySummary(
     const core::ArchitectureOverview& overview,
     const core::CapabilityGraph& graph) {
@@ -241,6 +371,17 @@ QString inferInputSummary(const bool hasNetwork) {
 QString inferOutputSummary(const bool hasUi) {
     return hasUi ? QStringLiteral("Results are mainly presented through a graphical user interface.")
                  : QStringLiteral("Results are mainly written to logs, the console, or local storage.");
+}
+
+QString inferInputSummaryZh(const bool hasNetwork) {
+    return hasNetwork
+               ? QStringLiteral("输入通常来自网络接口、Socket 或外部配置文件")
+               : QStringLiteral("输入通常来自本地文件、用户操作或系统接口");
+}
+
+QString inferOutputSummaryZh(const bool hasUi) {
+    return hasUi ? QStringLiteral("结果主要通过图形界面呈现")
+                 : QStringLiteral("结果主要写入日志、控制台或本地存储");
 }
 
 bool isDependencyCapability(const core::CapabilityNode& node) {
@@ -408,6 +549,144 @@ QString summarizeMainFlow(
     }
 
     return {};
+}
+
+QString mainFlowDigest(
+    const core::ArchitectureOverview& overview,
+    const core::CapabilityGraph& graph) {
+    QString summary = summarizeMainFlow(overview, graph).trimmed();
+    const QString prefix = QStringLiteral("Main path: ");
+    if (summary.startsWith(prefix)) {
+        summary.remove(0, prefix.size());
+    }
+    return stripTrailingPunctuation(summary);
+}
+
+QStringList buildTechnologyCluesZh(
+    const SystemContextSignals& contextSignals,
+    const OverviewFileTotals& totals) {
+    QStringList clues;
+    clues.push_back(QStringLiteral("以 C++ 为主"));
+    if (contextSignals.hasUi || totals.qmlFiles > 0) {
+        clues.push_back(QStringLiteral("带 Qt/QML 界面层"));
+    }
+    if (totals.webFiles > 0) {
+        clues.push_back(QStringLiteral("包含 Web 资源或前端文件"));
+    }
+    if (contextSignals.hasDatabase) {
+        clues.push_back(QStringLiteral("包含本地存储或数据支撑"));
+    }
+    if (contextSignals.hasNetwork) {
+        clues.push_back(QStringLiteral("包含网络或外部接口集成"));
+    }
+    if (totals.scriptFiles > 0) {
+        clues.push_back(QStringLiteral("带脚本或生成流程"));
+    }
+    return deduplicateQStringList(clues);
+}
+
+QString topNodeResponsibilitySummaryZh(const SystemContextSignals& contextSignals) {
+    if (contextSignals.topNodes.empty() || contextSignals.topNodes.front() == nullptr) {
+        return {};
+    }
+
+    const core::CapabilityNode& node = *contextSignals.topNodes.front();
+    const QString name = QString::fromStdString(node.name).trimmed();
+    QString detail =
+        QString::fromStdString(node.summary.empty() ? node.responsibility : node.summary)
+            .trimmed();
+    detail = stripTrailingPunctuation(detail);
+    if (name.isEmpty() || detail.isEmpty()) {
+        return {};
+    }
+
+    const QStringList leadingVerbs = {
+        QStringLiteral("负责"),
+        QStringLiteral("用于"),
+        QStringLiteral("处理"),
+        QStringLiteral("组织"),
+        QStringLiteral("协调"),
+        QStringLiteral("管理"),
+        QStringLiteral("提供"),
+        QStringLiteral("实现"),
+        QStringLiteral("扫描"),
+        QStringLiteral("解析")
+    };
+    for (const QString& verb : leadingVerbs) {
+        if (detail.startsWith(verb)) {
+            return QStringLiteral("其中%1%2").arg(quoteValue(name), detail);
+        }
+    }
+
+    return QStringLiteral("其中%1当前主要承担 %2").arg(quoteValue(name), detail);
+}
+
+QString inferEntryDigestZh(
+    const core::ArchitectureOverview& overview,
+    const core::CapabilityGraph& graph) {
+    if (const core::CapabilityNode* entryNode = primaryEntryNode(graph); entryNode != nullptr) {
+        return QStringLiteral("当前最明确的入口是%1")
+            .arg(quoteValue(QString::fromStdString(entryNode->name)));
+    }
+
+    Q_UNUSED(overview);
+    return QStringLiteral("当前还没有稳定显式入口");
+}
+
+QString buildProjectOverviewZh(
+    const QString& projectName,
+    const QString& projectKindSummaryZh,
+    const QString& audienceSummaryZh,
+    const QStringList& topModules,
+    const SystemContextSignals& contextSignals,
+    const core::ArchitectureOverview& overview,
+    const core::CapabilityGraph& graph,
+    const QString& inputSummaryZh,
+    const QString& outputSummaryZh,
+    const QStringList& technologyCluesZh) {
+    QStringList sentences;
+
+    QString positioningSentence = QStringLiteral("%1是一个%2")
+        .arg(projectName.trimmed().isEmpty() ? QStringLiteral("这个项目") : projectName.trimmed(),
+             projectKindSummaryZh.trimmed().isEmpty()
+                 ? QStringLiteral("还需要继续判定用途的项目")
+                 : projectKindSummaryZh.trimmed());
+    if (!audienceSummaryZh.trimmed().isEmpty()) {
+        positioningSentence += QStringLiteral("，适合%1").arg(audienceSummaryZh.trimmed());
+    }
+    sentences.push_back(ensureSentence(positioningSentence));
+
+    if (!topModules.isEmpty()) {
+        QString moduleSentence = QStringLiteral("核心模块包括%1")
+            .arg(joinChinesePreview(topModules, 3, QString(), true));
+        const QString topResponsibility = topNodeResponsibilitySummaryZh(contextSignals);
+        if (!topResponsibility.isEmpty()) {
+            moduleSentence += QStringLiteral("，%1").arg(topResponsibility);
+        }
+        sentences.push_back(ensureSentence(moduleSentence));
+    }
+
+    const QString entryDigestZh = inferEntryDigestZh(overview, graph);
+    const QString flowDigest = mainFlowDigest(overview, graph);
+    if (!entryDigestZh.isEmpty() || !flowDigest.isEmpty()) {
+        QString flowSentence = entryDigestZh;
+        if (!flowDigest.isEmpty()) {
+            flowSentence += flowSentence.isEmpty()
+                                ? QStringLiteral("主路径大致是 %1").arg(flowDigest)
+                                : QStringLiteral("，主路径大致是 %1").arg(flowDigest);
+        }
+        sentences.push_back(ensureSentence(flowSentence));
+    }
+
+    QString ioAndTechSentence =
+        QStringLiteral("%1，%2").arg(inputSummaryZh.trimmed(), outputSummaryZh.trimmed());
+    if (!technologyCluesZh.isEmpty()) {
+        ioAndTechSentence +=
+            QStringLiteral("；技术上%1").arg(technologyCluesZh.join(QStringLiteral("，")));
+    }
+    sentences.push_back(ensureSentence(ioAndTechSentence));
+
+    return sentences.join(QStringLiteral(" "));
 }
 
 QString capabilityCardSummary(const core::CapabilityNode& node) {
@@ -815,6 +1094,8 @@ QVariantMap ReadingGuideService::buildGuide(
     const auto contextSignals = summarizeSystemContext(graph);
     const auto totals = summarizeOverviewFiles(overview);
     const QString projectKindSummary = inferProjectKindSummary(report, overview, graph);
+    const QString projectKindSummaryZh =
+        inferProjectKindSummaryZh(report, overview, graph);
     const QStringList topModules = contextSignals.topModules;
     const QVariantList ruleFindings = buildRuleFindings(ruleReport);
     const QVariantList riskSignals = buildRiskSignals(ruleReport, graph);
@@ -840,21 +1121,42 @@ QVariantMap ReadingGuideService::buildGuide(
         inferAudienceHints(graph),
         3,
         QStringLiteral("developers, maintainers, or anyone onboarding to the codebase"));
+    const QString audienceSummaryZh = joinChinesePreview(
+        inferAudienceHintsZh(graph),
+        3,
+        QStringLiteral("开发者、维护者或需要快速接手代码的人"));
     const QString entrySummary = inferEntrySummary(overview, graph);
     const QString inputSummary = inferInputSummary(contextSignals.hasNetwork);
+    const QString inputSummaryZh = inferInputSummaryZh(contextSignals.hasNetwork);
     const QString outputSummary = inferOutputSummary(contextSignals.hasUi);
+    const QString outputSummaryZh = inferOutputSummaryZh(contextSignals.hasUi);
     const QString technologySummary = technologyClues.isEmpty()
         ? QStringLiteral("No stable technology summary is available yet.")
         : technologyClues.join(QStringLiteral("; ")) + QStringLiteral(".");
+    const QStringList technologyCluesZh =
+        buildTechnologyCluesZh(contextSignals, totals);
 
-    QString purposeSummary = QStringLiteral("This looks like %1.").arg(projectKindSummary);
+    QString purposeSummary = projectKindSummary.trimmed().isEmpty()
+                                 ? QStringLiteral("Project shape still needs confirmation.")
+                                 : ensureSentence(projectKindSummary);
     if (!topModules.isEmpty()) {
-        purposeSummary += QStringLiteral(" Start with \"%1\".")
+        purposeSummary += QStringLiteral(" Read \"%1\" first.")
                               .arg(topModules.join(QStringLiteral("\", \"")));
     }
     if (!mainFlowSummary.isEmpty()) {
         purposeSummary += QStringLiteral(" %1.").arg(mainFlowSummary);
     }
+    const QString projectOverview = buildProjectOverviewZh(
+        projectName,
+        projectKindSummaryZh,
+        audienceSummaryZh,
+        topModules,
+        contextSignals,
+        overview,
+        graph,
+        inputSummaryZh,
+        outputSummaryZh,
+        technologyCluesZh);
 
     QVariantList contextSections;
     auto appendContextSection = [&](const QString& title,
@@ -953,13 +1255,19 @@ QVariantMap ReadingGuideService::buildGuide(
     data.insert(
         QStringLiteral("headline"),
         mainFlowSummary.isEmpty()
-            ? QStringLiteral("The project is currently organized into %1 core modules. Start from the entry and trace the main path before diving deeper.")
+            ? QStringLiteral("%1 core modules around one main entry.")
                   .arg(contextSignals.coreModuleCount)
-            : QStringLiteral("The project is currently organized into %1 core modules. Start from the entry, then follow the primary path before diving deeper.")
+            : QStringLiteral("%1 core modules with a traceable main path.")
                   .arg(contextSignals.coreModuleCount));
     data.insert(
         QStringLiteral("audienceSummary"),
         audienceSummary);
+    data.insert(QStringLiteral("projectOverview"), projectOverview);
+    data.insert(QStringLiteral("projectOverviewBusy"), false);
+    data.insert(QStringLiteral("projectOverviewSource"), QStringLiteral("heuristic"));
+    data.insert(
+        QStringLiteral("projectOverviewStatus"),
+        QStringLiteral("来自结构推断"));
     data.insert(QStringLiteral("purposeSummary"), purposeSummary);
     data.insert(QStringLiteral("projectKindSummary"), projectKindSummary);
     data.insert(QStringLiteral("entrySummary"), entrySummary);

@@ -117,11 +117,17 @@ public:
     Q_INVOKABLE void refreshAiAvailability();
     Q_INVOKABLE void clearAiExplanation();
     Q_INVOKABLE void requestAiExplanation(const QVariantMap& nodeData, const QString& userTask = QString());
+    Q_INVOKABLE void requestProjectOverviewRefresh(const QString& userTask = QString());
     Q_INVOKABLE void requestProjectAiExplanation(const QString& userTask = QString());
     Q_INVOKABLE void requestReportAiExplanation(const QString& userTask = QString());
     Q_INVOKABLE void copyCodeContextToClipboard(qulonglong nodeId);
     Q_INVOKABLE void copyTextToClipboard(const QString& text);
     Q_INVOKABLE QVariantMap describeFileNode(const QVariantMap& nodeData) const;
+    Q_INVOKABLE void refreshProjectConfigRecommendation();
+    Q_INVOKABLE void selectProjectConfigRecommendationOption(
+        const QString& choiceId,
+        const QString& optionId);
+    Q_INVOKABLE void generateRecommendedProjectConfig();
 
 signals:
     void projectRootPathChanged();
@@ -186,6 +192,14 @@ private:
     void setSystemContextData(QVariantMap value);
     void setSystemContextCards(QVariantList value);
     void refreshAstPreview();
+    void setProjectConfigRecommendation(QVariantMap value);
+    void requestProjectOverviewRefreshInternal(const QString& userTask);
+    void updateProjectOverviewState(
+        QString overviewText,
+        bool busy,
+        QString source,
+        QString statusMessage);
+    QString formatProjectOverviewText(const AiReplyState& state) const;
     void applyAiAvailability(const AiAvailabilityState& state);
     void applyAiReplyState(const AiReplyState& state);
     void cancelActiveAiReply();

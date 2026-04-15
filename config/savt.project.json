@@ -1,33 +1,70 @@
 {
-  "version": 1,
-  "analysis": {
-    "ignoreDirectories": [
-      "config",
-      "tests/fixtures",
-      "tests/golden",
-      "docs"
-    ],
-    "moduleMerges": [
-      { "match": "src/core/include", "module": "src/core" },
-      { "match": "src/core/src", "module": "src/core" },
-      { "match": "src/ui/include", "module": "src/ui" },
-      { "match": "src/ui/src", "module": "src/ui" }
-    ],
-    "roleOverrides": [
-      { "match": "apps/desktop", "role": "presentation" },
-      { "match": "src/ui", "role": "presentation" },
-      { "match": "src/layout", "role": "visualization" },
-      { "match": "src/parser", "role": "analysis" },
-      { "match": "src/analyzer", "role": "analysis" },
-      { "match": "src/ai", "role": "analysis" },
-      { "match": "src/core", "role": "core_model" }
-    ],
-    "entryOverrides": [
-      { "match": "apps/desktop", "entry": true }
-    ],
-    "dependencyFoldRules": [
-      { "match": "third_party", "collapse": true, "hideByDefault": true },
-      { "match": "tools/llvm", "collapse": true, "hideByDefault": true }
-    ]
-  }
+    "analysis": {
+        "dependencyFoldRules": [
+            {
+                "collapse": true,
+                "hideByDefault": true,
+                "match": "third_party"
+            }
+        ],
+        "ignoreDirectories": [
+            ".git",
+            ".vscode",
+            "build",
+            "docs",
+            "samples",
+            "tests"
+        ],
+        "moduleMerges": [
+            {
+                "match": "src/ai/include",
+                "module": "src/ai"
+            },
+            {
+                "match": "src/ai/src",
+                "module": "src/ai"
+            },
+            {
+                "match": "src/analyzer/include",
+                "module": "src/analyzer"
+            },
+            {
+                "match": "src/analyzer/src",
+                "module": "src/analyzer"
+            },
+            {
+                "match": "src/core/include",
+                "module": "src/core"
+            },
+            {
+                "match": "src/core/src",
+                "module": "src/core"
+            },
+            {
+                "match": "src/layout/include",
+                "module": "src/layout"
+            },
+            {
+                "match": "src/layout/src",
+                "module": "src/layout"
+            },
+            {
+                "match": "src/parser/include",
+                "module": "src/parser"
+            },
+            {
+                "match": "src/parser/src",
+                "module": "src/parser"
+            },
+            {
+                "match": "src/ui/include",
+                "module": "src/ui"
+            },
+            {
+                "match": "src/ui/src",
+                "module": "src/ui"
+            }
+        ]
+    },
+    "version": 1
 }

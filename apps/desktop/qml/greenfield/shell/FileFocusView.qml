@@ -181,7 +181,7 @@ Item {
             Rectangle {
                 Layout.fillWidth: true
                 radius: root.tokens.radius8
-                color: root.tokens.panelBase
+                color: root.tokens.panelStrong
                 border.color: root.tokens.border1
                 implicitHeight: fileHeaderColumn.implicitHeight + 28
 
@@ -297,7 +297,7 @@ Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 70
                 radius: root.tokens.radius8
-                color: Qt.rgba(1, 1, 1, 0.92)
+                color: root.tokens.panelStrong
                 border.color: root.tokens.border1
 
                 ActionButton {
@@ -378,7 +378,7 @@ Item {
         radius: tokens.radius8
         color: tone === "ai"
                ? Qt.rgba(0.69, 0.32, 0.87, 0.08)
-               : Qt.rgba(1, 1, 1, 0.92)
+               : root.tokens.panelStrong
         border.color: tone === "ai"
                       ? Qt.rgba(0.69, 0.32, 0.87, 0.18)
                       : tokens.border1

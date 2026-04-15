@@ -5,39 +5,46 @@ QtObject {
     readonly property string textFontFamily: "Segoe UI Variable Text, Microsoft YaHei UI, PingFang SC"
     readonly property string monoFontFamily: "Cascadia Code, IBM Plex Mono, Consolas"
 
-    readonly property color base0: "#FFFFFF"
-    readonly property color base1: "#F5F5F7"
-    readonly property color base2: "#ECECEF"
-    readonly property color base3: "#D8D8DE"
-    readonly property color sidebarBase: Qt.rgba(0.9608, 0.9608, 0.9686, 0.78)
-    readonly property color topbarBase: Qt.rgba(0.9608, 0.9608, 0.9686, 0.68)
-    readonly property color panelBase: Qt.rgba(1.0, 1.0, 1.0, 0.88)
-    readonly property color searchBase: Qt.rgba(0, 0, 0, 0.05)
-    readonly property color border1: Qt.rgba(0, 0, 0, 0.06)
-    readonly property color border2: Qt.rgba(0, 0, 0, 0.12)
+    readonly property color base0: "#FCFEFF"
+    readonly property color base1: "#F4F6FB"
+    readonly property color base2: "#EEF2F8"
+    readonly property color base3: "#DCE5EF"
+    readonly property color sidebarBase: Qt.rgba(1.0, 1.0, 1.0, 0.62)
+    readonly property color topbarBase: Qt.rgba(1.0, 1.0, 1.0, 0.48)
+    readonly property color panelBase: Qt.rgba(1.0, 1.0, 1.0, 0.72)
+    readonly property color panelStrong: Qt.rgba(1.0, 1.0, 1.0, 0.82)
+    readonly property color panelSoft: Qt.rgba(1.0, 1.0, 1.0, 0.58)
+    readonly property color searchBase: Qt.rgba(1.0, 1.0, 1.0, 0.82)
+    readonly property color border1: Qt.rgba(0.0588, 0.0902, 0.1647, 0.08)
+    readonly property color border2: Qt.rgba(0.0588, 0.0902, 0.1647, 0.14)
+    readonly property color shineBorder: Qt.rgba(1.0, 1.0, 1.0, 0.64)
+    readonly property color shadowColor: Qt.rgba(0.0588, 0.0902, 0.1647, 0.12)
 
-    readonly property color text1: "#1D1D1F"
-    readonly property color text2: "#56565C"
-    readonly property color text3: "#86868B"
+    readonly property color text1: "#0F172A"
+    readonly property color text2: "#334155"
+    readonly property color text3: "#64748B"
     readonly property color textInverse: "#FFFFFF"
 
-    readonly property color signalTeal: "#34C759"
-    readonly property color signalTealSoft: "#E7F8EB"
+    readonly property color signalTeal: "#22C55E"
+    readonly property color signalTealSoft: "#E9FAEF"
     readonly property color signalCobalt: "#007AFF"
-    readonly property color signalCobaltSoft: "#E5F1FF"
-    readonly property color signalAmber: "#FF9500"
-    readonly property color signalAmberSoft: "#FFF4E0"
-    readonly property color signalCoral: "#FF3B30"
-    readonly property color signalCoralSoft: "#FFE8E6"
-    readonly property color signalRaspberry: "#AF52DE"
-    readonly property color signalRaspberrySoft: "#F6E8FC"
-    readonly property color signalMoss: "#30B0C7"
-    readonly property color signalMossSoft: "#E4F7FA"
+    readonly property color signalCobaltSoft: "#E7F1FF"
+    readonly property color signalAmber: "#F59E0B"
+    readonly property color signalAmberSoft: "#FFF5DF"
+    readonly property color signalCoral: "#EF4444"
+    readonly property color signalCoralSoft: "#FDECEC"
+    readonly property color signalRaspberry: "#8B5CF6"
+    readonly property color signalRaspberrySoft: "#F3EDFF"
+    readonly property color signalMoss: "#32ADE6"
+    readonly property color signalMossSoft: "#E8F7FD"
 
-    readonly property color graphCanvas: "#F5F5F7"
-    readonly property color graphGrid: Qt.rgba(0, 0, 0, 0.06)
-    readonly property color graphEdge: "#A1A1A6"
+    readonly property color graphCanvas: Qt.rgba(0.9725, 0.9804, 0.9922, 0.82)
+    readonly property color graphGrid: Qt.rgba(0.0588, 0.0902, 0.1647, 0.055)
+    readonly property color graphEdge: "#97A7BA"
     readonly property color graphEdgeFocus: "#007AFF"
+    readonly property color ambientBlue: Qt.rgba(0.0, 0.4784, 1.0, 0.18)
+    readonly property color ambientViolet: Qt.rgba(0.4314, 0.4196, 1.0, 0.16)
+    readonly property color ambientCyan: Qt.rgba(0.1961, 0.6784, 0.9020, 0.14)
 
     readonly property int radiusXs: 6
     readonly property int radiusSm: 8
@@ -61,8 +68,8 @@ QtObject {
     readonly property int space24: 24
     readonly property int space32: 32
 
-    readonly property real panelOpacity: 0.88
-    readonly property real sidebarOpacity: 0.78
+    readonly property real panelOpacity: 0.82
+    readonly property real sidebarOpacity: 0.62
 
     function toneColor(tone) {
         if (tone === "success")

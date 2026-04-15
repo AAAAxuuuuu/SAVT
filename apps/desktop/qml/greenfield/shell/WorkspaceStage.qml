@@ -126,26 +126,239 @@ Item {
         id: overviewView
 
         Item {
-            ArchitectureCanvas {
-                anchors.fill: parent
-                tokens: root.tokens
-                scene: root.analysisController.capabilityScene || ({})
-                selectedNode: root.focusState.focusedNode
-                emptyText: root.analysisController.analyzing
-                           ? "分析进行中，能力地图即将生成..."
-                           : "选择项目并运行分析后，这里会显示架构全景图。"
-                onNodeSelected: root.focusState.setCapability(node)
-                onNodeDrilled: root.openComponentLab(node)
-                onBlankClicked: root.focusState.clear()
+            readonly property var guide: root.analysisController.systemContextData || ({})
+            readonly property var topModules: guide.topModules || []
+            property bool overviewCollapsed: false
+            readonly property bool overviewBusy: !!guide.projectOverviewBusy
+            readonly property string overviewSource: cleanText(guide.projectOverviewSource || "heuristic")
+            readonly property string overviewStatus: cleanText(guide.projectOverviewStatus || "")
+
+            function cleanText(value) {
+                return String(value || "")
+                        .replace(/\s+/g, " ")
+                        .trim()
             }
 
-            StartOverlay {
-                anchors.centerIn: parent
-                visible: !root.caseState.hasProject || (!root.caseState.hasAtlas && !root.analysisController.analyzing)
-                tokens: root.tokens
-                analysisController: root.analysisController
-                caseState: root.caseState
-                onChooseProjectRequested: root.chooseProjectRequested()
+            function overviewSourceLabel() {
+                if (overviewBusy)
+                    return "AI 生成中"
+                if (overviewSource === "ai")
+                    return "AI 总览"
+                return "结构回退"
+            }
+
+            function overviewSummary() {
+                var text = cleanText(guide.projectOverview || "")
+                if (text.length > 0)
+                    return text
+                if (root.analysisController.analyzing) {
+                    return "SAVT 正在根据入口、主路径和关键模块整理这个项目的总览，分析完成后这里会先给你一段“它是干什么的”说明。"
+                }
+                if (root.caseState.hasProject) {
+                    return "项目已绑定。点击右上角“分析”后，这里会自动生成一段项目总览，先告诉你这个项目大概做什么、入口在哪、主路径怎么走。"
+                }
+                return ""
+            }
+
+            function collapsedSummary() {
+                var text = overviewSummary()
+                if (text.length <= 72)
+                    return text
+                return text.slice(0, 72).trim() + "..."
+            }
+
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 18
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: visible ? implicitHeight : 0
+                    visible: root.caseState.hasProject
+                    radius: root.tokens.radius8
+                    color: root.tokens.panelStrong
+                    border.color: root.tokens.border1
+                    implicitHeight: overviewCardColumn.implicitHeight + 28
+
+                    ColumnLayout {
+                        id: overviewCardColumn
+                        anchors.fill: parent
+                        anchors.margins: 16
+                        spacing: 10
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 12
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 4
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: "项目总览"
+                                    color: root.tokens.text3
+                                    font.family: root.tokens.textFontFamily
+                                    font.pixelSize: 12
+                                    font.weight: Font.DemiBold
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: cleanText(guide.projectName || root.caseState.projectName())
+                                    color: root.tokens.text1
+                                    font.family: root.tokens.displayFontFamily
+                                    font.pixelSize: 22
+                                    font.weight: Font.DemiBold
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            ActionButton {
+                                tokens: root.tokens
+                                text: overviewBusy ? "AI 整理中..." : "刷新 AI"
+                                tone: "ai"
+                                compact: true
+                                enabled: root.analysisController.aiAvailable && !overviewBusy
+                                onClicked: root.analysisController.requestProjectOverviewRefresh()
+                            }
+
+                            ActionButton {
+                                tokens: root.tokens
+                                text: "复制总览"
+                                tone: "secondary"
+                                compact: true
+                                enabled: overviewSummary().length > 0
+                                onClicked: root.analysisController.copyTextToClipboard(overviewSummary())
+                            }
+
+                            ActionButton {
+                                tokens: root.tokens
+                                text: overviewCollapsed ? "展开" : "收起"
+                                tone: "ghost"
+                                compact: true
+                                onClicked: overviewCollapsed = !overviewCollapsed
+                            }
+                        }
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: overviewSourceLabel() + ((overviewStatus.length > 0 && !overviewBusy)
+                                                           ? (" · " + overviewStatus)
+                                                           : "")
+                            wrapMode: Text.WordWrap
+                            color: root.tokens.text3
+                            font.family: root.tokens.textFontFamily
+                            font.pixelSize: 12
+                            visible: text.length > 0
+                        }
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: overviewCollapsed ? collapsedSummary() : overviewSummary()
+                            wrapMode: Text.WordWrap
+                            color: root.tokens.text2
+                            font.family: root.tokens.textFontFamily
+                            font.pixelSize: 14
+                            lineHeight: 1.22
+                        }
+
+                        Flow {
+                            Layout.fillWidth: true
+                            visible: !overviewCollapsed && topModules.length > 0
+                            spacing: 8
+
+                            Repeater {
+                                model: topModules
+
+                                Rectangle {
+                                    radius: root.tokens.radiusLg
+                                    color: Qt.rgba(root.tokens.signalCobalt.r,
+                                                   root.tokens.signalCobalt.g,
+                                                   root.tokens.signalCobalt.b,
+                                                   0.12)
+                                    border.color: Qt.rgba(root.tokens.signalCobalt.r,
+                                                          root.tokens.signalCobalt.g,
+                                                          root.tokens.signalCobalt.b,
+                                                          0.22)
+                                    implicitWidth: moduleChipLabel.implicitWidth + 16
+                                    implicitHeight: 26
+
+                                    Label {
+                                        id: moduleChipLabel
+                                        anchors.centerIn: parent
+                                        text: modelData
+                                        color: root.tokens.signalCobalt
+                                        font.family: root.tokens.textFontFamily
+                                        font.pixelSize: 11
+                                        font.weight: Font.DemiBold
+                                    }
+                                }
+                            }
+                        }
+
+                        Flow {
+                            Layout.fillWidth: true
+                            visible: topModules.length > 0
+                            spacing: 8
+
+                            Repeater {
+                                model: overviewCollapsed ? topModules.slice(0, 2) : []
+
+                                Rectangle {
+                                    radius: root.tokens.radiusLg
+                                    color: Qt.rgba(root.tokens.signalCobalt.r,
+                                                   root.tokens.signalCobalt.g,
+                                                   root.tokens.signalCobalt.b,
+                                                   0.12)
+                                    border.color: Qt.rgba(root.tokens.signalCobalt.r,
+                                                          root.tokens.signalCobalt.g,
+                                                          root.tokens.signalCobalt.b,
+                                                          0.22)
+                                    implicitWidth: moduleChipLabel.implicitWidth + 16
+                                    implicitHeight: 26
+
+                                    Label {
+                                        id: moduleChipLabel
+                                        anchors.centerIn: parent
+                                        text: modelData
+                                        color: root.tokens.signalCobalt
+                                        font.family: root.tokens.textFontFamily
+                                        font.pixelSize: 11
+                                        font.weight: Font.DemiBold
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    ArchitectureCanvas {
+                        anchors.fill: parent
+                        tokens: root.tokens
+                        scene: root.analysisController.capabilityScene || ({})
+                        selectedNode: root.focusState.focusedNode
+                        emptyText: root.analysisController.analyzing
+                                   ? "分析进行中，能力地图即将生成..."
+                                   : "选择项目并运行分析后，这里会显示架构全景图。"
+                        onNodeSelected: root.focusState.setCapability(node)
+                        onNodeDrilled: root.openComponentLab(node)
+                        onBlankClicked: root.focusState.clear()
+                    }
+
+                    StartOverlay {
+                        anchors.centerIn: parent
+                        visible: !root.caseState.hasProject || (!root.caseState.hasAtlas && !root.analysisController.analyzing)
+                        tokens: root.tokens
+                        analysisController: root.analysisController
+                        caseState: root.caseState
+                        onChooseProjectRequested: root.chooseProjectRequested()
+                    }
+                }
             }
         }
     }
@@ -166,7 +379,7 @@ Item {
                 width: Math.min(parent.width - 36, 560)
                 height: Math.max(88, componentHeaderLayout.implicitHeight + 24)
                 radius: root.tokens.radius8
-                color: root.tokens.panelBase
+                color: root.tokens.panelStrong
                 border.color: root.tokens.border1
 
                 RowLayout {
@@ -301,7 +514,7 @@ Item {
         width: 520
         height: 240
         radius: tokens.radius8
-        color: tokens.panelBase
+        color: tokens.panelStrong
         border.color: tokens.border1
 
         ColumnLayout {

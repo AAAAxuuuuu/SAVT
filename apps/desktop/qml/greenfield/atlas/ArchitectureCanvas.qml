@@ -23,15 +23,15 @@ Item {
     readonly property var overviewMindMapLayout: buildOverviewMindMapLayout()
     readonly property bool componentOverviewMode: componentMode
     readonly property var componentOverviewGroups: buildComponentOverviewGroups()
-    readonly property real componentOverviewGapX: 34
-    readonly property real componentOverviewGapY: 26
-    readonly property real componentOverviewSectionGap: 34
+    readonly property real componentOverviewGapX: 48
+    readonly property real componentOverviewGapY: 34
+    readonly property real componentOverviewSectionGap: 42
     readonly property real componentOverviewHeaderHeight: 34
     readonly property real componentOverviewCardWidth: Math.max(244, Math.min(308,
                                                                                (Math.max(860, width - 220) - 144 - Math.max(0, componentOverviewGroups.length - 1) * componentOverviewGapX) / Math.max(1, componentOverviewGroups.length)))
     readonly property real componentOverviewCardHeight: 148
     readonly property real sceneWidth: componentOverviewMode
-                                       ? Math.max(980, 72 * 2 + componentOverviewGroups.length * componentOverviewCardWidth + Math.max(0, componentOverviewGroups.length - 1) * componentOverviewGapX)
+                                       ? Math.max(980, componentOverviewSceneWidth())
                                        : Math.max(980, overviewMindMapLayout.width || 0, bounds.width || 980)
     readonly property real sceneHeight: componentOverviewMode
                                         ? Math.max(560, componentOverviewSceneHeight())
@@ -416,13 +416,48 @@ Item {
     }
 
     function componentOverviewSectionLeft(groupIndex) {
-        return 72 + groupIndex * (componentOverviewCardWidth + componentOverviewGapX)
+        var x = 72
+        for (var index = 0; index < groupIndex; ++index)
+            x += componentOverviewSectionWidth(index) + componentOverviewSectionGap
+        return x
+    }
+
+    function componentOverviewGroupColumnCap() {
+        if (componentOverviewGroups.length <= 1)
+            return 3
+        if (componentOverviewGroups.length <= 3)
+            return 2
+        return 1
+    }
+
+    function componentOverviewGroupColumns(group) {
+        var count = group && group.nodes ? group.nodes.length : 0
+        if (count <= 0)
+            return 1
+
+        var preferredRows = componentOverviewGroups.length <= 1 ? 4 : 5
+        return Math.max(1, Math.min(componentOverviewGroupColumnCap(),
+                                    Math.ceil(count / preferredRows)))
+    }
+
+    function componentOverviewGroupRows(group) {
+        var count = group && group.nodes ? group.nodes.length : 0
+        if (count <= 0)
+            return 1
+        return Math.ceil(count / componentOverviewGroupColumns(group))
+    }
+
+    function componentOverviewSectionWidth(groupIndex) {
+        var group = componentOverviewGroups[groupIndex]
+        var columns = componentOverviewGroupColumns(group)
+        return columns * componentOverviewCardWidth
+               + Math.max(0, columns - 1) * componentOverviewGapX
     }
 
     function componentOverviewMaxRows() {
         var maxRows = 1
         for (var index = 0; index < componentOverviewGroups.length; ++index) {
-            maxRows = Math.max(maxRows, componentOverviewGroups[index].nodes.length)
+            maxRows = Math.max(maxRows, componentOverviewGroupRows(componentOverviewGroups[index]))
         }
         return maxRows
     }
@@ -434,21 +469,37 @@ Item {
                 if (group.nodes[nodeIndex].id !== nodeId)
                     continue
 
+                var columns = componentOverviewGroupColumns(group)
+                var row = Math.floor(nodeIndex / columns)
+                var column = nodeIndex % columns
                 return {
-                    "x": componentOverviewSectionLeft(groupIndex),
+                    "x": componentOverviewSectionLeft(groupIndex)
+                         + column * (componentOverviewCardWidth + componentOverviewGapX),
                     "y": 96 + componentOverviewHeaderHeight + 16
-                         + nodeIndex * (componentOverviewCardHeight + componentOverviewGapY),
+                         + row * (componentOverviewCardHeight + componentOverviewGapY),
                     "groupIndex": groupIndex
                 }
             }
         }
 
+        var fallbackColumns = componentOverviewGroups.length <= 1 ? 3 : 2
         return {
-            "x": componentOverviewSectionLeft(0),
+            "x": componentOverviewSectionLeft(0)
+                 + (fallbackIndex % fallbackColumns) * (componentOverviewCardWidth + componentOverviewGapX),
             "y": 96 + componentOverviewHeaderHeight + 16
-                 + fallbackIndex * (componentOverviewCardHeight + componentOverviewGapY),
+                 + Math.floor(fallbackIndex / fallbackColumns) * (componentOverviewCardHeight + componentOverviewGapY),
             "groupIndex": -1
         }
+    }
+
+    function componentOverviewSceneWidth() {
+        var width = 72
+        for (var index = 0; index < componentOverviewGroups.length; ++index) {
+            width += componentOverviewSectionWidth(index)
+            if (index < componentOverviewGroups.length - 1)
+                width += componentOverviewSectionGap
+        }
+        return width + 72
     }
 
     function componentOverviewSceneHeight() {
@@ -1568,12 +1619,12 @@ Item {
     function overviewEdgeBaseColor(edge) {
         var kind = String(edge && edge.kind ? edge.kind : "").toLowerCase()
         if (kind === "activates")
-            return Qt.rgba(0.20, 0.64, 0.74, 0.9)
+            return Qt.rgba(0.20, 0.68, 0.90, 0.92)
         if (kind === "uses_infrastructure")
-            return Qt.rgba(0.60, 0.55, 0.46, 0.88)
+            return Qt.rgba(0.92, 0.62, 0.18, 0.88)
         if (kind === "enables")
-            return Qt.rgba(0.14, 0.47, 0.98, 0.9)
-        return Qt.rgba(0.24, 0.49, 0.86, 0.88)
+            return Qt.rgba(0.00, 0.48, 1.00, 0.92)
+        return Qt.rgba(0.42, 0.42, 1.00, 0.9)
     }
 
     function edgeColor(edge) {
@@ -1595,6 +1646,43 @@ Item {
     }
 
     Canvas {
+        id: atmosphereCanvas
+        anchors.fill: parent
+
+        function paintGlow(ctx, cx, cy, radius, color, coreAlpha, edgeAlpha) {
+            var gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius)
+            gradient.addColorStop(0.0, Qt.rgba(color.r, color.g, color.b, coreAlpha))
+            gradient.addColorStop(0.44, Qt.rgba(color.r, color.g, color.b, coreAlpha * 0.42))
+            gradient.addColorStop(1.0, Qt.rgba(color.r, color.g, color.b, edgeAlpha))
+            ctx.fillStyle = gradient
+            ctx.beginPath()
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2)
+            ctx.fill()
+        }
+
+        onPaint: {
+            var ctx = getContext("2d")
+            var gradient = ctx.createLinearGradient(0, 0, 0, height)
+
+            ctx.reset()
+            gradient.addColorStop(0.0, Qt.rgba(1, 1, 1, 0.28))
+            gradient.addColorStop(1.0, Qt.rgba(1, 1, 1, 0.08))
+            ctx.fillStyle = gradient
+            ctx.fillRect(0, 0, width, height)
+
+            paintGlow(ctx, width * 0.16, height * 0.14, Math.max(width, height) * 0.16,
+                      root.tokens.signalMoss, 0.22, 0.0)
+            paintGlow(ctx, width * 0.84, height * 0.12, Math.max(width, height) * 0.15,
+                      root.tokens.signalRaspberry, 0.16, 0.0)
+            paintGlow(ctx, width * 0.52, height * 0.72, Math.max(width, height) * 0.24,
+                      root.tokens.signalCobalt, 0.1, 0.0)
+        }
+
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+    }
+
+    Canvas {
         id: gridCanvas
         anchors.fill: parent
         onPaint: {
@@ -1610,7 +1698,7 @@ Item {
             for (var x = startX; x < width; x += step) {
                 for (var y = startY; y < height; y += step) {
                     ctx.beginPath()
-                    ctx.arc(x, y, 1.1, 0, Math.PI * 2)
+                    ctx.arc(x, y, 1.0, 0, Math.PI * 2)
                     ctx.fill()
                 }
             }
@@ -1870,10 +1958,10 @@ Item {
             Rectangle {
                 x: root.componentOverviewSectionLeft(index)
                 y: 96
-                width: root.componentOverviewCardWidth
+                width: root.componentOverviewSectionWidth(index)
                 height: root.componentOverviewHeaderHeight
                 radius: root.tokens.radius8
-                color: Qt.rgba(1, 1, 1, 0.84)
+                color: Qt.rgba(1, 1, 1, 0.72)
                 border.color: Qt.rgba(0.12, 0.18, 0.28, 0.06)
                 visible: !root.relationshipFocusActive
 
@@ -1945,8 +2033,8 @@ Item {
                 y: root.sceneY(modelData, index)
                 width: root.nodeWidth(modelData)
                 height: root.nodeHeight(modelData)
-                radius: root.tokens.radius8
-                color: root.tokens.base0
+                radius: root.tokens.radiusLg + 2
+                color: "transparent"
                 border.color: selected ? root.tokens.signalCobalt : root.tokens.border1
                 border.width: selected ? 2 : 1
                 z: hovered || selected ? 10 : 2
@@ -1956,11 +2044,37 @@ Item {
 
                 Rectangle {
                     anchors.fill: parent
-                    anchors.margins: -3
-                    radius: root.tokens.radius8
+                    radius: card.radius
+                    color: hovered || selected ? Qt.rgba(1, 1, 1, 0.82) : Qt.rgba(1, 1, 1, 0.74)
+
+                    gradient: Gradient {
+                        GradientStop {
+                            position: 0.0
+                            color: selected
+                                   ? Qt.rgba(1, 1, 1, 0.94)
+                                   : (card.hovered ? Qt.rgba(1, 1, 1, 0.88) : Qt.rgba(1, 1, 1, 0.8))
+                        }
+
+                        GradientStop {
+                            position: 1.0
+                            color: selected
+                                   ? Qt.rgba(0.94, 0.97, 1.0, 0.9)
+                                   : (card.hovered ? Qt.rgba(0.97, 0.98, 1.0, 0.76) : Qt.rgba(1, 1, 1, 0.68))
+                        }
+                    }
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: -4
+                    radius: card.radius + 2
                     color: "transparent"
-                    border.color: selected ? Qt.rgba(0, 0.478, 1, 0.15) : "transparent"
-                    border.width: selected ? 3 : 0
+                    border.color: selected
+                                  ? Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.18)
+                                  : (card.hovered
+                                     ? Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.08)
+                                     : "transparent")
+                    border.width: selected ? 4 : (card.hovered ? 2 : 0)
                     z: -1
                 }
 
@@ -1973,7 +2087,12 @@ Item {
                     width: 104
                     height: 24
                     radius: root.tokens.radius8
-                    color: root.tokens.signalCoral
+                    color: "transparent"
+
+                    gradient: Gradient {
+                        GradientStop { position: 0.0; color: root.tokens.signalCoral }
+                        GradientStop { position: 1.0; color: Qt.rgba(0.95, 0.27, 0.34, 0.94) }
+                    }
 
                     Label {
                         anchors.centerIn: parent
@@ -2166,7 +2285,7 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            color: root.componentMode ? Qt.rgba(0.985, 0.988, 0.994, 0.94) : Qt.rgba(0.97, 0.975, 0.985, 0.82)
+            color: root.componentMode ? Qt.rgba(0.978, 0.984, 0.994, 0.94) : Qt.rgba(0.972, 0.978, 0.988, 0.84)
         }
 
         Canvas {
@@ -2250,7 +2369,7 @@ Item {
             width: metrics.width
             height: metrics.height
             radius: root.tokens.radiusXxl
-            color: root.componentMode ? Qt.rgba(1, 1, 1, 0.54) : Qt.rgba(1, 1, 1, 0.72)
+            color: root.componentMode ? Qt.rgba(1, 1, 1, 0.6) : Qt.rgba(1, 1, 1, 0.76)
             border.color: Qt.rgba(0.12, 0.18, 0.28, 0.07)
 
             Label {
@@ -2271,7 +2390,7 @@ Item {
                 width: rect.width
                 height: rect.height
                 radius: root.tokens.radius8
-                color: root.tokens.base0
+                color: root.tokens.panelStrong
                 border.color: root.tokens.signalCobalt
                 border.width: 2
 
@@ -2390,7 +2509,7 @@ Item {
                     width: rect.width
                     height: rect.height
                     radius: root.tokens.radius8
-                    color: root.tokens.base0
+                    color: root.tokens.panelStrong
                     border.color: Qt.rgba(0.83, 0.34, 0.92, 0.34)
                     border.width: 1
 
@@ -2443,7 +2562,7 @@ Item {
                     width: rect.width
                     height: rect.height
                     radius: root.tokens.radius8
-                    color: root.tokens.base0
+                    color: root.tokens.panelStrong
                     border.color: Qt.rgba(0.14, 0.48, 1, 0.28)
                     border.width: 1
 
@@ -2503,11 +2622,16 @@ Item {
         anchors.bottom: parent.bottom
         anchors.margins: 18
         width: 272
-        height: 38
-        radius: root.tokens.radius8
-        color: Qt.rgba(1, 1, 1, 0.86)
+        height: 40
+        radius: root.tokens.radiusLg
+        color: Qt.rgba(1, 1, 1, 0.74)
         border.color: root.tokens.border1
         z: 30
+
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.84) }
+            GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.64) }
+        }
 
         RowLayout {
             anchors.fill: parent

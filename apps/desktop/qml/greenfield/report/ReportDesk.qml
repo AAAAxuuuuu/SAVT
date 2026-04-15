@@ -76,7 +76,7 @@ ScrollView {
         Rectangle {
             Layout.fillWidth: true
             radius: root.tokens.radius8
-            color: root.tokens.panelBase
+            color: root.tokens.panelStrong
             border.color: root.tokens.border1
             implicitHeight: headerColumn.implicitHeight + 36
 
@@ -102,7 +102,7 @@ ScrollView {
         Rectangle {
             Layout.fillWidth: true
             radius: root.tokens.radius8
-            color: root.tokens.panelBase
+            color: root.tokens.panelStrong
             border.color: root.tokens.border1
             implicitHeight: overviewColumn.implicitHeight + 32
 
@@ -194,7 +194,7 @@ ScrollView {
         Rectangle {
             Layout.fillWidth: true
             radius: root.tokens.radius8
-            color: root.tokens.panelBase
+            color: root.tokens.panelStrong
             border.color: root.tokens.border1
             implicitHeight: aiColumn.implicitHeight + 32
 
@@ -255,7 +255,7 @@ ScrollView {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 640
                 radius: root.tokens.radius8
-                color: root.tokens.panelBase
+                color: root.tokens.panelStrong
                 border.color: root.tokens.border1
 
                 Label {
@@ -300,7 +300,7 @@ ScrollView {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 640
                 radius: root.tokens.radius8
-                color: root.tokens.panelBase
+                color: root.tokens.panelStrong
                 border.color: root.tokens.border1
 
                 Label {
@@ -385,26 +385,43 @@ ScrollView {
         property string emptyText: ""
 
         radius: tokens.radius6
-        color: tokens.base1
+        color: tokens.panelStrong
         border.color: tokens.border1
 
-        ScrollView {
+        Flickable {
+            id: paneFlick
             anchors.fill: parent
             anchors.margins: 1
             clip: true
-            contentWidth: availableWidth
+            boundsBehavior: Flickable.StopAtBounds
+            flickableDirection: Flickable.VerticalFlick
+            contentWidth: width
+            contentHeight: textFrame.height
 
-            TextEdit {
-                width: parent.width
-                readOnly: true
-                selectByMouse: true
-                wrapMode: TextEdit.Wrap
-                textFormat: TextEdit.RichText
-                text: htmlText.length > 0 ? htmlText : "<p>" + emptyText + "</p>"
-                color: tokens.text2
-                font.family: tokens.textFontFamily
-                font.pixelSize: 13
-                padding: 14
+            ScrollBar.vertical: ScrollBar {
+                policy: ScrollBar.AsNeeded
+            }
+
+            Item {
+                id: textFrame
+                width: paneFlick.width
+                height: Math.max(paneFlick.height, markdownText.contentHeight + 28)
+
+                TextEdit {
+                    id: markdownText
+                    x: 14
+                    y: 14
+                    width: Math.max(0, textFrame.width - 28)
+                    height: contentHeight
+                    readOnly: true
+                    selectByMouse: true
+                    wrapMode: TextEdit.Wrap
+                    textFormat: TextEdit.RichText
+                    text: htmlText.length > 0 ? htmlText : "<p>" + emptyText + "</p>"
+                    color: tokens.text2
+                    font.family: tokens.textFontFamily
+                    font.pixelSize: 13
+                }
             }
         }
     }

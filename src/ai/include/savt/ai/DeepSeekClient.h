@@ -60,6 +60,8 @@ struct ArchitectureAssistantRequest {
     QStringList fileSignals;
     QStringList fileReadingHints;
     QStringList contextClues;
+    QStringList repositoryDocuments;
+    QStringList repositorySnippets;
     QStringList riskSignals;
     QStringList readingOrder;
     QStringList reportHighlights;

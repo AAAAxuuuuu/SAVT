@@ -3,6 +3,7 @@
 #include "savt/core/ProjectAnalysisConfig.h"
 #include "savt/ui/AnalysisTextFormatter.h"
 #include "savt/ui/AstPreviewService.h"
+#include "savt/ui/ProjectConfigRecommendationService.h"
 #include "savt/ui/ReadingGuideService.h"
 #include "savt/ui/SemanticReadinessService.h"
 
@@ -222,6 +223,13 @@ WorkspaceProjection WorkspaceProjectionBuilder::build(
     projection.systemContextData.insert(
         QStringLiteral("projectConfig"),
         buildProjectConfigData(projectRootPath));
+    projection.systemContextData.insert(
+        QStringLiteral("projectConfigRecommendation"),
+        ProjectConfigRecommendationService::buildRecommendation(
+            projectRootPath,
+            artifacts.report,
+            artifacts.overview,
+            artifacts.capabilityGraph));
 
     projection.systemContextCards =
         ReadingGuideService::buildGuideCards(

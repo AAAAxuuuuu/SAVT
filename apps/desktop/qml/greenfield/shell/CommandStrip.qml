@@ -14,6 +14,28 @@ Rectangle {
     signal chooseProjectRequested()
 
     color: tokens.topbarBase
+    border.color: tokens.border1
+
+    gradient: Gradient {
+        GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.54) }
+        GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.24) }
+    }
+
+    Rectangle {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: 1
+        color: root.tokens.shineBorder
+    }
+
+    Rectangle {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: 1
+        color: root.tokens.border1
+    }
 
     function searchCapability(queryText) {
         var query = (queryText || "").trim().toLowerCase()
@@ -35,9 +57,9 @@ Rectangle {
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 24
-        anchors.rightMargin: 24
-        spacing: 12
+        anchors.leftMargin: 26
+        anchors.rightMargin: 26
+        spacing: 14
 
         Item {
             Layout.fillWidth: true
@@ -46,7 +68,7 @@ Rectangle {
         TextField {
             id: searchField
             Layout.preferredWidth: activeFocus ? 260 : 190
-            Layout.preferredHeight: 34
+            Layout.preferredHeight: 36
             placeholderText: "Ask SAVT 架构搜索..."
             selectByMouse: true
             color: root.tokens.text1
@@ -56,18 +78,45 @@ Rectangle {
             onAccepted: root.searchCapability(text)
 
             background: Rectangle {
-                radius: root.tokens.radius8
+                radius: root.tokens.radiusLg
                 color: root.tokens.searchBase
-                border.color: searchField.activeFocus ? root.tokens.signalCobalt : "transparent"
+                border.color: searchField.activeFocus ? root.tokens.signalCobalt : root.tokens.border1
+
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0.0
+                        color: searchField.activeFocus
+                               ? Qt.rgba(1, 1, 1, 0.96)
+                               : Qt.rgba(1, 1, 1, 0.88)
+                    }
+                    GradientStop {
+                        position: 1.0
+                        color: searchField.activeFocus
+                               ? Qt.rgba(1, 1, 1, 0.82)
+                               : Qt.rgba(1, 1, 1, 0.68)
+                    }
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: parent.radius
+                    color: "transparent"
+                    border.color: root.tokens.shineBorder
+                    border.width: 1
+                    opacity: 0.52
+                }
             }
         }
 
         Rectangle {
-            Layout.preferredHeight: 28
-            Layout.minimumWidth: 118
-            radius: root.tokens.radius8
-            color: root.tokens.toneSoft(root.caseState.trustTone())
-            border.color: root.tokens.toneColor(root.caseState.trustTone())
+            Layout.preferredHeight: 30
+            Layout.minimumWidth: 126
+            radius: root.tokens.radiusLg
+            color: Qt.rgba(1, 1, 1, 0.72)
+            border.color: Qt.rgba(root.tokens.toneColor(root.caseState.trustTone()).r,
+                                  root.tokens.toneColor(root.caseState.trustTone()).g,
+                                  root.tokens.toneColor(root.caseState.trustTone()).b,
+                                  0.28)
 
             Label {
                 anchors.centerIn: parent

@@ -31,6 +31,10 @@ ApplicationWindow {
         property var systemContextData: ({
             "headline": "",
             "projectName": "",
+            "projectOverview": "",
+            "projectOverviewBusy": false,
+            "projectOverviewSource": "heuristic",
+            "projectOverviewStatus": "",
             "purposeSummary": "",
             "projectKindSummary": "",
             "entrySummary": "",

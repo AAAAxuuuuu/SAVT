@@ -65,6 +65,12 @@ public:
         const QVariantList& systemContextCards,
         const QVariantList& capabilityNodeItems);
 
+    static AiPreparedRequest prepareProjectOverviewRequest(
+        const AiRequestContext& context,
+        const QVariantMap& systemContextData,
+        const QVariantList& systemContextCards,
+        const QVariantList& capabilityNodeItems);
+
     static AiPreparedRequest prepareReportRequest(
         const AiRequestContext& context,
         const QVariantMap& systemContextData,
