@@ -7,6 +7,16 @@
                 "match": "third_party"
             }
         ],
+        "entryOverrides": [
+            {
+                "entry": true,
+                "match": "apps/desktop"
+            },
+            {
+                "entry": true,
+                "match": "apps/desktop/qml"
+            }
+        ],
         "ignoreDirectories": [
             ".git",
             ".vscode",
@@ -63,6 +73,12 @@
             {
                 "match": "src/ui/src",
                 "module": "src/ui"
+            }
+        ],
+        "roleOverrides": [
+            {
+                "match": "apps/desktop/qml",
+                "role": "presentation"
             }
         ]
     },

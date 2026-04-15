@@ -298,6 +298,7 @@ Item {
             }
 
             Rectangle {
+                visible: !root.componentNodeDetailActive
                 anchors.left: parent.left
                 anchors.top: parent.top
                 anchors.margins: 18
@@ -407,7 +408,7 @@ Item {
             anchors.fill: parent
             anchors.leftMargin: 18
             anchors.rightMargin: 18
-            anchors.topMargin: 122
+            anchors.topMargin: 18
             anchors.bottomMargin: 18
             tokens: root.tokens
             analysisController: root.analysisController
@@ -424,7 +425,7 @@ Item {
             anchors.fill: parent
             anchors.leftMargin: 18
             anchors.rightMargin: 18
-            anchors.topMargin: 122
+            anchors.topMargin: 18
             anchors.bottomMargin: 18
             tokens: root.tokens
             analysisController: root.analysisController

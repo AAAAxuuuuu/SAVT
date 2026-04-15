@@ -83,6 +83,7 @@ Rectangle {
                                                                 && aiTargetMatchesCurrentNode)
     readonly property string aiCardText: currentAiCardText()
     readonly property bool showAiCard: aiBusyForCurrentNode || aiHasCachedResultForCurrentNode
+    readonly property int detailColumns: embeddedMode && width >= 1120 ? 2 : 1
 
     function cleanText(value) {
         return String(value || "")
@@ -375,131 +376,159 @@ Rectangle {
     }
     Component.onCompleted: refreshFileDetail()
 
-    ColumnLayout {
+    ScrollView {
         anchors.fill: parent
-        spacing: 0
+        clip: true
+        contentWidth: availableWidth
 
-        Item {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 122
+        ColumnLayout {
+            width: parent.width
+            spacing: 16
 
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 20
-                anchors.rightMargin: 20
-                anchors.topMargin: 18
-                anchors.bottomMargin: 14
-                spacing: 10
+            Rectangle {
+                Layout.topMargin: 18
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                Layout.fillWidth: true
+                radius: root.tokens.radiusXl
+                color: Qt.rgba(1, 1, 1, 0.82)
+                border.color: root.tokens.border1
+                implicitHeight: headerColumn.implicitHeight + 32
 
-                RowLayout {
-                    Layout.fillWidth: true
+                Rectangle {
+                    anchors.fill: parent
+                    radius: parent.radius
+                    color: "transparent"
+                    border.color: root.tokens.shineBorder
+                    border.width: 1
+                }
+
+                ColumnLayout {
+                    id: headerColumn
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.leftMargin: 18
+                    anchors.rightMargin: 18
+                    anchors.topMargin: 16
                     spacing: 10
 
-                    Label {
+                    RowLayout {
                         Layout.fillWidth: true
-                        text: root.titleText
-                        color: root.tokens.text1
-                        elide: Text.ElideRight
-                        font.family: root.tokens.displayFontFamily
-                        font.pixelSize: 22
-                        font.weight: Font.DemiBold
-                    }
+                        spacing: 12
 
-                    ActionButton {
-                        tokens: root.tokens
-                        text: root.embeddedMode ? "返回组件图" : "X"
-                        compact: true
-                        square: !root.embeddedMode
-                        fixedWidth: root.embeddedMode ? 0 : 30
-                        tone: root.embeddedMode ? "secondary" : "ghost"
-                        onClicked: {
-                            if (root.embeddedMode) {
-                                root.focusState.clearNodeFocus()
-                            } else {
-                                root.focusState.inspectorOpen = false
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 4
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: root.embeddedMode ? "组件解读" : "焦点解读"
+                                color: root.tokens.text3
+                                font.family: root.tokens.textFontFamily
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: root.titleText
+                                color: root.tokens.text1
+                                wrapMode: Text.WordWrap
+                                maximumLineCount: root.embeddedMode ? 2 : 3
+                                elide: Text.ElideRight
+                                font.family: root.tokens.displayFontFamily
+                                font.pixelSize: root.embeddedMode ? 24 : 22
+                                font.weight: Font.DemiBold
+                            }
+                        }
+
+                        ActionButton {
+                            tokens: root.tokens
+                            text: root.embeddedMode ? "返回组件图" : "X"
+                            compact: true
+                            square: !root.embeddedMode
+                            fixedWidth: root.embeddedMode ? 0 : 30
+                            tone: root.embeddedMode ? "secondary" : "ghost"
+                            Layout.alignment: Qt.AlignTop
+                            onClicked: {
+                                if (root.embeddedMode) {
+                                    root.focusState.clearNodeFocus()
+                                } else {
+                                    root.focusState.inspectorOpen = false
+                                }
                             }
                         }
                     }
-                }
 
-                Label {
-                    Layout.fillWidth: true
-                    text: root.subtitleText
-                    color: root.tokens.text3
-                    elide: Text.ElideRight
-                    visible: text.length > 0
-                    font.family: root.tokens.textFontFamily
-                    font.pixelSize: 13
-                }
-
-                Label {
-                    Layout.fillWidth: true
-                    text: root.detailPathText
-                    visible: root.singleFileMode && text.length > 0
-                    color: root.tokens.text3
-                    elide: Text.ElideMiddle
-                    font.family: root.tokens.monoFontFamily
-                    font.pixelSize: 11
-                }
-
-                Flow {
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    ChipBadge {
-                        tokens: root.tokens
-                        visible: root.kindLabel.length > 0
-                        text: root.singleFileMode ? cleanText(root.fileDetail.languageLabel || "具体文件") : root.kindLabel
-                        tone: "brand"
+                    Label {
+                        Layout.fillWidth: true
+                        text: root.subtitleText
+                        color: root.tokens.text3
+                        wrapMode: Text.WordWrap
+                        visible: text.length > 0
+                        font.family: root.tokens.textFontFamily
+                        font.pixelSize: 13
                     }
 
-                    ChipBadge {
-                        tokens: root.tokens
-                        visible: root.singleFileMode
-                                 ? cleanText(root.fileDetail.categoryLabel || "").length > 0
-                                 : (root.roleLabel.length > 0 && root.roleLabel !== root.kindLabel)
-                        text: root.singleFileMode ? cleanText(root.fileDetail.categoryLabel || "") : root.roleLabel
-                        tone: "neutral"
+                    Label {
+                        Layout.fillWidth: true
+                        text: root.detailPathText
+                        visible: root.singleFileMode && text.length > 0
+                        wrapMode: Text.WrapAnywhere
+                        color: root.tokens.text3
+                        font.family: root.tokens.monoFontFamily
+                        font.pixelSize: 11
                     }
 
-                    ChipBadge {
-                        tokens: root.tokens
-                        visible: root.singleFileMode
-                                 ? cleanText(root.fileDetail.roleLabel || "").length > 0
-                                 : true
-                        text: root.singleFileMode ? cleanText(root.fileDetail.roleLabel || "") : (root.fileCount + " 个文件")
-                        tone: root.singleFileMode ? "neutral" : "success"
-                    }
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: 8
 
-                    ChipBadge {
-                        tokens: root.tokens
-                        visible: root.singleFileMode
-                        text: "总行数 " + Number(root.fileDetail.lineCount || 0)
-                        tone: "success"
+                        ChipBadge {
+                            tokens: root.tokens
+                            visible: root.kindLabel.length > 0
+                            text: root.singleFileMode ? cleanText(root.fileDetail.languageLabel || "具体文件") : root.kindLabel
+                            tone: "brand"
+                        }
+
+                        ChipBadge {
+                            tokens: root.tokens
+                            visible: root.singleFileMode
+                                     ? cleanText(root.fileDetail.categoryLabel || "").length > 0
+                                     : (root.roleLabel.length > 0 && root.roleLabel !== root.kindLabel)
+                            text: root.singleFileMode ? cleanText(root.fileDetail.categoryLabel || "") : root.roleLabel
+                            tone: "neutral"
+                        }
+
+                        ChipBadge {
+                            tokens: root.tokens
+                            visible: root.singleFileMode
+                                     ? cleanText(root.fileDetail.roleLabel || "").length > 0
+                                     : true
+                            text: root.singleFileMode ? cleanText(root.fileDetail.roleLabel || "") : (root.fileCount + " 个文件")
+                            tone: root.singleFileMode ? "neutral" : "success"
+                        }
+
+                        ChipBadge {
+                            tokens: root.tokens
+                            visible: root.singleFileMode
+                            text: "总行数 " + Number(root.fileDetail.lineCount || 0)
+                            tone: "success"
+                        }
                     }
                 }
             }
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 1
-            color: root.tokens.border1
-        }
-
-        ScrollView {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            clip: true
-            contentWidth: availableWidth
 
             Loader {
-                width: parent.width
-                height: item ? item.implicitHeight : 0
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                Layout.bottomMargin: 18
                 sourceComponent: root.singleFileMode ? fileModeContent : moduleModeContent
             }
         }
-
     }
 
     Component {
@@ -507,88 +536,116 @@ Rectangle {
 
         ColumnLayout {
             width: parent ? parent.width : 0
-            spacing: 14
+            spacing: 16
 
-            AccentCard {
-                Layout.topMargin: 18
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                Layout.fillWidth: true
-                tokens: root.tokens
-                title: "模块概览"
-                body: root.summaryText.length > 0
-                      ? root.summaryText
-                      : "选中一个架构对象后，这里会优先给出简洁摘要，帮助你快速判断它是什么。"
-                tone: "neutral"
-            }
+            GridLayout {
+                width: parent ? parent.width : 0
+                columns: root.detailColumns
+                columnSpacing: 14
+                rowSpacing: 14
 
-            AccentCard {
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                Layout.fillWidth: true
-                tokens: root.tokens
-                title: "当前判断"
-                body: root.conclusionText
-                tone: "brand"
-            }
+                AccentCard {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignTop
+                    tokens: root.tokens
+                    title: "模块概览"
+                    body: root.summaryText.length > 0
+                          ? root.summaryText
+                          : "当前组件已选中，但还没有形成稳定的模块摘要。"
+                    tone: "neutral"
+                }
 
-            AccentCard {
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                Layout.fillWidth: true
-                visible: root.showAiCard
-                tokens: root.tokens
-                title: root.analysisController.aiBusy ? "AI 辅助解读 · 生成中" : "AI 辅助解读"
-                body: root.aiCardText
-                tone: "ai"
+                AccentCard {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignTop
+                    tokens: root.tokens
+                    title: "当前判断"
+                    body: root.conclusionText
+                    tone: "brand"
+                }
             }
 
             Rectangle {
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
                 Layout.fillWidth: true
-                Layout.preferredHeight: 72
-                visible: !root.showAiCard && !!root.focusState.focusedNode
-                radius: root.tokens.radius8
-                color: root.tokens.panelStrong
-                border.color: root.tokens.border1
+                radius: root.tokens.radiusXl
+                color: Qt.rgba(root.tokens.signalRaspberry.r, root.tokens.signalRaspberry.g, root.tokens.signalRaspberry.b, 0.07)
+                border.color: Qt.rgba(root.tokens.signalRaspberry.r, root.tokens.signalRaspberry.g, root.tokens.signalRaspberry.b, 0.16)
+                implicitHeight: aiColumn.implicitHeight + 26
 
-                ActionButton {
-                    anchors.centerIn: parent
-                    width: parent.width - 28
+                ColumnLayout {
+                    id: aiColumn
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 16
+                    anchors.topMargin: 14
+                    spacing: 10
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Label {
+                            text: root.analysisController.aiBusy ? "AI 辅助解读 · 生成中" : "AI 辅助解读"
+                            color: root.tokens.signalRaspberry
+                            font.family: root.tokens.textFontFamily
+                            font.pixelSize: 12
+                            font.weight: Font.DemiBold
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        ActionButton {
+                            tokens: root.tokens
+                            text: root.analysisController.aiBusy ? "生成中..." : "生成解读"
+                            tone: "ai"
+                            compact: true
+                            enabled: root.analysisController.aiAvailable
+                                     && !!root.focusState.focusedNode
+                                     && !root.analysisController.aiBusy
+                            onClicked: root.requestAiInterpretation()
+                        }
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: root.showAiCard
+                              ? root.aiCardText
+                              : "这里会围绕当前组件的职责、边界、风险和建议阅读路径生成一段中文解读。"
+                        wrapMode: Text.WordWrap
+                        color: root.tokens.text1
+                        font.family: root.tokens.textFontFamily
+                        font.pixelSize: 13
+                        lineHeight: 1.22
+                    }
+                }
+            }
+
+            GridLayout {
+                width: parent ? parent.width : 0
+                columns: root.detailColumns
+                columnSpacing: 14
+                rowSpacing: 14
+
+                SectionBlock {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignTop
                     tokens: root.tokens
-                    text: root.analysisController.aiBusy ? "AI 正在生成..." : "请求 AI 辅助解读"
-                    tone: "primary"
-                    enabled: root.analysisController.aiAvailable
-                             && !!root.focusState.focusedNode
-                             && !root.analysisController.aiBusy
-                    onClicked: root.requestAiInterpretation()
+                    title: "结构事实"
+                    rows: root.factRows
+                }
+
+                SectionBlock {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignTop
+                    tokens: root.tokens
+                    title: "判断依据"
+                    rows: root.ruleRows
                 }
             }
 
             SectionBlock {
-                Layout.fillWidth: true
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                tokens: root.tokens
-                title: "结构事实"
-                rows: root.factRows
-            }
-
-            SectionBlock {
-                Layout.fillWidth: true
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                tokens: root.tokens
-                title: "判断依据"
-                rows: root.ruleRows
-            }
-
-            SectionBlock {
-                Layout.fillWidth: true
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                Layout.bottomMargin: 16
+                width: parent ? parent.width : 0
                 tokens: root.tokens
                 title: "关键文件"
                 rows: root.sourceFiles.length > 0 ? root.sourceFiles.map(localizePath) : ["暂无源文件线索。"]
@@ -602,106 +659,130 @@ Rectangle {
 
         ColumnLayout {
             width: parent ? parent.width : 0
-            spacing: 14
+            spacing: 16
 
-            AccentCard {
-                Layout.topMargin: 18
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                Layout.fillWidth: true
-                tokens: root.tokens
-                title: "文件定位"
-                body: root.summaryText.length > 0
-                      ? root.summaryText
-                      : "当前文件已选中，但还没有稳定的文件定位摘要。"
-                tone: "neutral"
-            }
+            GridLayout {
+                width: parent ? parent.width : 0
+                columns: 2
+                columnSpacing: 14
+                rowSpacing: 14
 
-            AccentCard {
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                Layout.fillWidth: true
-                tokens: root.tokens
-                title: "当前判断"
-                body: root.conclusionText
-                tone: "brand"
-            }
-
-            AccentCard {
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                Layout.fillWidth: true
-                visible: root.showAiCard
-                tokens: root.tokens
-                title: root.analysisController.aiBusy ? "AI 文件解读 · 生成中" : "AI 文件解读"
-                body: root.aiCardText
-                tone: "ai"
-            }
-
-            Rectangle {
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                Layout.fillWidth: true
-                Layout.preferredHeight: 72
-                visible: !root.showAiCard && !!root.focusState.focusedNode
-                radius: root.tokens.radius8
-                color: root.tokens.panelStrong
-                border.color: root.tokens.border1
-
-                ActionButton {
-                    anchors.centerIn: parent
-                    width: parent.width - 28
+                AccentCard {
+                    Layout.fillWidth: true
                     tokens: root.tokens
-                    text: root.analysisController.aiBusy ? "AI 正在生成..." : "请 AI 解读这个文件"
-                    tone: "primary"
-                    enabled: root.analysisController.aiAvailable
-                             && !!root.focusState.focusedNode
-                             && !root.analysisController.aiBusy
-                    onClicked: root.requestAiInterpretation()
+                    title: "文件定位"
+                    body: root.summaryText.length > 0
+                          ? root.summaryText
+                          : "当前文件已选中，但还没有稳定的文件定位摘要。"
+                    tone: "neutral"
+                }
+
+                AccentCard {
+                    Layout.fillWidth: true
+                    tokens: root.tokens
+                    title: "当前判断"
+                    body: root.conclusionText
+                    tone: "brand"
                 }
             }
 
-            SectionBlock {
+            Rectangle {
                 Layout.fillWidth: true
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                tokens: root.tokens
-                title: "导入 / 依赖线索"
-                rows: root.fileImportRows.length > 0 ? root.fileImportRows : ["当前文件还没有抽取到明显的导入线索。"]
+                radius: root.tokens.radiusXl
+                color: Qt.rgba(root.tokens.signalRaspberry.r, root.tokens.signalRaspberry.g, root.tokens.signalRaspberry.b, 0.07)
+                border.color: Qt.rgba(root.tokens.signalRaspberry.r, root.tokens.signalRaspberry.g, root.tokens.signalRaspberry.b, 0.16)
+                implicitHeight: fileAiColumn.implicitHeight + 26
+
+                ColumnLayout {
+                    id: fileAiColumn
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 16
+                    anchors.topMargin: 14
+                    spacing: 10
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Label {
+                            text: root.aiBusyForCurrentFile ? "AI 文件解读 · 生成中" : "AI 文件解读"
+                            color: root.tokens.signalRaspberry
+                            font.family: root.tokens.textFontFamily
+                            font.pixelSize: 12
+                            font.weight: Font.DemiBold
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        ActionButton {
+                            tokens: root.tokens
+                            text: root.analysisController.aiBusy ? "生成中..." : "生成解读"
+                            tone: "ai"
+                            compact: true
+                            enabled: root.analysisController.aiAvailable
+                                     && !!root.focusState.focusedNode
+                                     && !root.analysisController.aiBusy
+                            onClicked: root.requestAiInterpretation()
+                        }
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: root.aiBusyForCurrentFile
+                              ? (root.cleanText(root.analysisController.aiStatusMessage).length > 0
+                                 ? root.cleanText(root.analysisController.aiStatusMessage)
+                                 : "正在结合当前文件的路径、声明和关键片段生成解读，请稍候。")
+                              : (root.aiResultForCurrentFile
+                                 ? root.aiDigestText()
+                                 : "这里会只围绕当前文件生成中文解读，不再泛泛解释整个模块。")
+                        wrapMode: Text.WordWrap
+                        color: root.tokens.text1
+                        font.family: root.tokens.textFontFamily
+                        font.pixelSize: 13
+                        lineHeight: 1.22
+                    }
+                }
             }
 
-            SectionBlock {
-                Layout.fillWidth: true
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                tokens: root.tokens
-                title: "声明 / 主符号"
-                rows: root.fileDeclarationRows.length > 0 ? root.fileDeclarationRows : ["当前文件还没有抽取到稳定的声明符号。"]
-            }
+            GridLayout {
+                width: parent ? parent.width : 0
+                columns: 2
+                columnSpacing: 14
+                rowSpacing: 14
 
-            SectionBlock {
-                Layout.fillWidth: true
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                tokens: root.tokens
-                title: "行为信号"
-                rows: root.fileBehaviorRows.length > 0 ? root.fileBehaviorRows : ["当前文件还没有抽取到明显的行为信号。"]
-            }
+                SectionBlock {
+                    Layout.fillWidth: true
+                    tokens: root.tokens
+                    title: "导入 / 依赖线索"
+                    rows: root.fileImportRows.length > 0 ? root.fileImportRows : ["当前文件还没有抽取到明显的导入线索。"]
+                }
 
-            SectionBlock {
-                Layout.fillWidth: true
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                tokens: root.tokens
-                title: "建议阅读顺序"
-                rows: root.fileReadingRows.length > 0 ? root.fileReadingRows : ["建议先从导入、主符号和首个非空代码片段开始。"]
+                SectionBlock {
+                    Layout.fillWidth: true
+                    tokens: root.tokens
+                    title: "声明 / 主符号"
+                    rows: root.fileDeclarationRows.length > 0 ? root.fileDeclarationRows : ["当前文件还没有抽取到稳定的声明符号。"]
+                }
+
+                SectionBlock {
+                    Layout.fillWidth: true
+                    tokens: root.tokens
+                    title: "行为信号"
+                    rows: root.fileBehaviorRows.length > 0 ? root.fileBehaviorRows : ["当前文件还没有抽取到明显的行为信号。"]
+                }
+
+                SectionBlock {
+                    Layout.fillWidth: true
+                    tokens: root.tokens
+                    title: "建议阅读顺序"
+                    rows: root.fileReadingRows.length > 0 ? root.fileReadingRows : ["建议先从导入、主符号和首个非空代码片段开始。"]
+                }
             }
 
             AccentCard {
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                Layout.bottomMargin: 16
-                Layout.fillWidth: true
+                width: parent ? parent.width : 0
                 visible: root.cleanMultilineText(root.fileDetail.previewText).length > 0
                 tokens: root.tokens
                 title: "关键片段"
