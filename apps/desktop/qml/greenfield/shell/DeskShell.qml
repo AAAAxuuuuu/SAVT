@@ -9,6 +9,8 @@ Item {
     required property QtObject analysisController
     required property QtObject caseState
     required property QtObject focusState
+    readonly property bool overviewInspectorVisible: root.caseState.route === "overview"
+                                                     && root.focusState.inspectorOpen
 
     signal chooseProjectRequested()
 
@@ -72,7 +74,7 @@ Item {
                 anchors.left: parent.left
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
-                width: parent.width - (root.focusState.inspectorOpen ? inspector.width + 12 : 0)
+                width: parent.width - (root.overviewInspectorVisible ? inspector.width + 12 : 0)
 
                 Behavior on width {
                     NumberAnimation {
@@ -99,9 +101,10 @@ Item {
 
             FocusBrief {
                 id: inspector
+                visible: root.caseState.route === "overview"
                 width: 336
                 height: parent.height - 16
-                x: root.focusState.inspectorOpen ? parent.width - width - 8 : parent.width + 28
+                x: root.overviewInspectorVisible ? parent.width - width - 8 : parent.width + 28
                 y: 8
                 tokens: root.tokens
                 analysisController: root.analysisController

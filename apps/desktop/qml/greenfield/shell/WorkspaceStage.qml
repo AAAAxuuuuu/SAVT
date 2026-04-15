@@ -14,7 +14,10 @@ Item {
     required property QtObject caseState
     required property QtObject focusState
     property var componentFileDetail: ({})
-    readonly property bool componentFileDetailActive: root.caseState.route === "component"
+    readonly property bool componentNodeDetailActive: root.caseState.route === "component"
+                                                      && !!root.focusState.focusedNode
+                                                      && root.focusState.focusedNode.id !== undefined
+    readonly property bool componentFileDetailActive: root.componentNodeDetailActive
                                                       && !!root.componentFileDetail
                                                       && !!root.componentFileDetail.available
                                                       && !!root.componentFileDetail.singleFile
@@ -289,7 +292,9 @@ Item {
         Item {
             Loader {
                 anchors.fill: parent
-                sourceComponent: root.componentFileDetailActive ? componentFileView : componentCanvasView
+                sourceComponent: root.componentNodeDetailActive
+                                 ? (root.componentFileDetailActive ? componentFileView : componentNodeView)
+                                 : componentCanvasView
             }
 
             Rectangle {
@@ -320,6 +325,10 @@ Item {
                                                      || (root.focusState.focusedNode
                                                          ? root.focusState.focusedNode.name
                                                          : "未命名文件")))
+                                  : root.componentNodeDetailActive
+                                    ? ("组件解读：" + (root.focusState.focusedNode
+                                                     ? root.focusState.focusedNode.name
+                                                     : "未命名组件"))
                                   : (root.focusState.focusedCapability
                                      ? ("组件探测：" + root.focusState.focusedCapability.name)
                                      : "组件探测实验室")
@@ -335,9 +344,15 @@ Item {
                             text: root.normalizedPreviewText(
                                       root.componentFileDetailActive
                                       ? root.componentFileDetail.summary
+                                      : root.componentNodeDetailActive
+                                        ? (root.focusState.focusedNode.summary
+                                           || root.focusState.focusedNode.responsibility
+                                           || root.focusState.focusedNode.role)
                                       : root.componentSceneForFocus().summary,
                                       root.componentFileDetailActive
                                       ? "当前已切换到文件解读模式，会结合路径、声明、依赖和片段来理解这个文件。"
+                                      : root.componentNodeDetailActive
+                                        ? "当前已切换到组件解读模式，会围绕组件职责、关系和证据进行阅读。"
                                       : "双击全景图节点后，SAVT 会接入 componentSceneCatalog 展开组件关系。")
                             color: root.tokens.text3
                             wrapMode: Text.WordWrap
@@ -351,10 +366,16 @@ Item {
 
                     ActionButton {
                         tokens: root.tokens
-                        text: "返回全景"
+                        text: root.componentNodeDetailActive ? "返回组件图" : "返回全景"
                         tone: "secondary"
                         Layout.alignment: Qt.AlignVCenter
-                        onClicked: root.caseState.navigate("overview")
+                        onClicked: {
+                            if (root.componentNodeDetailActive) {
+                                root.focusState.clearNodeFocus()
+                            } else {
+                                root.caseState.navigate("overview")
+                            }
+                        }
                     }
                 }
             }
@@ -376,6 +397,23 @@ Item {
             onNodeSelected: root.focusState.setNode(node)
             onNodeDrilled: root.focusState.setNode(node)
             onBlankClicked: root.focusState.clearNodeFocus()
+        }
+    }
+
+    Component {
+        id: componentNodeView
+
+        FocusBrief {
+            anchors.fill: parent
+            anchors.leftMargin: 18
+            anchors.rightMargin: 18
+            anchors.topMargin: 122
+            anchors.bottomMargin: 18
+            tokens: root.tokens
+            analysisController: root.analysisController
+            caseState: root.caseState
+            focusState: root.focusState
+            embeddedMode: true
         }
     }
 

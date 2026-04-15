@@ -10,6 +10,7 @@ Rectangle {
     required property QtObject analysisController
     required property QtObject caseState
     required property QtObject focusState
+    property bool embeddedMode: false
 
     radius: tokens.radiusXxl + 4
     color: tokens.panelSoft
@@ -406,12 +407,18 @@ Rectangle {
 
                     ActionButton {
                         tokens: root.tokens
-                        text: "X"
+                        text: root.embeddedMode ? "返回组件图" : "X"
                         compact: true
-                        square: true
-                        fixedWidth: 30
-                        tone: "ghost"
-                        onClicked: root.focusState.inspectorOpen = false
+                        square: !root.embeddedMode
+                        fixedWidth: root.embeddedMode ? 0 : 30
+                        tone: root.embeddedMode ? "secondary" : "ghost"
+                        onClicked: {
+                            if (root.embeddedMode) {
+                                root.focusState.clearNodeFocus()
+                            } else {
+                                root.focusState.inspectorOpen = false
+                            }
+                        }
                     }
                 }
 
