@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Window
 
 Item {
     id: root
@@ -14,11 +15,56 @@ Item {
 
     signal chooseProjectRequested()
 
+    function closeCurrentWindow() {
+        if (root.Window.window)
+            root.Window.window.close()
+        else
+            Qt.quit()
+    }
+
+    function handleBackAction() {
+        if (root.caseState.route === "component") {
+            if (root.focusState.focusedNode && root.focusState.focusedNode.id !== undefined) {
+                root.focusState.clearNodeFocus()
+                return
+            }
+            root.caseState.navigate("overview")
+            return
+        }
+
+        if (root.caseState.route === "report" || root.caseState.route === "config") {
+            root.caseState.navigate("overview")
+            return
+        }
+
+        if (root.caseState.route === "overview"
+                && (root.focusState.focusedNode
+                    || root.focusState.focusedCapability
+                    || root.focusState.focusedEdge
+                    || root.focusState.inspectorOpen)) {
+            root.focusState.clear()
+        }
+    }
+
     Shortcut { sequence: "Ctrl+1"; onActivated: root.caseState.navigate("overview") }
     Shortcut { sequence: "Ctrl+2"; onActivated: root.caseState.navigate("component") }
     Shortcut { sequence: "Ctrl+3"; onActivated: root.caseState.navigate("report") }
     Shortcut { sequence: "Ctrl+4"; onActivated: root.caseState.navigate("config") }
-    Shortcut { sequence: "Escape"; onActivated: root.focusState.clear() }
+    Shortcut {
+        sequence: StandardKey.Close
+        context: Qt.ApplicationShortcut
+        onActivated: root.closeCurrentWindow()
+    }
+    Shortcut {
+        sequence: StandardKey.Quit
+        context: Qt.ApplicationShortcut
+        onActivated: Qt.quit()
+    }
+    Shortcut {
+        sequence: "Escape"
+        context: Qt.ApplicationShortcut
+        onActivated: root.handleBackAction()
+    }
 
     RowLayout {
         anchors.fill: parent

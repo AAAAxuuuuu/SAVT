@@ -2277,6 +2277,45 @@ Item {
         visible: root.relationshipFocusActive
         z: 18
 
+        WheelHandler {
+            target: null
+            acceptedDevices: PointerDevice.TouchPad
+            onWheel: function(event) {
+                var deltaX = event.pixelDelta.x
+                var deltaY = event.pixelDelta.y
+                if (Math.abs(deltaX) < 0.01 && Math.abs(deltaY) < 0.01) {
+                    deltaX = event.angleDelta.x / 4.0
+                    deltaY = event.angleDelta.y / 4.0
+                }
+
+                root.panX += deltaX
+                root.panY += deltaY
+            }
+        }
+
+        PinchHandler {
+            target: null
+            acceptedDevices: PointerDevice.TouchPad | PointerDevice.TouchScreen
+            property real lastScale: 1.0
+
+            onActiveChanged: {
+                if (active)
+                    lastScale = 1.0
+            }
+
+            onScaleChanged: {
+                if (!active)
+                    return
+
+                var factor = scale / lastScale
+                if (Math.abs(factor - 1.0) < 0.001)
+                    return
+
+                root.zoomAt(centroid.position.x, centroid.position.y, factor)
+                lastScale = scale
+            }
+        }
+
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
