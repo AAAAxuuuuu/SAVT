@@ -1150,7 +1150,7 @@ ai::ArchitectureAssistantRequest buildProjectOverviewRequest(
                   "先读 README、项目文档、工程清单和关键源码摘录，再直接说明这个仓库是做什么的、给谁用、核心模块、入口主路径和输入输出。"
                   " README 不清楚时，再按工程结构和代码谨慎归纳。"
                   " 结果写进 plain_summary，控制在 120 到 200 个中文字符。"
-                  " 不要写“从当前结构看”“整体来看”“这个项目很重要”“这个页面展示了什么”这类套话。")
+                  " 避免套话、空泛称赞和页面说明式表述。")
             : context.userTask.trimmed();
     request.diagnostics = {
         QStringLiteral("analysis phase: %1")

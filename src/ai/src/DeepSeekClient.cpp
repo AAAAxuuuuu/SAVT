@@ -649,8 +649,7 @@ QString projectOverviewResponseContractText() {
       "120-200 Chinese characters, directly explaining what the repository "
       "does, who it serves, its main parts, the rough entry or main path, and "
       "the main input or output. "
-      "Avoid boilerplate such as \"从当前结构看\", \"整体来看\", "
-      "\"这个项目很重要\", or UI meta commentary. "
+      "Avoid stock opening phrases, generic praise, and UI meta commentary. "
       "\"uncertainty\": only mention real uncertainty in one short sentence. "
       "\"evidence\" and \"where_to_start\" should stay short and use at most 2 "
       "items each.");

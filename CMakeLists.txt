@@ -158,7 +158,7 @@ else()
     FetchContent_Declare(savt_tree_sitter
         GIT_REPOSITORY "${SAVT_TREE_SITTER_GIT_REPOSITORY}"
         GIT_TAG "${SAVT_TREE_SITTER_GIT_TAG}"
-        GIT_SHALLOW TRUE
+        GIT_SHALLOW FALSE
     )
     FetchContent_MakeAvailable(savt_tree_sitter)
 endif()
@@ -176,7 +176,7 @@ if(NOT EXISTS "${SAVT_TREE_SITTER_CPP_PARSER}")
     FetchContent_Declare(savt_tree_sitter_cpp
         GIT_REPOSITORY "${SAVT_TREE_SITTER_CPP_GIT_REPOSITORY}"
         GIT_TAG "${SAVT_TREE_SITTER_CPP_GIT_TAG}"
-        GIT_SHALLOW TRUE
+        GIT_SHALLOW FALSE
     )
     FetchContent_GetProperties(savt_tree_sitter_cpp)
     if(NOT savt_tree_sitter_cpp_POPULATED)
