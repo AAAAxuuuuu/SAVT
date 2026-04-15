@@ -162,7 +162,6 @@ AnalysisController::AnalysisController(QObject* parent)
     : QObject(parent),
       m_aiNetworkManager(new QNetworkAccessManager(this)),
       m_analysisWatcher(new QFutureWatcher<void>(this)) {
-    setProjectRootPathInternal(AnalysisOrchestrator::defaultProjectRootPath(), false);
     setStatusMessage(QStringLiteral("准备就绪。选择一个项目目录后，就可以先看项目分工，再按需进入程序员视图。"));
     setAnalysisReport(QStringLiteral(
         "程序员入口的详细分析报告会显示在这里。\n\n完成项目分析后，你可以在右侧切换到“程序员入口”，查看完整报告和 AST 预览。"));
@@ -888,9 +887,7 @@ void AnalysisController::clearVisualizationState() {
 }
 
 void AnalysisController::setProjectRootPathInternal(QString value, const bool emitSignal) {
-    if (value.isEmpty()) {
-        value = AnalysisOrchestrator::defaultProjectRootPath();
-    }
+    value = QDir::cleanPath(value.trimmed());
     if (m_projectRootPath == value) {
         return;
     }
