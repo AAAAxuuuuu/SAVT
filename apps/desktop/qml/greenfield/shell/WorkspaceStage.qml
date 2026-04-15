@@ -128,10 +128,7 @@ Item {
         Item {
             readonly property var guide: root.analysisController.systemContextData || ({})
             readonly property var topModules: guide.topModules || []
-            property bool overviewCollapsed: false
             readonly property bool overviewBusy: !!guide.projectOverviewBusy
-            readonly property string overviewSource: cleanText(guide.projectOverviewSource || "heuristic")
-            readonly property string overviewStatus: cleanText(guide.projectOverviewStatus || "")
 
             function cleanText(value) {
                 return String(value || "")
@@ -139,32 +136,8 @@ Item {
                         .trim()
             }
 
-            function overviewSourceLabel() {
-                if (overviewBusy)
-                    return "AI 生成中"
-                if (overviewSource === "ai")
-                    return "AI 总览"
-                return "结构回退"
-            }
-
             function overviewSummary() {
-                var text = cleanText(guide.projectOverview || "")
-                if (text.length > 0)
-                    return text
-                if (root.analysisController.analyzing) {
-                    return "SAVT 正在根据入口、主路径和关键模块整理这个项目的总览，分析完成后这里会先给你一段“它是干什么的”说明。"
-                }
-                if (root.caseState.hasProject) {
-                    return "项目已绑定。点击右上角“分析”后，这里会自动生成一段项目总览，先告诉你这个项目大概做什么、入口在哪、主路径怎么走。"
-                }
-                return ""
-            }
-
-            function collapsedSummary() {
-                var text = overviewSummary()
-                if (text.length <= 72)
-                    return text
-                return text.slice(0, 72).trim() + "..."
+                return cleanText(guide.projectOverview || "")
             }
 
             ColumnLayout {
@@ -226,75 +199,22 @@ Item {
                             ActionButton {
                                 tokens: root.tokens
                                 text: "复制总览"
-                                tone: "secondary"
+                                tone: "ghost"
                                 compact: true
                                 enabled: overviewSummary().length > 0
                                 onClicked: root.analysisController.copyTextToClipboard(overviewSummary())
                             }
-
-                            ActionButton {
-                                tokens: root.tokens
-                                text: overviewCollapsed ? "展开" : "收起"
-                                tone: "ghost"
-                                compact: true
-                                onClicked: overviewCollapsed = !overviewCollapsed
-                            }
                         }
 
                         Label {
                             Layout.fillWidth: true
-                            text: overviewSourceLabel() + ((overviewStatus.length > 0 && !overviewBusy)
-                                                           ? (" · " + overviewStatus)
-                                                           : "")
-                            wrapMode: Text.WordWrap
-                            color: root.tokens.text3
-                            font.family: root.tokens.textFontFamily
-                            font.pixelSize: 12
-                            visible: text.length > 0
-                        }
-
-                        Label {
-                            Layout.fillWidth: true
-                            text: overviewCollapsed ? collapsedSummary() : overviewSummary()
+                            text: overviewSummary()
                             wrapMode: Text.WordWrap
                             color: root.tokens.text2
                             font.family: root.tokens.textFontFamily
                             font.pixelSize: 14
                             lineHeight: 1.22
-                        }
-
-                        Flow {
-                            Layout.fillWidth: true
-                            visible: !overviewCollapsed && topModules.length > 0
-                            spacing: 8
-
-                            Repeater {
-                                model: topModules
-
-                                Rectangle {
-                                    radius: root.tokens.radiusLg
-                                    color: Qt.rgba(root.tokens.signalCobalt.r,
-                                                   root.tokens.signalCobalt.g,
-                                                   root.tokens.signalCobalt.b,
-                                                   0.12)
-                                    border.color: Qt.rgba(root.tokens.signalCobalt.r,
-                                                          root.tokens.signalCobalt.g,
-                                                          root.tokens.signalCobalt.b,
-                                                          0.22)
-                                    implicitWidth: moduleChipLabel.implicitWidth + 16
-                                    implicitHeight: 26
-
-                                    Label {
-                                        id: moduleChipLabel
-                                        anchors.centerIn: parent
-                                        text: modelData
-                                        color: root.tokens.signalCobalt
-                                        font.family: root.tokens.textFontFamily
-                                        font.pixelSize: 11
-                                        font.weight: Font.DemiBold
-                                    }
-                                }
-                            }
+                            visible: text.length > 0
                         }
 
                         Flow {
@@ -303,7 +223,7 @@ Item {
                             spacing: 8
 
                             Repeater {
-                                model: overviewCollapsed ? topModules.slice(0, 2) : []
+                                model: topModules
 
                                 Rectangle {
                                     radius: root.tokens.radiusLg
@@ -514,7 +434,7 @@ Item {
         width: 520
         height: 240
         radius: tokens.radius8
-        color: tokens.panelStrong
+        color: Qt.rgba(tokens.panelStrong.r, tokens.panelStrong.g, tokens.panelStrong.b, 1.0)
         border.color: tokens.border1
 
         ColumnLayout {
