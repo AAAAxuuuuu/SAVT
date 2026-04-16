@@ -3,6 +3,7 @@
 
 #include <QDir>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
@@ -10,6 +11,7 @@
 int main(int argc, char *argv[]) {
   QQuickStyle::setStyle(QStringLiteral("Basic"));
   QGuiApplication app(argc, argv);
+  app.setWindowIcon(QIcon(QStringLiteral(":/icons/app_icon.png")));
 
   savt::ui::AnalysisController analysisController;
   MarkdownRenderer markdownRenderer;

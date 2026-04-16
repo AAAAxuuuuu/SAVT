@@ -1,6 +1,17 @@
-qt_add_executable(savt_desktop
+set(savt_desktop_sources
     src/main.cpp
     src/MarkdownRenderer.cpp
+    assets/app_icon.qrc
+)
+
+if(WIN32)
+    list(APPEND savt_desktop_sources
+        assets/app_icon.rc
+    )
+endif()
+
+qt_add_executable(savt_desktop
+    ${savt_desktop_sources}
 )
 
 qt_add_qml_module(savt_desktop
