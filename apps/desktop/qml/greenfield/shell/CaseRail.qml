@@ -10,6 +10,10 @@ Rectangle {
     required property QtObject caseState
     required property QtObject focusState
 
+    readonly property var guide: root.analysisController.systemContextData || ({})
+    readonly property var algorithmSummary: guide.algorithmSummary || ({})
+    readonly property var algorithmMetrics: guide.algorithmMetrics || []
+
     radius: tokens.radiusXxl + 4
     color: tokens.sidebarBase
     border.color: tokens.border1
@@ -32,6 +36,10 @@ Rectangle {
         return root.caseState.route === route ? "#FFFFFF" : root.tokens.text3
     }
 
+    function metricAt(index) {
+        return index >= 0 && index < algorithmMetrics.length ? algorithmMetrics[index] : ({})
+    }
+
     function searchCapability(queryText) {
         var query = String(queryText || "").trim().toLowerCase()
         if (query.length === 0)
@@ -50,31 +58,118 @@ Rectangle {
         }
     }
 
+    function requestProjectAiReview() {
+        root.analysisController.requestProjectAiExplanation(
+                    "请基于当前 SAVT 架构重建结果，总结这次算法分析的关键发现。"
+                    + " 输出请明确写出：当前重建链路最稳定的能力域、证据最弱的边界、缓存或精度状态对结论的影响、以及下一步最值得补强的算法点。")
+        root.caseState.navigate("report")
+    }
+
     ColumnLayout {
         anchors.fill: parent
-        anchors.topMargin: 24
-        anchors.bottomMargin: 24
+        anchors.topMargin: 22
+        anchors.bottomMargin: 22
         anchors.leftMargin: 14
         anchors.rightMargin: 14
-        spacing: 6
+        spacing: 8
 
         Label {
             Layout.leftMargin: 8
-            Layout.topMargin: 2
-            Layout.bottomMargin: 12
-            text: "SAVT WORKSPACE"
+            text: "SAVT RECONSTRUCTION"
             color: root.tokens.text3
             font.family: root.tokens.textFontFamily
             font.pixelSize: 12
             font.weight: Font.DemiBold
         }
 
+        Rectangle {
+            Layout.fillWidth: true
+            radius: root.tokens.radiusXl
+            color: Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.1)
+            border.color: Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.18)
+            implicitHeight: heroColumn.implicitHeight + 26
+
+            ColumnLayout {
+                id: heroColumn
+                anchors.fill: parent
+                anchors.margins: 13
+                spacing: 8
+
+                Label {
+                    text: "Algorithm Core"
+                    color: root.tokens.signalCobalt
+                    font.family: root.tokens.textFontFamily
+                    font.pixelSize: 11
+                    font.weight: Font.DemiBold
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: root.caseState.projectName()
+                    color: root.tokens.text1
+                    font.family: root.tokens.displayFontFamily
+                    font.pixelSize: 20
+                    font.weight: Font.DemiBold
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: String(root.algorithmSummary.headline || "从源码事实到多粒度架构视图")
+                    color: root.tokens.text2
+                    wrapMode: Text.WordWrap
+                    font.family: root.tokens.textFontFamily
+                    font.pixelSize: 12
+                    lineHeight: 1.16
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: String(root.algorithmSummary.modeLine || root.caseState.trustLabel())
+                    color: root.tokens.text3
+                    wrapMode: Text.WordWrap
+                    font.family: root.tokens.textFontFamily
+                    font.pixelSize: 11
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    visible: text.length > 0
+                    text: String(root.algorithmSummary.cacheLine || "")
+                    color: root.tokens.text3
+                    wrapMode: Text.WordWrap
+                    font.family: root.tokens.textFontFamily
+                    font.pixelSize: 11
+                }
+
+                Rectangle {
+                    Layout.preferredHeight: 28
+                    Layout.preferredWidth: trustLabel.implicitWidth + 18
+                    radius: height / 2
+                    color: root.tokens.toneSoft(root.caseState.trustTone())
+                    border.color: root.tokens.toneColor(root.caseState.trustTone())
+
+                    Label {
+                        id: trustLabel
+                        anchors.centerIn: parent
+                        text: root.caseState.trustLabel()
+                        color: root.tokens.toneColor(root.caseState.trustTone())
+                        font.family: root.tokens.textFontFamily
+                        font.pixelSize: 11
+                        font.weight: Font.DemiBold
+                    }
+                }
+            }
+        }
+
         Repeater {
             model: [
-                {"route": "overview", "label": "架构全景图"},
-                {"route": "component", "label": "组件探测实验室"},
-                {"route": "report", "label": "深度诊断报告"},
-                {"route": "config", "label": "分析环境配置"}
+                {"route": "overview", "label": "重建全景"},
+                {"route": "component", "label": "边界钻取"},
+                {"route": "report", "label": "算法报告"},
+                {"route": "config", "label": "环境与精度"}
             ]
 
             Rectangle {
@@ -147,14 +242,12 @@ Rectangle {
             }
         }
 
-        Item { Layout.fillHeight: true }
-
         TextField {
             id: searchField
             Layout.fillWidth: true
             Layout.topMargin: 8
             Layout.preferredHeight: 38
-            placeholderText: "架构搜索..."
+            placeholderText: "搜索能力域 / 证据..."
             selectByMouse: true
             color: root.tokens.text1
             placeholderTextColor: root.tokens.text3
@@ -186,13 +279,16 @@ Rectangle {
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.topMargin: 6
             spacing: 8
 
             ActionButton {
                 Layout.fillWidth: true
                 tokens: root.tokens
-                text: root.analysisController.analyzing ? "停止" : "分析"
+                text: root.analysisController.analyzing ? "停止" : "重建"
+                hint: root.analysisController.analyzing
+                      ? "停止当前架构重建任务，保留已经生成的阶段结果。"
+                      : "以当前模式重新运行源码扫描、事实提取、能力聚合和视图重建。"
+                disabledHint: "先选择一个项目目录，才能开始重建。"
                 compact: true
                 tone: root.analysisController.analyzing ? "danger" : "primary"
                 enabled: root.caseState.hasProject
@@ -207,78 +303,142 @@ Rectangle {
             ActionButton {
                 Layout.fillWidth: true
                 tokens: root.tokens
-                text: "AI"
+                text: "高精度"
+                hint: "尝试接入 compile_commands.json 和语义后端，提升事实提取精度。"
+                disabledHint: root.analysisController.analyzing
+                              ? "当前正在重建，请等待结束后再切换高精度模式。"
+                              : "先选择项目，再启动高精度重建。"
                 compact: true
-                tone: "ai"
-                enabled: root.analysisController.aiAvailable
-                onClicked: {
-                    if (root.focusState.focusedNode)
-                        root.analysisController.requestAiExplanation(root.focusState.focusedNode,
-                                                                     "请解释当前架构节点，并给出下一步建议。")
-                    else
-                        root.analysisController.requestProjectAiExplanation("请用架构工作台视角总结当前项目。")
-                    root.caseState.navigate("report")
-                }
+                tone: "secondary"
+                enabled: root.caseState.hasProject && !root.analysisController.analyzing
+                onClicked: root.analysisController.analyzeCurrentProjectHighPrecision()
             }
         }
 
-        Rectangle {
+        ActionButton {
             Layout.fillWidth: true
-            Layout.topMargin: 10
-            Layout.preferredHeight: 1
-            color: root.tokens.border1
+            tokens: root.tokens
+            text: "AI 复盘"
+            hint: "让 AI 基于当前重建结果总结算法亮点、证据薄弱点和下一步补强方向。"
+            disabledHint: "AI 服务未配置或当前不可用。"
+            compact: true
+            tone: "ai"
+            enabled: root.analysisController.aiAvailable
+            onClicked: root.requestProjectAiReview()
         }
+
+        Item { Layout.fillHeight: true }
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.topMargin: 6
             radius: root.tokens.radiusLg
             color: root.tokens.panelStrong
             border.color: root.tokens.border1
-            implicitHeight: projectColumn.implicitHeight + 24
+            implicitHeight: snapshotColumn.implicitHeight + 24
 
             ColumnLayout {
-                id: projectColumn
+                id: snapshotColumn
                 anchors.fill: parent
                 anchors.margins: 12
-                spacing: 6
+                spacing: 8
 
                 Label {
-                    text: "当前项目"
+                    text: "算法快照"
                     color: root.tokens.text3
                     font.family: root.tokens.textFontFamily
                     font.pixelSize: 12
                     font.weight: Font.DemiBold
                 }
 
-                Label {
+                GridLayout {
                     Layout.fillWidth: true
-                    text: root.caseState.projectName()
-                    color: root.tokens.text2
-                    wrapMode: Text.WordWrap
-                    maximumLineCount: 2
-                    elide: Text.ElideRight
-                    font.family: root.tokens.textFontFamily
-                    font.pixelSize: 12
-                }
+                    columns: 2
+                    columnSpacing: 8
+                    rowSpacing: 8
 
-                Rectangle {
-                    Layout.preferredHeight: 28
-                    Layout.preferredWidth: trustLabel.implicitWidth + 18
-                    radius: height / 2
-                    color: root.tokens.toneSoft(root.caseState.trustTone())
-                    border.color: root.tokens.toneColor(root.caseState.trustTone())
+                    RailMetricCard {
+                        Layout.fillWidth: true
+                        tokens: root.tokens
+                        title: String(root.metricAt(0).label || "源码事实")
+                        value: String(root.metricAt(0).value || "--")
+                        tone: String(root.metricAt(0).tone || "info")
+                    }
 
-                    Label {
-                        id: trustLabel
-                        anchors.centerIn: parent
-                        text: root.caseState.trustLabel()
-                        color: root.tokens.toneColor(root.caseState.trustTone())
-                        font.family: root.tokens.textFontFamily
-                        font.pixelSize: 11
-                        font.weight: Font.DemiBold
+                    RailMetricCard {
+                        Layout.fillWidth: true
+                        tokens: root.tokens
+                        title: String(root.metricAt(2).label || "能力域")
+                        value: String(root.metricAt(2).value || "--")
+                        tone: String(root.metricAt(2).tone || "success")
+                    }
+
+                    RailMetricCard {
+                        Layout.fillWidth: true
+                        tokens: root.tokens
+                        title: String(root.metricAt(4).label || "证据包")
+                        value: String(root.metricAt(4).value || "--")
+                        tone: String(root.metricAt(4).tone || "ai")
+                    }
+
+                    RailMetricCard {
+                        Layout.fillWidth: true
+                        tokens: root.tokens
+                        title: String(root.metricAt(5).label || "增量更新")
+                        value: String(root.metricAt(5).value || "--")
+                        tone: String(root.metricAt(5).tone || "warning")
                     }
                 }
+
+                Label {
+                    Layout.fillWidth: true
+                    visible: text.length > 0
+                    text: String(root.algorithmSummary.evidenceLine || "")
+                    wrapMode: Text.WordWrap
+                    color: root.tokens.text2
+                    font.family: root.tokens.textFontFamily
+                    font.pixelSize: 11
+                    lineHeight: 1.16
+                }
+            }
+        }
+    }
+
+    component RailMetricCard: Rectangle {
+        required property QtObject tokens
+        property string title: ""
+        property string value: ""
+        property string tone: "info"
+
+        radius: tokens.radiusLg
+        color: tokens.toneSoft(tone)
+        border.color: Qt.rgba(tokens.toneColor(tone).r,
+                              tokens.toneColor(tone).g,
+                              tokens.toneColor(tone).b,
+                              0.24)
+        implicitHeight: contentColumn.implicitHeight + 16
+
+        ColumnLayout {
+            id: contentColumn
+            anchors.fill: parent
+            anchors.margins: 8
+            spacing: 2
+
+            Label {
+                Layout.fillWidth: true
+                text: title
+                color: tokens.text3
+                font.family: tokens.textFontFamily
+                font.pixelSize: 10
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: value
+                color: tokens.text1
+                font.family: tokens.textFontFamily
+                font.pixelSize: 12
+                font.weight: Font.DemiBold
+                wrapMode: Text.WordWrap
             }
         }
     }

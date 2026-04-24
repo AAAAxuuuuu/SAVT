@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <fstream>
 #include <iterator>
+#include <sstream>
 #include <unordered_set>
 
 namespace savt::analyzer::detail {
@@ -299,6 +301,158 @@ struct PrefixStats {
     std::unordered_set<std::string> thirdLevelDirs;
 };
 
+struct CMakeCompilationDatabaseAttempt {
+    std::filesystem::path buildDirectory;
+    std::string generatorName;
+};
+
+std::string configuredCMakeCommand() {
+#ifdef SAVT_CMAKE_COMMAND
+    const std::string configuredPath = SAVT_CMAKE_COMMAND;
+    std::error_code errorCode;
+    if (!configuredPath.empty() &&
+        std::filesystem::exists(std::filesystem::path(configuredPath), errorCode)) {
+        return configuredPath;
+    }
+#endif
+    return "cmake";
+}
+
+std::string configuredCMakeMakeProgram() {
+#ifdef SAVT_CMAKE_MAKE_PROGRAM
+    const std::string configuredPath = SAVT_CMAKE_MAKE_PROGRAM;
+    std::error_code errorCode;
+    if (!configuredPath.empty() &&
+        std::filesystem::exists(std::filesystem::path(configuredPath), errorCode)) {
+        return configuredPath;
+    }
+#endif
+    return {};
+}
+
+std::string environmentValue(const char* name) {
+    const char* value = std::getenv(name);
+    return value == nullptr ? std::string() : std::string(value);
+}
+
+std::string quoteShellArgument(const std::string& value) {
+#ifdef _WIN32
+    std::string escaped;
+    escaped.reserve(value.size());
+    for (const char ch : value) {
+        if (ch == '"') {
+            escaped += "\\\"";
+        } else {
+            escaped += ch;
+        }
+    }
+    return "\"" + escaped + "\"";
+#else
+    std::string escaped = "'";
+    for (const char ch : value) {
+        if (ch == '\'') {
+            escaped += "'\\''";
+        } else {
+            escaped += ch;
+        }
+    }
+    escaped += "'";
+    return escaped;
+#endif
+}
+
+std::string quoteShellPath(const std::filesystem::path& path) {
+    return quoteShellArgument(path.lexically_normal().string());
+}
+
+std::filesystem::path savtCompileDatabaseRoot(const std::filesystem::path& rootPath) {
+    return rootPath / ".savt";
+}
+
+std::vector<CMakeCompilationDatabaseAttempt> cmakeCompilationDatabaseAttempts(
+    const std::filesystem::path& rootPath) {
+    const std::filesystem::path savtRoot = savtCompileDatabaseRoot(rootPath);
+    if (!environmentValue("CMAKE_GENERATOR").empty()) {
+        return {{savtRoot / "compile-db", {}}};
+    }
+
+    return {
+        {savtRoot / "compile-db-ninja", "Ninja"},
+        {savtRoot / "compile-db", {}}
+    };
+}
+
+bool appendExistingCompilationDatabase(
+    CompilationDatabaseProbe& probe,
+    const std::filesystem::path& candidate) {
+    std::error_code errorCode;
+    const std::filesystem::path normalizedCandidate = candidate.lexically_normal();
+    if (std::filesystem::exists(normalizedCandidate, errorCode) &&
+        std::filesystem::is_regular_file(normalizedCandidate, errorCode)) {
+        probe.resolvedPath = normalizedCandidate;
+        return true;
+    }
+    return false;
+}
+
+bool configureCMakeCompilationDatabase(
+    const std::filesystem::path& rootPath,
+    const CMakeCompilationDatabaseAttempt& attempt,
+    std::vector<std::string>& diagnostics) {
+    std::error_code errorCode;
+    std::filesystem::create_directories(attempt.buildDirectory, errorCode);
+    if (errorCode) {
+        diagnostics.push_back(
+            "Automatic compile_commands.json generation failed: could not create build directory " +
+            normalizePath(attempt.buildDirectory) + ".");
+        return false;
+    }
+
+    const std::filesystem::path logPath = attempt.buildDirectory / "cmake-configure.log";
+    std::ostringstream command;
+#ifdef _WIN32
+    command << "call ";
+#endif
+    command << quoteShellArgument(configuredCMakeCommand())
+            << " -S " << quoteShellPath(rootPath)
+            << " -B " << quoteShellPath(attempt.buildDirectory);
+    if (!attempt.generatorName.empty()) {
+        command << " -G " << quoteShellArgument(attempt.generatorName);
+        const std::string makeProgram = configuredCMakeMakeProgram();
+        if (attempt.generatorName == "Ninja" && !makeProgram.empty()) {
+            command << " -DCMAKE_MAKE_PROGRAM=" << quoteShellArgument(makeProgram);
+        }
+    }
+    command << " -DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+            << " > " << quoteShellPath(logPath) << " 2>&1";
+
+    diagnostics.push_back(
+        "Automatic compile_commands.json generation: running CMake configure in " +
+        normalizePath(attempt.buildDirectory) +
+        (attempt.generatorName.empty() ? std::string(".") : " with generator " + attempt.generatorName + "."));
+
+    const int exitCode = std::system(command.str().c_str());
+    const std::filesystem::path generatedPath = attempt.buildDirectory / "compile_commands.json";
+    if (exitCode == 0 && std::filesystem::exists(generatedPath, errorCode) &&
+        std::filesystem::is_regular_file(generatedPath, errorCode)) {
+        diagnostics.push_back(
+            "Automatic compile_commands.json generation succeeded: " + normalizePath(generatedPath) + ".");
+        return true;
+    }
+
+    if (exitCode != 0) {
+        diagnostics.push_back(
+            "Automatic compile_commands.json generation failed: CMake configure exited with code " +
+            std::to_string(exitCode) + ". See " + normalizePath(logPath) + ".");
+    } else {
+        diagnostics.push_back(
+            "Automatic compile_commands.json generation did not produce compile_commands.json. "
+            "The selected CMake generator may not support CMAKE_EXPORT_COMPILE_COMMANDS. See " +
+            normalizePath(logPath) + ".");
+    }
+    return false;
+}
+
 }  // namespace
 
 bool hasSourceExtension(const std::filesystem::path& filePath) {
@@ -417,7 +571,7 @@ bool shouldSkipDirectory(const std::filesystem::path& directoryPath, const Analy
         return true;
     }
 
-    if (nameLower == ".qtc_clangd" || nameLower == ".cache" || nameLower == "cache") {
+    if (nameLower == ".qtc_clangd" || nameLower == ".savt" || nameLower == ".cache" || nameLower == "cache") {
         return true;
     }
 
@@ -785,6 +939,8 @@ CompilationDatabaseProbe probeCompilationDatabase(
     }
     appendCandidate(rootPath / "compile_commands.json");
     appendCandidate(rootPath / ".qtc_clangd" / "compile_commands.json");
+    appendCandidate(rootPath / ".savt" / "compile-db-ninja" / "compile_commands.json");
+    appendCandidate(rootPath / ".savt" / "compile-db" / "compile_commands.json");
     appendCandidate(rootPath / "build" / "compile_commands.json");
     appendCandidate(rootPath / "build" / ".qtc_clangd" / "compile_commands.json");
 
@@ -815,13 +971,61 @@ CompilationDatabaseProbe probeCompilationDatabase(
 
         probe.searchedPaths.push_back(normalizedCandidate);
 
-        if (std::filesystem::exists(normalizedCandidate, errorCode) && std::filesystem::is_regular_file(normalizedCandidate, errorCode)) {
+        if (appendExistingCompilationDatabase(probe, normalizedCandidate)) {
             probe.resolvedPath = normalizedCandidate;
             return probe;
         }
     }
 
     return probe;
+}
+
+CompilationDatabaseProbe prepareCompilationDatabase(
+    const std::filesystem::path& rootPath,
+    const AnalyzerOptions& options) {
+    CompilationDatabaseProbe probe = probeCompilationDatabase(rootPath, options);
+    if (probe.resolvedPath.has_value() ||
+        !options.autoGenerateCompilationDatabase ||
+        !options.compilationDatabasePath.empty() ||
+        isCancellationRequested(options)) {
+        return probe;
+    }
+
+    const std::filesystem::path cmakeListsPath = rootPath / "CMakeLists.txt";
+    std::error_code errorCode;
+    if (!std::filesystem::exists(cmakeListsPath, errorCode) ||
+        !std::filesystem::is_regular_file(cmakeListsPath, errorCode)) {
+        probe.diagnostics.push_back(
+            "Automatic compile_commands.json generation skipped: no CMakeLists.txt was found at the project root.");
+        return probe;
+    }
+
+    probe.generationAttempted = true;
+    for (const CMakeCompilationDatabaseAttempt& attempt : cmakeCompilationDatabaseAttempts(rootPath)) {
+        if (isCancellationRequested(options)) {
+            probe.diagnostics.push_back(
+                "Automatic compile_commands.json generation canceled before CMake configure completed.");
+            return probe;
+        }
+
+        probe.generationBuildDirectory = attempt.buildDirectory.lexically_normal();
+        if (!configureCMakeCompilationDatabase(rootPath, attempt, probe.diagnostics)) {
+            continue;
+        }
+
+        const std::filesystem::path generatedPath = attempt.buildDirectory / "compile_commands.json";
+        if (appendExistingCompilationDatabase(probe, generatedPath)) {
+            probe.generated = true;
+            return probe;
+        }
+    }
+
+    CompilationDatabaseProbe refreshedProbe = probeCompilationDatabase(rootPath, options);
+    refreshedProbe.diagnostics = std::move(probe.diagnostics);
+    refreshedProbe.generationAttempted = probe.generationAttempted;
+    refreshedProbe.generated = probe.generated;
+    refreshedProbe.generationBuildDirectory = std::move(probe.generationBuildDirectory);
+    return refreshedProbe;
 }
 
 std::optional<std::filesystem::path> locateCompilationDatabase(

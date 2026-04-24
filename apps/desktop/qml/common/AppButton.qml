@@ -8,9 +8,16 @@ Button {
 
     property string tone: "neutral"
     property bool compact: false
+    property string hint: ""
+    property string disabledHint: ""
+    readonly property string effectiveHint: !enabled && disabledHint.length > 0 ? disabledHint : hint
 
     hoverEnabled: true
     focusPolicy: Qt.StrongFocus
+    transformOrigin: Item.Center
+    scale: !enabled ? 1.0 : (down ? 0.975 : (hovered ? 1.015 : 1.0))
+    opacity: enabled ? 1.0 : 0.68
+    z: hovered || down || activeFocus ? 4 : 0
     implicitHeight: compact ? 34 : 42
     leftPadding: compact ? 14 : 18
     rightPadding: compact ? 14 : 18
@@ -19,6 +26,24 @@ Button {
     font.family: theme.textFontFamily
     font.pixelSize: compact ? 13 : 14
     font.weight: Font.DemiBold
+    Accessible.name: text
+    Accessible.description: effectiveHint
+    ToolTip.visible: effectiveHint.length > 0 && hovered
+    ToolTip.text: effectiveHint
+    ToolTip.delay: 620
+    ToolTip.timeout: 5200
+
+    Behavior on scale {
+        NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+    }
+
+    Behavior on opacity {
+        NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+    }
+
+    HoverHandler {
+        cursorShape: control.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+    }
 
     background: Rectangle {
         radius: control.compact ? theme.radiusMd : theme.radiusLg
@@ -26,6 +51,18 @@ Button {
         border.color: control.borderColor()
         border.width: control.activeFocus ? 2 : 1
         opacity: control.enabled ? 1.0 : 0.92
+
+        Behavior on color {
+            ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
+        }
+
+        Behavior on border.color {
+            ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
+        }
+
+        Behavior on opacity {
+            NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+        }
     }
 
     contentItem: Label {

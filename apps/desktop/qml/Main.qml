@@ -85,8 +85,10 @@ ApplicationWindow {
         property string aiScope: ""
 
         function analyzeCurrentProject() {}
+        function analyzeCurrentProjectHighPrecision() {}
         function stopAnalysis() {}
         function analyzeProject(projectRootPath) {}
+        function analyzeProjectHighPrecision(projectRootPath) {}
         function analyzeProjectUrl(projectRootUrl) {}
         function ensureComponentSceneForCapability(capabilityId) {}
         function refreshAiAvailability() {}

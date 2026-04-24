@@ -9,6 +9,9 @@ Button {
     property bool compact: false
     property bool square: false
     property int fixedWidth: 0
+    property string hint: ""
+    property string disabledHint: ""
+    readonly property string effectiveHint: !enabled && disabledHint.length > 0 ? disabledHint : hint
 
     readonly property color fillColor: {
         if (tone === "primary")
@@ -50,6 +53,11 @@ Button {
     }
 
     hoverEnabled: true
+    focusPolicy: Qt.StrongFocus
+    transformOrigin: Item.Center
+    scale: !enabled ? 1.0 : (down ? 0.975 : (hovered ? 1.018 : 1.0))
+    opacity: enabled ? 1.0 : 0.62
+    z: hovered || down || activeFocus ? 4 : 0
     padding: compact ? 10 : 14
     leftPadding: compact ? 12 : 16
     rightPadding: compact ? 12 : 16
@@ -60,6 +68,24 @@ Button {
                    ? fixedWidth
                    : (square ? implicitHeight : Math.max(compact ? 72 : 88,
                                                          contentItem.implicitWidth + leftPadding + rightPadding))
+    Accessible.name: text
+    Accessible.description: effectiveHint
+    ToolTip.visible: effectiveHint.length > 0 && hovered
+    ToolTip.text: effectiveHint
+    ToolTip.delay: 620
+    ToolTip.timeout: 5200
+
+    Behavior on scale {
+        NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+    }
+
+    Behavior on opacity {
+        NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+    }
+
+    HoverHandler {
+        cursorShape: control.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+    }
 
     contentItem: Text {
         text: control.text
@@ -80,6 +106,10 @@ Button {
                       ? control.strokeColor
                       : Qt.rgba(control.strokeColor.r, control.strokeColor.g, control.strokeColor.b, 0.4)
 
+        Behavior on border.color {
+            ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
+        }
+
         gradient: Gradient {
             GradientStop {
                 position: 0.0
@@ -95,6 +125,10 @@ Button {
                     if (control.hovered)
                         return Qt.lighter(control.fillColor, 1.04)
                     return control.fillColor
+                }
+
+                Behavior on color {
+                    ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
                 }
             }
 
@@ -113,6 +147,10 @@ Button {
                         return Qt.lighter(control.fillColor2, 1.04)
                     return control.fillColor2
                 }
+
+                Behavior on color {
+                    ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
+                }
             }
         }
 
@@ -123,6 +161,19 @@ Button {
             border.color: control.tone === "ghost" ? "transparent" : control.tokens.shineBorder
             border.width: control.enabled ? 1 : 0
             opacity: control.tone === "secondary" ? 0.72 : 0.46
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            color: "transparent"
+            border.color: control.tokens.signalCobalt
+            border.width: control.activeFocus ? 2 : 0
+            opacity: control.activeFocus ? 0.92 : 0.0
+
+            Behavior on opacity {
+                NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+            }
         }
     }
 }

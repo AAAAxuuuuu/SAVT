@@ -3,6 +3,7 @@
 #include "savt/core/ArchitectureAggregation.h"
 #include "savt/core/ComponentGraph.h"
 #include "savt/core/ProjectAnalysisConfig.h"
+#include "savt/reconstruction/ArchitectureReconstruction.h"
 
 #include <QDebug>
 #include <QElapsedTimer>
@@ -105,6 +106,7 @@ std::string buildAnalyzerOptionsSignature(const savt::analyzer::AnalyzerOptions&
     std::ostringstream output;
     output << "third_party=" << (options.includeThirdParty ? 1 : 0)
            << ";build_dirs=" << (options.includeBuildDirectories ? 1 : 0)
+           << ";auto_compdb=" << (options.autoGenerateCompilationDatabase ? 1 : 0)
            << ";max_files=" << options.maxFiles
            << ";precision=" << static_cast<int>(options.precision)
            << ";tooling=" << SAVT_CLANG_TOOLING_STATUS_CODE;
@@ -129,10 +131,21 @@ std::optional<std::filesystem::path> locateCompilationDatabase(
     const std::array<std::filesystem::path, 4> candidates = {
         rootPath / "compile_commands.json",
         rootPath / ".qtc_clangd" / "compile_commands.json",
+        rootPath / ".savt" / "compile-db-ninja" / "compile_commands.json",
+        rootPath / ".savt" / "compile-db" / "compile_commands.json"
+    };
+    for (const std::filesystem::path& candidate : candidates) {
+        std::error_code errorCode;
+        if (std::filesystem::exists(candidate, errorCode)) {
+            return candidate.lexically_normal();
+        }
+    }
+
+    const std::array<std::filesystem::path, 2> buildCandidates = {
         rootPath / "build" / "compile_commands.json",
         rootPath / "build" / ".qtc_clangd" / "compile_commands.json"
     };
-    for (const std::filesystem::path& candidate : candidates) {
+    for (const std::filesystem::path& candidate : buildCandidates) {
         std::error_code errorCode;
         if (std::filesystem::exists(candidate, errorCode)) {
             return candidate.lexically_normal();
@@ -399,25 +412,37 @@ AnalysisArtifacts IncrementalAnalysisPipeline::analyze(
     }
 
     if (!result.layoutLayer.hit) {
-        savt::layout::LayeredGraphLayout layoutEngine;
-        result.capabilitySceneLayout = layoutEngine.layoutCapabilityScene(result.capabilityGraph);
-        result.moduleLayout = layoutEngine.layoutModules(result.report);
+        savt::core::ArchitectureAggregation aggregation;
+        aggregation.overview = result.overview;
+        aggregation.capabilityGraph = result.capabilityGraph;
+        aggregation.ruleReport = result.ruleReport;
+
+        savt::reconstruction::ArchitectureReconstructionOptions reconstructionOptions;
+        reconstructionOptions.cancellationRequested = [&options]() {
+            return isCancellationRequested(options);
+        };
+        const auto reconstruction = savt::reconstruction::buildArchitectureReconstruction(
+            result.report,
+            aggregation,
+            reconstructionOptions);
+        if (reconstruction.canceled) {
+            result.canceled = true;
+            result.canceledPhase = "重建架构视图";
+            return result;
+        }
+
+        result.capabilitySceneLayout = reconstruction.capabilitySceneLayout;
+        result.moduleLayout = reconstruction.moduleLayout;
         publishProgress(progress, 94, "生成 L3 组件视图...");
-        for (const savt::core::CapabilityNode& capabilityNode : result.capabilityGraph.nodes) {
+        for (const auto& [capabilityId, drilldown] : reconstruction.capabilityDrilldowns) {
             if (isCancellationRequested(options)) {
                 result.canceled = true;
                 result.canceledPhase = "生成 L3 组件视图";
                 return result;
             }
 
-            auto componentGraph = savt::core::buildComponentGraphForCapability(
-                result.report,
-                result.overview,
-                result.capabilityGraph,
-                capabilityNode.id);
-            auto componentLayout = layoutEngine.layoutComponentScene(componentGraph);
-            result.componentGraphs.emplace(capabilityNode.id, std::move(componentGraph));
-            result.componentLayouts.emplace(capabilityNode.id, std::move(componentLayout));
+            result.componentGraphs.emplace(capabilityId, drilldown.graph);
+            result.componentLayouts.emplace(capabilityId, drilldown.layout);
         }
         std::lock_guard<std::mutex> lock(cacheMutex());
         layoutCache()[result.layoutLayer.key] = CachedLayoutEntry{

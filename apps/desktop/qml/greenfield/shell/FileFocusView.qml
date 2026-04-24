@@ -301,6 +301,7 @@ Item {
                         ActionButton {
                             tokens: root.tokens
                             text: "返回组件图"
+                            hint: "退出文件详情，回到组件关系图继续查看上下游。"
                             tone: "secondary"
                             compact: true
                             Layout.alignment: Qt.AlignTop
@@ -396,6 +397,10 @@ Item {
                         ActionButton {
                             tokens: root.tokens
                             text: root.analysisController.aiBusy ? "生成中..." : "生成解读"
+                            hint: "让 AI 基于当前文件的结构事实生成职责解读和阅读建议。"
+                            disabledHint: root.analysisController.aiBusy
+                                          ? "AI 正在生成解读，请稍等。"
+                                          : "需要 AI 可用且当前文件详情已加载。"
                             tone: "ai"
                             compact: true
                             enabled: root.analysisController.aiAvailable

@@ -129,51 +129,49 @@ Item {
         id: overviewView
 
         Item {
+            id: overviewScroll
+
             readonly property var guide: root.analysisController.systemContextData || ({})
             readonly property var topModules: guide.topModules || []
+            readonly property var algorithmSummary: guide.algorithmSummary || ({})
             readonly property bool overviewBusy: !!guide.projectOverviewBusy
 
             function cleanText(value) {
-                return String(value || "")
-                        .replace(/\s+/g, " ")
-                        .trim()
+                return String(value || "").replace(/\s+/g, " ").trim()
             }
 
             function overviewSummary() {
-                return cleanText(guide.projectOverview || "")
+                return cleanText(algorithmSummary.summary || guide.projectOverview || "")
             }
 
             ColumnLayout {
                 anchors.fill: parent
-                spacing: 18
+                spacing: 8
 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: visible ? implicitHeight : 0
-                    visible: root.caseState.hasProject
                     radius: root.tokens.radius8
                     color: root.tokens.panelStrong
                     border.color: root.tokens.border1
-                    implicitHeight: overviewCardColumn.implicitHeight + 28
+                    implicitHeight: heroColumn.implicitHeight + 24
 
                     ColumnLayout {
-                        id: overviewCardColumn
+                        id: heroColumn
                         anchors.fill: parent
-                        anchors.margins: 16
+                        anchors.margins: 14
                         spacing: 10
 
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: 12
+                            spacing: 14
 
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 spacing: 4
 
                                 Label {
-                                    Layout.fillWidth: true
-                                    text: "项目总览"
-                                    color: root.tokens.text3
+                                    text: "Architecture Reconstruction"
+                                    color: root.tokens.signalCobalt
                                     font.family: root.tokens.textFontFamily
                                     font.pixelSize: 12
                                     font.weight: Font.DemiBold
@@ -184,102 +182,183 @@ Item {
                                     text: cleanText(guide.projectName || root.caseState.projectName())
                                     color: root.tokens.text1
                                     font.family: root.tokens.displayFontFamily
-                                    font.pixelSize: 22
+                                    font.pixelSize: 26
                                     font.weight: Font.DemiBold
+                                    wrapMode: Text.WordWrap
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: cleanText(algorithmSummary.headline || "从源码事实到多粒度架构视图")
+                                    color: root.tokens.text1
+                                    wrapMode: Text.WordWrap
+                                    font.family: root.tokens.displayFontFamily
+                                    font.pixelSize: 18
+                                    font.weight: Font.DemiBold
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: overviewSummary()
+                                    visible: text.length > 0
+                                    wrapMode: Text.WordWrap
+                                    maximumLineCount: 1
                                     elide: Text.ElideRight
+                                    color: root.tokens.text2
+                                    font.family: root.tokens.textFontFamily
+                                    font.pixelSize: 12
+                                    lineHeight: 1.16
                                 }
                             }
 
-                            ActionButton {
-                                tokens: root.tokens
-                                text: overviewBusy ? "AI 整理中..." : "刷新 AI"
-                                tone: "ai"
-                                compact: true
-                                enabled: root.analysisController.aiAvailable && !overviewBusy
-                                onClicked: root.analysisController.requestProjectOverviewRefresh()
-                            }
+                            ColumnLayout {
+                                Layout.preferredWidth: 196
+                                spacing: 6
 
-                            ActionButton {
-                                tokens: root.tokens
-                                text: "复制总览"
-                                tone: "ghost"
-                                compact: true
-                                enabled: overviewSummary().length > 0
-                                onClicked: root.analysisController.copyTextToClipboard(overviewSummary())
+                                ActionButton {
+                                    Layout.fillWidth: true
+                                    tokens: root.tokens
+                                    text: root.analysisController.analyzing ? "停止重建" : "重新重建"
+                                    compact: true
+                                    tone: root.analysisController.analyzing ? "danger" : "primary"
+                                    enabled: root.caseState.hasProject
+                                    onClicked: {
+                                        if (root.analysisController.analyzing)
+                                            root.analysisController.stopAnalysis()
+                                        else
+                                            root.analysisController.analyzeCurrentProject()
+                                    }
+                                }
+
+                                ActionButton {
+                                    Layout.fillWidth: true
+                                    tokens: root.tokens
+                                    text: "高精度重建"
+                                    compact: true
+                                    tone: "secondary"
+                                    enabled: root.caseState.hasProject && !root.analysisController.analyzing
+                                    onClicked: root.analysisController.analyzeCurrentProjectHighPrecision()
+                                }
+
+                                ActionButton {
+                                    Layout.fillWidth: true
+                                    tokens: root.tokens
+                                    text: overviewBusy ? "刷新摘要中..." : "刷新算法摘要"
+                                    tone: "ai"
+                                    compact: true
+                                    enabled: root.analysisController.aiAvailable && !overviewBusy
+                                    onClicked: root.analysisController.requestProjectOverviewRefresh()
+                                }
                             }
                         }
 
-                        Label {
+                        Flow {
                             Layout.fillWidth: true
-                            text: overviewSummary()
-                            wrapMode: Text.WordWrap
-                            color: root.tokens.text2
-                            font.family: root.tokens.textFontFamily
-                            font.pixelSize: 14
-                            lineHeight: 1.22
-                            visible: text.length > 0
+                            spacing: 6
+
+                            PillChip {
+                                tokens: root.tokens
+                                text: root.analysisController.analyzing
+                                      ? ((root.analysisController.analysisPhase || "重建中")
+                                         + " · " + Math.round(root.analysisController.analysisProgress) + "%")
+                                      : String(algorithmSummary.modeLine || root.caseState.trustLabel())
+                                tone: root.caseState.trustTone()
+                            }
+
+                            PillChip {
+                                tokens: root.tokens
+                                text: String(algorithmSummary.cacheLine || "")
+                                tone: "moss"
+                            }
+
+                            PillChip {
+                                tokens: root.tokens
+                                text: String(algorithmSummary.evidenceLine || "")
+                                tone: "ai"
+                            }
                         }
 
                         Flow {
                             Layout.fillWidth: true
                             visible: topModules.length > 0
-                            spacing: 8
+                            spacing: 6
 
                             Repeater {
                                 model: topModules
 
-                                Rectangle {
-                                    radius: root.tokens.radiusLg
-                                    color: Qt.rgba(root.tokens.signalCobalt.r,
-                                                   root.tokens.signalCobalt.g,
-                                                   root.tokens.signalCobalt.b,
-                                                   0.12)
-                                    border.color: Qt.rgba(root.tokens.signalCobalt.r,
-                                                          root.tokens.signalCobalt.g,
-                                                          root.tokens.signalCobalt.b,
-                                                          0.22)
-                                    implicitWidth: moduleChipLabel.implicitWidth + 16
-                                    implicitHeight: 26
+                                PillChip {
+                                    required property var modelData
 
-                                    Label {
-                                        id: moduleChipLabel
-                                        anchors.centerIn: parent
-                                        text: modelData
-                                        color: root.tokens.signalCobalt
-                                        font.family: root.tokens.textFontFamily
-                                        font.pixelSize: 11
-                                        font.weight: Font.DemiBold
-                                    }
+                                    tokens: root.tokens
+                                    text: String(modelData || "")
+                                    tone: "info"
                                 }
                             }
                         }
                     }
                 }
 
-                Item {
+                Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Layout.minimumHeight: 440
+                    radius: root.tokens.radius8
+                    color: Qt.rgba(root.tokens.panelStrong.r, root.tokens.panelStrong.g, root.tokens.panelStrong.b, 0.7)
+                    border.color: root.tokens.border1
+                    clip: true
 
-                    ArchitectureCanvas {
+                    ColumnLayout {
+                        id: canvasColumn
                         anchors.fill: parent
-                        tokens: root.tokens
-                        scene: root.analysisController.capabilityScene || ({})
-                        selectedNode: root.focusState.focusedNode
-                        emptyText: root.analysisController.analyzing
-                                   ? "分析进行中，能力地图即将生成..."
-                                   : "选择项目并运行分析后，这里会显示架构全景图。"
-                        onNodeSelected: root.focusState.setCapability(node)
-                        onNodeDrilled: root.openComponentLab(node)
-                        onBlankClicked: root.focusState.clear()
-                    }
+                        anchors.margins: 10
+                        spacing: 8
 
-                    StartOverlay {
-                        anchors.centerIn: parent
-                        visible: !root.caseState.hasProject || (!root.caseState.hasAtlas && !root.analysisController.analyzing)
-                        tokens: root.tokens
-                        analysisController: root.analysisController
-                        caseState: root.caseState
-                        onChooseProjectRequested: root.chooseProjectRequested()
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            Layout.minimumHeight: 392
+                            radius: root.tokens.radius8
+                            color: Qt.rgba(root.tokens.base0.r, root.tokens.base0.g, root.tokens.base0.b, 0.82)
+                            border.color: root.tokens.border1
+                            clip: true
+
+                            ArchitectureCanvas {
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                tokens: root.tokens
+                                scene: root.analysisController.capabilityScene || ({})
+                                selectedNode: root.focusState.focusedNode
+                                emptyText: root.analysisController.analyzing
+                                           ? "正在重建能力全景，画布会随着布局结果逐步刷新..."
+                                           : "选择项目并运行重建后，这里会显示 L2 能力域全景图。"
+                                onNodeSelected: root.focusState.setCapability(node)
+                                onNodeDrilled: root.openComponentLab(node)
+                                onBlankClicked: root.focusState.clear()
+                            }
+
+                            ActionButton {
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.topMargin: 10
+                                anchors.rightMargin: 10
+                                z: 8
+                                tokens: root.tokens
+                                text: "复制摘要"
+                                tone: "ghost"
+                                compact: true
+                                enabled: overviewScroll.overviewSummary().length > 0
+                                onClicked: root.analysisController.copyTextToClipboard(overviewScroll.overviewSummary())
+                            }
+
+                            StartOverlay {
+                                anchors.centerIn: parent
+                                visible: !root.caseState.hasProject || (!root.caseState.hasAtlas && !root.analysisController.analyzing)
+                                tokens: root.tokens
+                                analysisController: root.analysisController
+                                caseState: root.caseState
+                                onChooseProjectRequested: root.chooseProjectRequested()
+                            }
+                        }
                     }
                 }
             }
@@ -322,17 +401,17 @@ Item {
                         Label {
                             Layout.fillWidth: true
                             text: root.componentFileDetailActive
-                                  ? ("文件解读：" + (root.componentFileDetail.fileName
+                                  ? ("文件证据钻取 · " + (root.componentFileDetail.fileName
                                                      || (root.focusState.focusedNode
                                                          ? root.focusState.focusedNode.name
                                                          : "未命名文件")))
                                   : root.componentNodeDetailActive
-                                    ? ("组件解读：" + (root.focusState.focusedNode
+                                    ? ("节点证据钻取 · " + (root.focusState.focusedNode
                                                      ? root.focusState.focusedNode.name
-                                                     : "未命名组件"))
+                                                     : "未命名节点"))
                                   : (root.focusState.focusedCapability
-                                     ? ("组件探测：" + root.focusState.focusedCapability.name)
-                                     : "组件探测实验室")
+                                     ? ("边界钻取 · " + root.focusState.focusedCapability.name)
+                                     : "边界钻取工作台")
                             color: root.tokens.text1
                             elide: Text.ElideRight
                             font.family: root.tokens.displayFontFamily
@@ -353,8 +432,8 @@ Item {
                                       root.componentFileDetailActive
                                       ? "当前已切换到文件解读模式，会结合路径、声明、依赖和片段来理解这个文件。"
                                       : root.componentNodeDetailActive
-                                        ? "当前已切换到组件解读模式，会围绕组件职责、关系和证据进行阅读。"
-                                      : "双击全景图节点后，SAVT 会接入 componentSceneCatalog 展开组件关系。")
+                                        ? "当前已切换到节点证据钻取模式，会围绕职责、关系和证据包解释这个节点为什么被划入当前能力域。"
+                                      : "双击全景图中的能力域后，SAVT 会展开 L3 组件图，帮助继续验证边界与责任分配。")
                             color: root.tokens.text3
                             wrapMode: Text.WordWrap
                             maximumLineCount: 2
@@ -367,7 +446,7 @@ Item {
 
                     ActionButton {
                         tokens: root.tokens
-                        text: root.componentNodeDetailActive ? "返回组件图" : "返回全景"
+                        text: root.componentNodeDetailActive ? "返回钻取图" : "返回全景"
                         tone: "secondary"
                         Layout.alignment: Qt.AlignVCenter
                         onClicked: {
@@ -393,8 +472,8 @@ Item {
             selectedNode: root.focusState.focusedNode
             componentMode: true
             emptyText: root.focusState.focusedCapability
-                       ? "正在准备该能力域的组件图，或当前能力域暂无可下钻组件。"
-                       : "请在架构全景图中双击一个能力域以下钻。"
+                       ? "正在准备该能力域的组件图，或当前能力域暂时没有可继续钻取的组件。"
+                       : "请在重建全景图中双击一个能力域进入边界钻取。"
             onNodeSelected: root.focusState.setNode(node)
             onNodeDrilled: root.focusState.setNode(node)
             onBlankClicked: root.focusState.clearNodeFocus()
@@ -462,6 +541,32 @@ Item {
         }
     }
 
+    component PillChip: Rectangle {
+        required property QtObject tokens
+        property string text: ""
+        property string tone: "info"
+
+        visible: text.length > 0
+        radius: height / 2
+        implicitHeight: 30
+        implicitWidth: chipLabel.implicitWidth + 18
+        color: tokens.toneSoft(tone)
+        border.color: Qt.rgba(tokens.toneColor(tone).r,
+                              tokens.toneColor(tone).g,
+                              tokens.toneColor(tone).b,
+                              0.24)
+
+        Label {
+            id: chipLabel
+            anchors.centerIn: parent
+            text: parent.text
+            color: tokens.toneColor(tone)
+            font.family: tokens.textFontFamily
+            font.pixelSize: 11
+            font.weight: Font.DemiBold
+        }
+    }
+
     component StartOverlay: Rectangle {
         id: startOverlay
         required property QtObject tokens
@@ -482,7 +587,7 @@ Item {
             spacing: 14
 
             Label {
-                text: "开始架构分析"
+                text: "开始架构重建"
                 color: tokens.text1
                 font.family: tokens.displayFontFamily
                 font.pixelSize: 26
@@ -492,8 +597,8 @@ Item {
             Label {
                 Layout.fillWidth: true
                 text: caseState.hasProject
-                      ? "项目已选择，但还没有分析结果。点击开始分析后会生成架构全景图、组件探测数据、报告和 AST 预览。"
-                      : "选择一个项目文件夹，SAVT 会把源码事实转成架构图、证据链和可行动的诊断报告。"
+                      ? "项目已选择，但还没有重建结果。点击开始后，SAVT 会依次执行源码扫描、事实提取、能力聚合、证据校准和多层视图输出。"
+                      : "选择一个 C/C++ 项目目录，SAVT 会把源码事实转成 L1/L2/L3 架构视图、证据链和可继续钻取的边界结果。"
                 wrapMode: Text.WordWrap
                 color: tokens.text3
                 font.family: tokens.textFontFamily
@@ -510,10 +615,18 @@ Item {
 
                 ActionButton {
                     tokens: startOverlay.tokens
-                    text: analysisController.analyzing ? "分析中..." : "开始分析"
+                    text: analysisController.analyzing ? "重建中..." : "开始重建"
                     tone: "primary"
                     enabled: caseState.hasProject && !analysisController.analyzing
                     onClicked: analysisController.analyzeCurrentProject()
+                }
+
+                ActionButton {
+                    tokens: startOverlay.tokens
+                    text: "高精度重建"
+                    tone: "secondary"
+                    enabled: caseState.hasProject && !analysisController.analyzing
+                    onClicked: analysisController.analyzeCurrentProjectHighPrecision()
                 }
             }
         }

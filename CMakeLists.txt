@@ -229,6 +229,7 @@ add_subdirectory(src/parser)
 add_subdirectory(src/analyzer)
 add_subdirectory(src/ai)
 add_subdirectory(src/layout)
+add_subdirectory(src/reconstruction)
 
 add_subdirectory(src/ui)
 

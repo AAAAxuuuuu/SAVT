@@ -11,6 +11,7 @@ target_link_libraries(savt_backend_tests
     PRIVATE
         savt_analyzer
         savt_layout
+        savt_reconstruction
         savt_ui
 )
 

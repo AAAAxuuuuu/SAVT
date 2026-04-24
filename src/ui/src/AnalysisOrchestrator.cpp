@@ -94,6 +94,7 @@ QString AnalysisOrchestrator::defaultProjectRootPath() {
 void AnalysisOrchestrator::run(
     QPromise<void>& promise,
     const QString& cleanedPath,
+    const analyzer::AnalyzerPrecision precision,
     const std::shared_ptr<PendingAnalysisResult>& output) {
     PendingAnalysisResult result;
     clearPendingPresentation(result);
@@ -109,9 +110,7 @@ void AnalysisOrchestrator::run(
         }
 
         analyzer::AnalyzerOptions options;
-        // Keep the first pass fast so users can get the project map before
-        // deciding whether a slower semantic run is worth it.
-        options.precision = analyzer::AnalyzerPrecision::SyntaxOnly;
+        options.precision = precision;
         options.cancellationRequested = [&promise]() { return promise.isCanceled(); };
 
         const auto artifacts = IncrementalAnalysisPipeline::analyze(

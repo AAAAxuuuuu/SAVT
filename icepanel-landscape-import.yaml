@@ -1,0 +1,235 @@
+# yaml-language-server: $schema=https://api.icepanel.io/v1/schemas/LandscapeImportData
+{
+  "namespace": "savt-platform",
+  "modelObjects": [
+    {
+      "id": "domain-savt",
+      "name": "Software Architecture Visualization",
+      "type": "domain",
+      "caption": "SAVT 的平台级 C4 入口。",
+      "description": "根据仓库中的 CMake、QML、模块目录、配置与打包脚本整理出的领域边界，用于承载 SAVT 的系统、参与者和外部依赖。"
+    },
+    {
+      "id": "actor-developer-architect",
+      "name": "Developer / Architect",
+      "type": "actor",
+      "parentId": "domain-savt",
+      "external": true,
+      "caption": "通过桌面工作台加载代码仓库、查看 L1-L4 视图并按需触发 AI 解释。",
+      "description": "该参与者由桌面交互壳层、项目路径输入和文档中面向架构师、研发和评审人员的使用场景共同支撑。"
+    },
+    {
+      "id": "system-savt",
+      "name": "SAVT",
+      "type": "system",
+      "parentId": "domain-savt",
+      "caption": "基于 Qt 6、QML 与现代 C++ 的软件架构分析与可视化平台。",
+      "description": "系统通过项目扫描、语法/可选语义分析、图模型聚合、布局计算、桌面呈现与受约束 AI 解释来帮助用户理解大型代码仓库。"
+    },
+    {
+      "id": "system-ai-endpoint",
+      "name": "AI Chat Completions Endpoint",
+      "type": "system",
+      "parentId": "domain-savt",
+      "external": true,
+      "caption": "外部 AI HTTP 端点，可为官方 DeepSeek API 或兼容 OpenAI Chat Completions 风格的代理。",
+      "description": "该外部系统来自 config/deepseek-ai*.json 与 AI 说明文档；SAVT 仅在启用配置后通过网络 API 调用，不内置本地模型运行时。"
+    },
+    {
+      "id": "app-savt-desktop",
+      "name": "SAVT Desktop Workbench",
+      "type": "app",
+      "parentId": "system-savt",
+      "caption": "桌面可执行程序 savt_desktop，负责工作台入口、QML 视图加载和模块编排。",
+      "description": "应用由 apps/desktop 目标构建，使用 QQmlApplicationEngine 装载 QML 模块；通过 CMake presets 在 Windows/macOS 构建，并在 Windows 上通过 windeployqt 与 Inno Setup 打包。",
+      "technologyIds": [
+        "XRwunQSC82WQFVWFdkUL",
+        "k41luVJyd74BmJXegLcy",
+        "kBVOm4vsmB463Ftr7u4D"
+      ],
+      "icon": {
+        "technologyId": "XRwunQSC82WQFVWFdkUL"
+      }
+    },
+    {
+      "id": "store-project-workspace",
+      "name": "Analyzed Project Workspace",
+      "type": "store",
+      "parentId": "system-savt",
+      "external": true,
+      "caption": "被分析的本地项目目录，包含源码、工程清单、编译数据库与结构相关资源。",
+      "description": "SAVT 从用户选择的项目根路径递归扫描项目文件，并在可用时读取 compile_commands.json、QML、JS/TS、Python、Java 与工程清单文件。"
+    },
+    {
+      "id": "component-desktop-shell",
+      "name": "Desktop Shell",
+      "type": "component",
+      "parentId": "app-savt-desktop",
+      "caption": "Qt Quick/QML 前端壳层，负责主窗口、工作台、检查面板与交互入口。",
+      "description": "来自 apps/desktop/src/main.cpp 与 QML 模块；它把 AnalysisController 和 MarkdownRenderer 暴露给 QML，并加载主界面。",
+      "technologyIds": [
+        "XRwunQSC82WQFVWFdkUL"
+      ],
+      "icon": {
+        "technologyId": "XRwunQSC82WQFVWFdkUL"
+      }
+    },
+    {
+      "id": "component-ui-orchestration",
+      "name": "UI / Orchestration Layer",
+      "type": "component",
+      "parentId": "app-savt-desktop",
+      "caption": "控制器与服务编排层，负责分析触发、场景映射、报告、AST 预览、阅读辅助和 AI 触发。",
+      "description": "对应 src/ui 中的 AnalysisController、AnalysisOrchestrator、SceneMapper、ReportService、AstPreviewService、AiService 等服务。",
+      "technologyIds": [
+        "XRwunQSC82WQFVWFdkUL"
+      ],
+      "icon": {
+        "technologyId": "XRwunQSC82WQFVWFdkUL"
+      }
+    },
+    {
+      "id": "component-analyzer-pipeline",
+      "name": "Analyzer Pipeline",
+      "type": "component",
+      "parentId": "app-savt-desktop",
+      "caption": "项目扫描、Tree-sitter 语法分析与可选 LLVM/libclang 语义分析管线。",
+      "description": "对应 src/analyzer 与 src/parser；支持 SyntaxOnly、SemanticPreferred、SemanticRequired 模式，并显式报告编译数据库或 LLVM 不可用状态。",
+      "technologyIds": [
+        "XRwunQSC82WQFVWFdkUL"
+      ],
+      "icon": {
+        "technologyId": "XRwunQSC82WQFVWFdkUL"
+      }
+    },
+    {
+      "id": "component-core-model",
+      "name": "Core Graph Model",
+      "type": "component",
+      "parentId": "app-savt-desktop",
+      "caption": "统一的分析结果与图模型数据底座。",
+      "description": "对应 src/core 中的 AnalysisReport、ArchitectureOverview、CapabilityGraph、ComponentGraph 等核心模型。",
+      "technologyIds": [
+        "XRwunQSC82WQFVWFdkUL"
+      ],
+      "icon": {
+        "technologyId": "XRwunQSC82WQFVWFdkUL"
+      }
+    },
+    {
+      "id": "component-layout-engine",
+      "name": "Layout Engine",
+      "type": "component",
+      "parentId": "app-savt-desktop",
+      "caption": "为 L2/L3 视图计算 layered graph 布局。",
+      "description": "对应 src/layout/LayeredGraphLayout.cpp，用于将能力域与组件图转换成可视化场景坐标和分组结果。",
+      "technologyIds": [
+        "XRwunQSC82WQFVWFdkUL"
+      ],
+      "icon": {
+        "technologyId": "XRwunQSC82WQFVWFdkUL"
+      }
+    },
+    {
+      "id": "component-ai-adapter",
+      "name": "AI Adapter",
+      "type": "component",
+      "parentId": "app-savt-desktop",
+      "caption": "读取本地 AI 配置、构造受限请求并解析 chat completions 响应。",
+      "description": "对应 src/ai 的 savt_ai 模块与 DeepSeekClient；仅发送证据包，不承担通用聊天能力，默认要求简体中文输出。",
+      "technologyIds": [
+        "XRwunQSC82WQFVWFdkUL"
+      ],
+      "icon": {
+        "technologyId": "XRwunQSC82WQFVWFdkUL"
+      }
+    }
+  ],
+  "modelConnections": [
+    {
+      "id": "connection-actor-app",
+      "name": "Uses",
+      "direction": "bidirectional",
+      "originId": "actor-developer-architect",
+      "targetId": "app-savt-desktop",
+      "description": "用户通过桌面工作台选择项目、浏览 L1-L4 视图、查看证据与报告，并手动触发受约束 AI 解释。"
+    },
+    {
+      "id": "connection-app-workspace",
+      "name": "Opens and analyzes selected project",
+      "direction": "outgoing",
+      "originId": "app-savt-desktop",
+      "targetId": "store-project-workspace",
+      "description": "桌面应用以项目根路径为输入，经内部分析管线扫描源码、工程清单与结构相关资源。"
+    },
+    {
+      "id": "connection-app-ai-endpoint",
+      "name": "Requests optional AI explanations",
+      "direction": "outgoing",
+      "originId": "app-savt-desktop",
+      "targetId": "system-ai-endpoint",
+      "description": "当本地 AI 配置启用时，桌面应用通过受限 AI 适配层调用外部 chat completions API。",
+      "technologyIds": [
+        "20VtuIRnZRytNwM9vvxn",
+        "AKd30nIcOMCYnGrIIzFs",
+        "OfYKvSfjuhOFZLhcoeAB"
+      ]
+    },
+    {
+      "id": "connection-shell-ui",
+      "name": "Binds UI state and commands",
+      "direction": "bidirectional",
+      "originId": "component-desktop-shell",
+      "targetId": "component-ui-orchestration",
+      "description": "QML 壳层通过 AnalysisController 和相关服务公开状态、命令与渲染所需数据。"
+    },
+    {
+      "id": "connection-ui-analyzer",
+      "name": "Starts analysis workflows",
+      "direction": "outgoing",
+      "originId": "component-ui-orchestration",
+      "targetId": "component-analyzer-pipeline",
+      "description": "控制器与编排层触发项目扫描、语法分析、语义探测与结果聚合。"
+    },
+    {
+      "id": "connection-ui-core",
+      "name": "Maps scenes, reports and evidence",
+      "direction": "outgoing",
+      "originId": "component-ui-orchestration",
+      "targetId": "component-core-model",
+      "description": "服务层读取统一图模型，生成场景、报告、阅读提示和证据链展示数据。"
+    },
+    {
+      "id": "connection-ui-layout",
+      "name": "Requests L2/L3 layout",
+      "direction": "outgoing",
+      "originId": "component-ui-orchestration",
+      "targetId": "component-layout-engine",
+      "description": "服务层请求布局模块为能力图和组件图生成可视化场景结果。"
+    },
+    {
+      "id": "connection-ui-ai",
+      "name": "Requests bounded AI explanations",
+      "direction": "outgoing",
+      "originId": "component-ui-orchestration",
+      "targetId": "component-ai-adapter",
+      "description": "AiService 仅在用户主动触发时调用 AI 适配层，并向其传入受限证据包。"
+    },
+    {
+      "id": "connection-analyzer-core",
+      "name": "Builds analysis graph data",
+      "direction": "outgoing",
+      "originId": "component-analyzer-pipeline",
+      "targetId": "component-core-model",
+      "description": "分析管线产出 AnalysisReport、ArchitectureOverview、CapabilityGraph 与 ComponentGraph 所需的基础节点、边和诊断信息。"
+    },
+    {
+      "id": "connection-layout-core",
+      "name": "Consumes graph models for layout",
+      "direction": "outgoing",
+      "originId": "component-layout-engine",
+      "targetId": "component-core-model",
+      "description": "布局引擎基于核心图模型生成 L2/L3 视图所需的层次布局、坐标与分组结果。"
+    }
+  ]
+}

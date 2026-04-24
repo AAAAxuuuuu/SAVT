@@ -96,10 +96,10 @@ The first configure can automatically fetch `tree-sitter` and `tree-sitter-cpp` 
 See:
 
 - `docs/build-setup.md`
-- `docs/phase0-baseline-2026-03-28.md`
-- `docs/phase1-semantic-readiness-2026-03-28.md`
 - `docs/qtcreator-setup.md`
 - `docs/semantic-toolchain-setup.md`
+- `docs/project-structure.md`
+- `docs/project-config.md`
 
 ## Encoding hygiene
 

@@ -21,6 +21,9 @@ qt_add_qml_module(savt_desktop
         qml/Main.qml
         qml/greenfield/MainSurface.qml
         qml/greenfield/atlas/ArchitectureCanvas.qml
+        qml/greenfield/atlas/ArchitectureEdgePainter.js
+        qml/greenfield/atlas/ArchitectureEdgeRouter.js
+        qml/greenfield/atlas/ArchitectureEdgeUtils.js
         qml/greenfield/config/ConfigDesk.qml
         qml/greenfield/foundation/ActionButton.qml
         qml/greenfield/foundation/Tokens.qml

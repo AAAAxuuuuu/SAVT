@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "savt/analyzer/CppProjectAnalyzer.h"
 #include "savt/core/ArchitectureGraph.h"
 #include "savt/core/ArchitectureOverview.h"
 #include "savt/core/CapabilityGraph.h"
@@ -41,6 +42,7 @@ public:
     static void run(
         QPromise<void>& promise,
         const QString& cleanedPath,
+        savt::analyzer::AnalyzerPrecision precision,
         const std::shared_ptr<PendingAnalysisResult>& output);
 };
 

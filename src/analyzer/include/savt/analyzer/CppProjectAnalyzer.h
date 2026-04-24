@@ -19,6 +19,7 @@ enum class AnalyzerPrecision {
 struct AnalyzerOptions {
     bool includeThirdParty = false;
     bool includeBuildDirectories = false;
+    bool autoGenerateCompilationDatabase = true;
     std::size_t maxFiles = 0;
     AnalyzerPrecision precision = AnalyzerPrecision::SemanticPreferred;
     std::filesystem::path compilationDatabasePath;

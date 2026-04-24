@@ -208,9 +208,12 @@ savt::core::AnalysisReport CppProjectAnalyzer::analyzeProject(
     const std::filesystem::path normalizedRoot = rootPath.lexically_normal();
     const bool semanticRequested = options.precision != AnalyzerPrecision::SyntaxOnly;
     const bool semanticRequired = options.precision == AnalyzerPrecision::SemanticRequired;
-    const auto compilationDatabaseProbe = detail::probeCompilationDatabase(normalizedRoot, options);
-    const auto& compilationDatabasePath = compilationDatabaseProbe.resolvedPath;
     const auto backendInfo = detail::semanticBackendBuildInfo();
+    const auto compilationDatabaseProbe =
+        semanticRequested
+            ? detail::prepareCompilationDatabase(normalizedRoot, options)
+            : detail::probeCompilationDatabase(normalizedRoot, options);
+    const auto& compilationDatabasePath = compilationDatabaseProbe.resolvedPath;
     const auto projectConfig = savt::core::loadProjectAnalysisConfig(normalizedRoot);
 
     std::vector<std::string> preflightDiagnostics;
@@ -218,6 +221,10 @@ savt::core::AnalysisReport CppProjectAnalyzer::analyzeProject(
         preflightDiagnostics.end(),
         projectConfig.diagnostics.begin(),
         projectConfig.diagnostics.end());
+    preflightDiagnostics.insert(
+        preflightDiagnostics.end(),
+        compilationDatabaseProbe.diagnostics.begin(),
+        compilationDatabaseProbe.diagnostics.end());
     std::string semanticStatusCode = semanticRequested ? "semantic_ready" : "not_requested";
     std::string semanticStatusMessage = semanticRequested
         ? "Semantic analysis is ready to start."
@@ -236,8 +243,9 @@ savt::core::AnalysisReport CppProjectAnalyzer::analyzeProject(
                 "Compilation database search paths: " + joinPathList(compilationDatabaseProbe.searchedPaths));
         }
         semanticStatusCode = "missing_compile_commands";
-        semanticStatusMessage =
-            "Semantic analysis is blocked because no compile_commands.json was found for the target project.";
+        semanticStatusMessage = compilationDatabaseProbe.generationAttempted
+            ? "Semantic analysis is blocked because no compile_commands.json was found or generated for the target project."
+            : "Semantic analysis is blocked because no compile_commands.json was found for the target project.";
     }
     if (semanticRequested && !backendInfo.available) {
         preflightDiagnostics.push_back(backendInfo.statusMessage);

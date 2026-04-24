@@ -38,12 +38,12 @@ QtObject {
 
     function routeTitle() {
         if (route === "component")
-            return "组件探测实验室"
+            return "边界钻取"
         if (route === "report")
-            return "深度诊断报告"
+            return "算法报告"
         if (route === "config")
-            return "分析环境配置"
-        return "架构全景图"
+            return "环境与精度"
+        return "重建全景"
     }
 
     function trustTone() {

@@ -21,6 +21,10 @@
 class QNetworkAccessManager;
 class QNetworkReply;
 
+namespace savt::analyzer {
+enum class AnalyzerPrecision;
+}
+
 namespace savt::ui {
 
 struct PendingAnalysisResult;
@@ -110,8 +114,10 @@ public:
     QString aiScope() const;
 
     Q_INVOKABLE void analyzeCurrentProject();
+    Q_INVOKABLE void analyzeCurrentProjectHighPrecision();
     Q_INVOKABLE void stopAnalysis();
     Q_INVOKABLE void analyzeProject(const QString& projectRootPath);
+    Q_INVOKABLE void analyzeProjectHighPrecision(const QString& projectRootPath);
     Q_INVOKABLE void analyzeProjectUrl(const QUrl& projectRootUrl);
     Q_INVOKABLE void ensureComponentSceneForCapability(qulonglong capabilityId);
     Q_INVOKABLE void refreshAiAvailability();
@@ -168,7 +174,12 @@ signals:
     void aiScopeChanged();
 
 private:
-    void beginAnalysis(const QString& cleanedPath);
+    void analyzeProjectWithPrecision(
+        const QString& projectRootPath,
+        savt::analyzer::AnalyzerPrecision precision);
+    void beginAnalysis(
+        const QString& cleanedPath,
+        savt::analyzer::AnalyzerPrecision precision);
     void finishAnalysis();
     void clearVisualizationState();
     void scheduleBackgroundCapabilityAnnotation();

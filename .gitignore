@@ -2,10 +2,12 @@
 build/
 target/
 out/
+/output/windows-installer/
 Debug/
 Release/
 cmake-build-*/
 .qt/
+/.savt/
 
 # IDE 配置文件
 .vscode/

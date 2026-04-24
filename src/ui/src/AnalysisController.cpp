@@ -5,7 +5,7 @@
 #include "savt/ui/AstPreviewService.h"
 #include "savt/ui/FileInsightService.h"
 #include "savt/ui/ProjectConfigRecommendationService.h"
-#include "savt/core/ComponentGraph.h"
+#include "savt/reconstruction/ArchitectureReconstruction.h"
 
 #include <QtGui/QClipboard>
 #include <QDir>
@@ -306,7 +306,17 @@ void AnalysisController::setSelectedAstFilePath(const QString& value) {
     refreshAstPreview();
 }
 
-void AnalysisController::analyzeCurrentProject() { analyzeProject(m_projectRootPath); }
+void AnalysisController::analyzeCurrentProject() {
+    analyzeProjectWithPrecision(
+        m_projectRootPath,
+        analyzer::AnalyzerPrecision::SyntaxOnly);
+}
+
+void AnalysisController::analyzeCurrentProjectHighPrecision() {
+    analyzeProjectWithPrecision(
+        m_projectRootPath,
+        analyzer::AnalyzerPrecision::SemanticPreferred);
+}
 
 void AnalysisController::stopAnalysis() {
     if (!m_analyzing || m_stopRequested) {
@@ -321,6 +331,20 @@ void AnalysisController::stopAnalysis() {
 }
 
 void AnalysisController::analyzeProject(const QString& projectRootPath) {
+    analyzeProjectWithPrecision(
+        projectRootPath,
+        analyzer::AnalyzerPrecision::SyntaxOnly);
+}
+
+void AnalysisController::analyzeProjectHighPrecision(const QString& projectRootPath) {
+    analyzeProjectWithPrecision(
+        projectRootPath,
+        analyzer::AnalyzerPrecision::SemanticPreferred);
+}
+
+void AnalysisController::analyzeProjectWithPrecision(
+    const QString& projectRootPath,
+    const analyzer::AnalyzerPrecision precision) {
     const QString cleanedPath = QDir::cleanPath(projectRootPath.trimmed());
     if (cleanedPath.isEmpty()) {
         setStatusMessage(QStringLiteral("请先选择一个项目目录。"));
@@ -347,7 +371,7 @@ void AnalysisController::analyzeProject(const QString& projectRootPath) {
     }
 
     setProjectRootPathInternal(cleanedPath, true);
-    beginAnalysis(cleanedPath);
+    beginAnalysis(cleanedPath, precision);
 }
 
 void AnalysisController::analyzeProjectUrl(const QUrl& projectRootUrl) {
@@ -381,15 +405,13 @@ void AnalysisController::ensureComponentSceneForCapability(const qulonglong capa
     const QString previousStatusMessage = m_statusMessage;
     setStatusMessage(QStringLiteral("正在生成组件工作台..."));
 
-    savt::layout::LayeredGraphLayout layoutEngine;
-    auto componentGraph = savt::core::buildComponentGraphForCapability(
+    const auto drilldown = savt::reconstruction::buildCapabilityDrilldown(
         m_lastReport,
         m_lastOverview,
         m_lastCapabilityGraph,
         static_cast<std::size_t>(capabilityId));
-    auto componentLayout = layoutEngine.layoutComponentScene(componentGraph);
     const auto componentScene =
-        SceneMapper::buildComponentSceneData(componentGraph, componentLayout);
+        SceneMapper::buildComponentSceneData(drilldown.graph, drilldown.layout);
 
     QVariantMap updatedCatalog = m_componentSceneCatalog;
     updatedCatalog.insert(capabilityKey, SceneMapper::toVariantMap(componentScene));
@@ -789,21 +811,38 @@ void AnalysisController::requestReportAiExplanation(const QString& userTask) {
         [this, reply = m_aiReply]() { finishAiReply(reply); });
 }
 
-void AnalysisController::beginAnalysis(const QString& cleanedPath) {
+void AnalysisController::beginAnalysis(
+    const QString& cleanedPath,
+    const analyzer::AnalyzerPrecision precision) {
+    const bool highPrecision = precision != analyzer::AnalyzerPrecision::SyntaxOnly;
+    const QString phaseText = highPrecision
+        ? QStringLiteral("准备高精度分析...")
+        : QStringLiteral("准备分析...");
+
     clearVisualizationState();
     setAnalyzing(true);
     setStopRequested(false);
     setAnalysisProgress(0.0);
-    setAnalysisPhase(QStringLiteral("准备分析..."));
-    setStatusMessage(QStringLiteral("准备分析..."));
+    setAnalysisPhase(phaseText);
+    setStatusMessage(phaseText);
     setAnalysisReport(
-        QStringLiteral("正在分析项目：%1\n\n系统会先整理项目的主要分工，再为程序员准备详细分析报告和 AST 预览。")
+        (highPrecision
+             ? QStringLiteral(
+                   "正在以高精度模式分析项目：%1\n\n"
+                   "系统会优先准备 compile_commands.json，并尝试进入 Clang/LibTooling 语义分析。")
+             : QStringLiteral(
+                   "正在分析项目：%1\n\n"
+                   "系统会先整理项目的主要分工，再为程序员准备详细分析报告和 AST 预览。"))
             .arg(QDir::toNativeSeparators(cleanedPath)));
     m_pendingAnalysisResult = std::make_shared<PendingAnalysisResult>();
     m_analysisWatcher->setFuture(QtConcurrent::run(
-        [cleanedPath, pendingAnalysisResult = m_pendingAnalysisResult](
+        [cleanedPath, precision, pendingAnalysisResult = m_pendingAnalysisResult](
             QPromise<void>& promise) {
-            AnalysisOrchestrator::run(promise, cleanedPath, pendingAnalysisResult);
+            AnalysisOrchestrator::run(
+                promise,
+                cleanedPath,
+                precision,
+                pendingAnalysisResult);
         }));
 }
 

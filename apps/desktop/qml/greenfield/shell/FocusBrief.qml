@@ -423,7 +423,7 @@ Rectangle {
 
                             Label {
                                 Layout.fillWidth: true
-                                text: root.embeddedMode ? "组件解读" : "焦点解读"
+                                text: root.embeddedMode ? "证据钻取" : "边界解读"
                                 color: root.tokens.text3
                                 font.family: root.tokens.textFontFamily
                                 font.pixelSize: 12
@@ -446,6 +446,9 @@ Rectangle {
                         ActionButton {
                             tokens: root.tokens
                             text: root.embeddedMode ? "返回组件图" : "X"
+                            hint: root.embeddedMode
+                                  ? "退出当前详情，回到组件关系图。"
+                                  : "关闭右侧焦点面板。"
                             compact: true
                             square: !root.embeddedMode
                             fixedWidth: root.embeddedMode ? 0 : 30
@@ -559,7 +562,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignTop
                     tokens: root.tokens
-                    title: "当前判断"
+                    title: "边界结论"
                     body: root.conclusionText
                     tone: "brand"
                 }
@@ -598,6 +601,10 @@ Rectangle {
                         ActionButton {
                             tokens: root.tokens
                             text: root.analysisController.aiBusy ? "生成中..." : "生成解读"
+                            hint: "让 AI 解释当前选中节点的职责、证据和下一步排查方向。"
+                            disabledHint: root.analysisController.aiBusy
+                                          ? "AI 正在生成解读，请稍等。"
+                                          : "需要先选中节点，并确保 AI 服务可用。"
                             tone: "ai"
                             compact: true
                             enabled: root.analysisController.aiAvailable
@@ -631,7 +638,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignTop
                     tokens: root.tokens
-                    title: "结构事实"
+                    title: "结构证据"
                     rows: root.factRows
                 }
 
@@ -639,7 +646,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignTop
                     tokens: root.tokens
-                    title: "判断依据"
+                    title: "规则依据"
                     rows: root.ruleRows
                 }
             }
@@ -647,7 +654,7 @@ Rectangle {
             SectionBlock {
                 width: parent ? parent.width : 0
                 tokens: root.tokens
-                title: "关键文件"
+                title: "关键证据文件"
                 rows: root.sourceFiles.length > 0 ? root.sourceFiles.map(localizePath) : ["暂无源文件线索。"]
                 mono: true
             }
@@ -680,7 +687,7 @@ Rectangle {
                 AccentCard {
                     Layout.fillWidth: true
                     tokens: root.tokens
-                    title: "当前判断"
+                    title: "文件结论"
                     body: root.conclusionText
                     tone: "brand"
                 }
@@ -719,6 +726,10 @@ Rectangle {
                         ActionButton {
                             tokens: root.tokens
                             text: root.analysisController.aiBusy ? "生成中..." : "生成解读"
+                            hint: "让 AI 解释当前选中节点的职责、证据和下一步排查方向。"
+                            disabledHint: root.analysisController.aiBusy
+                                          ? "AI 正在生成解读，请稍等。"
+                                          : "需要先选中节点，并确保 AI 服务可用。"
                             tone: "ai"
                             compact: true
                             enabled: root.analysisController.aiAvailable

@@ -7,6 +7,7 @@
 #include "savt/core/CapabilityGraph.h"
 #include "savt/core/ComponentGraph.h"
 #include "savt/layout/LayeredGraphLayout.h"
+#include "savt/reconstruction/ArchitectureReconstruction.h"
 #include "savt/ui/SceneMapper.h"
 
 #include <algorithm>
@@ -1115,6 +1116,54 @@ void testLargeMixedOverviewAvoidsModuleScopedCapabilityExplosion() {
            "large mixed-language workspaces should aggregate capability nodes to keep the scene bounded");
 }
 
+void testArchitectureReconstructionBuildsCapabilityDrilldowns() {
+    namespace fs = std::filesystem;
+
+    const fs::path tempRoot = makeTempDirectory("savt_architecture_reconstruction");
+    writeTextFile(tempRoot / "apps" / "desktop" / "main.cpp",
+                  "#include \"../../src/analyzer/Pipeline.h\"\n"
+                  "int main() { return runPipeline(); }\n");
+    writeTextFile(tempRoot / "src" / "analyzer" / "Pipeline.h",
+                  "int runPipeline();\n");
+    writeTextFile(tempRoot / "src" / "analyzer" / "Pipeline.cpp",
+                  "#include \"Pipeline.h\"\n"
+                  "int runPipeline() { return 42; }\n");
+
+    savt::analyzer::CppProjectAnalyzer analyzer;
+    savt::analyzer::AnalyzerOptions options;
+    options.precision = savt::analyzer::AnalyzerPrecision::SyntaxOnly;
+
+    const auto report = analyzer.analyzeProject(tempRoot, options);
+    const auto aggregation = savt::core::buildArchitectureAggregation(report);
+    const auto reconstruction =
+        savt::reconstruction::buildArchitectureReconstruction(report, aggregation);
+    const auto moduleNodeCount = static_cast<std::size_t>(std::count_if(
+        report.nodes.begin(),
+        report.nodes.end(),
+        [](const savt::core::SymbolNode& node) {
+            return node.kind == savt::core::SymbolKind::Module;
+        }));
+
+    expect(!aggregation.capabilityGraph.nodes.empty(),
+           "architecture reconstruction fixture should produce at least one capability node");
+    expect(reconstruction.capabilitySceneLayout.nodes.size() == aggregation.capabilityGraph.nodes.size(),
+           "architecture reconstruction should preserve the capability-node count in the L2 scene layout");
+    expect(reconstruction.moduleLayout.nodes.size() == moduleNodeCount,
+           "architecture reconstruction should preserve module layout coverage");
+    expect(!reconstruction.capabilityDrilldowns.empty(),
+           "architecture reconstruction should materialize L3 drilldowns for discovered capabilities");
+
+    const std::size_t capabilityId = aggregation.capabilityGraph.nodes.front().id;
+    const auto drilldownIt = reconstruction.capabilityDrilldowns.find(capabilityId);
+    expect(drilldownIt != reconstruction.capabilityDrilldowns.end(),
+           "architecture reconstruction should index drilldowns by capability id");
+    expect(drilldownIt->second.layout.nodes.size() == drilldownIt->second.graph.nodes.size(),
+           "capability drilldown layout should cover every reconstructed component node");
+
+    std::error_code errorCode;
+    fs::remove_all(tempRoot, errorCode);
+}
+
 void testAnalysisGraphBuilderPreservesDistinctSemanticOverloads() {
     using savt::analyzer::AnalyzerOptions;
     using savt::analyzer::detail::AnalysisGraphBuilder;
@@ -1406,6 +1455,45 @@ int main() { return 0; }
                return diagnostic.find("Compilation database search paths:") != std::string::npos;
            }),
            "diagnostics should record the compilation database search paths");
+
+    fs::remove_all(tempRoot, errorCode);
+}
+
+void testPrepareCompilationDatabaseGeneratesForCMakeProject() {
+    namespace fs = std::filesystem;
+
+    const fs::path tempRoot = makeTempDirectory("savt_auto_compdb");
+    std::error_code errorCode;
+    writeTextFile(tempRoot / "CMakeLists.txt", R"CMAKE(
+cmake_minimum_required(VERSION 3.20)
+project(SavtAutoCompdbFixture LANGUAGES CXX)
+add_executable(savt_auto_compdb_fixture main.cpp)
+)CMAKE");
+    writeTextFile(tempRoot / "main.cpp", R"CPP(
+int main() { return 0; }
+)CPP");
+
+    savt::analyzer::AnalyzerOptions options;
+    options.precision = savt::analyzer::AnalyzerPrecision::SemanticRequired;
+
+    const auto initialProbe = savt::analyzer::detail::probeCompilationDatabase(tempRoot, options);
+    expect(!initialProbe.resolvedPath.has_value(),
+           "fixture should start without an existing compile_commands.json");
+
+    const auto preparedProbe = savt::analyzer::detail::prepareCompilationDatabase(tempRoot, options);
+    expect(preparedProbe.generationAttempted,
+           "CMake fixtures without compile_commands.json should trigger automatic generation");
+    expect(preparedProbe.generated,
+           "automatic compile_commands.json generation should mark the result as generated");
+    expect(preparedProbe.resolvedPath.has_value() &&
+               fs::exists(*preparedProbe.resolvedPath, errorCode),
+           "automatic generation should produce a readable compile_commands.json");
+    expect(preparedProbe.resolvedPath->filename() == "compile_commands.json",
+           "automatic generation should resolve the generated compilation database file");
+    expect(std::any_of(preparedProbe.diagnostics.begin(), preparedProbe.diagnostics.end(), [](const std::string& diagnostic) {
+               return diagnostic.find("generation succeeded") != std::string::npos;
+           }),
+           "diagnostics should record successful compile_commands.json generation");
 
     fs::remove_all(tempRoot, errorCode);
 }
@@ -1789,10 +1877,12 @@ int main() {
     testSingleModuleCapabilityFallsBackToFileLevelL3Expansion();
     testAnalysisReportSerializesFactSources();
     testLargeMixedOverviewAvoidsModuleScopedCapabilityExplosion();
+    testArchitectureReconstructionBuildsCapabilityDrilldowns();
     testAnalysisGraphBuilderPreservesDistinctSemanticOverloads();
     testNodeBackendRelativeImportsAndRoleClassification();
     testSpringBootJavaImportsAndRoleClassification();
     testSemanticRequiredBlocksWhenCompileCommandsAreMissing();
+    testPrepareCompilationDatabaseGeneratesForCMakeProject();
     testSemanticPreferredExplainsBackendUnavailability();
     testSyntaxOnlyAnalysisMarksFactsAsInferred();
 #ifdef SAVT_ENABLE_CLANG_TOOLING

@@ -131,6 +131,11 @@ Rectangle {
         ActionButton {
             tokens: root.tokens
             text: root.caseState.hasProject ? (root.analysisController.analyzing ? "停止" : "分析") : "选择项目"
+            hint: !root.caseState.hasProject
+                  ? "先选择要分析的项目目录。"
+                  : (root.analysisController.analyzing
+                     ? "停止当前分析任务，保留已经产出的结果。"
+                     : "快速首扫当前项目，生成架构地图和报告。")
             compact: true
             tone: root.analysisController.analyzing ? "danger" : "primary"
             fixedWidth: 92
@@ -149,6 +154,8 @@ Rectangle {
         ActionButton {
             tokens: root.tokens
             text: "AI"
+            hint: "让 AI 根据当前选中节点或项目整体生成解释和下一步建议。"
+            disabledHint: "AI 服务未配置或当前不可用。"
             compact: true
             tone: "ai"
             fixedWidth: 64

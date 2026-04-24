@@ -43,6 +43,7 @@ target_link_libraries(savt_ui
         savt_layout
         savt_ui_formatters
     PRIVATE
+        savt_reconstruction
         savt_parser
 )
 

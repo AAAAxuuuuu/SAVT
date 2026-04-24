@@ -23,7 +23,11 @@ struct SemanticBackendBuildInfo {
 struct CompilationDatabaseProbe {
     std::optional<std::filesystem::path> resolvedPath;
     std::vector<std::filesystem::path> searchedPaths;
+    std::vector<std::string> diagnostics;
     bool explicitPathProvided = false;
+    bool generationAttempted = false;
+    bool generated = false;
+    std::filesystem::path generationBuildDirectory;
 };
 
 bool hasSourceExtension(const std::filesystem::path& filePath);
@@ -50,6 +54,9 @@ bool isCancellationRequested(const AnalyzerOptions& options);
 bool isSemanticBackendBuilt();
 SemanticBackendBuildInfo semanticBackendBuildInfo();
 CompilationDatabaseProbe probeCompilationDatabase(
+    const std::filesystem::path& rootPath,
+    const AnalyzerOptions& options);
+CompilationDatabaseProbe prepareCompilationDatabase(
     const std::filesystem::path& rootPath,
     const AnalyzerOptions& options);
 

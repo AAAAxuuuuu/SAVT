@@ -154,6 +154,7 @@ ScrollView {
                         ActionButton {
                             tokens: root.tokens
                             text: "选择项目"
+                            hint: "切换要分析和配置的项目根目录。"
                             tone: "secondary"
                             onClicked: root.chooseProjectRequested()
                         }
@@ -161,6 +162,10 @@ ScrollView {
                         ActionButton {
                             tokens: root.tokens
                             text: root.analysisController.analyzing ? "停止分析" : "重新分析"
+                            hint: root.analysisController.analyzing
+                                  ? "停止当前分析任务，保留已生成的结果。"
+                                  : "使用快速首扫重新生成当前项目的架构结果。"
+                            disabledHint: "先选择项目目录，才能重新分析。"
                             tone: root.analysisController.analyzing ? "danger" : "primary"
                             enabled: root.caseState.hasProject
                             onClicked: {
@@ -173,7 +178,20 @@ ScrollView {
 
                         ActionButton {
                             tokens: root.tokens
+                            text: "高精度分析"
+                            hint: "检查或生成 compile_commands.json 后，重新执行语义优先分析。"
+                            disabledHint: root.analysisController.analyzing
+                                          ? "当前正在分析，请等待完成。"
+                                          : "先选择项目目录，再启动高精度分析。"
+                            tone: "secondary"
+                            enabled: root.caseState.hasProject && !root.analysisController.analyzing
+                            onClicked: root.analysisController.analyzeCurrentProjectHighPrecision()
+                        }
+
+                        ActionButton {
+                            tokens: root.tokens
                             text: "刷新 AI"
+                            hint: "重新检测本机 AI 配置和服务可用状态。"
                             tone: "secondary"
                             onClicked: root.analysisController.refreshAiAvailability()
                         }
@@ -411,6 +429,10 @@ ScrollView {
                     ActionButton {
                         tokens: root.tokens
                         text: "刷新草案"
+                        hint: "根据当前项目重新生成配置草案，帮助补齐忽略目录、模块归并和角色覆盖。"
+                        disabledHint: root.analysisController.analyzing
+                                      ? "当前正在分析，请等待完成。"
+                                      : "先选择项目目录，再刷新配置草案。"
                         tone: "secondary"
                         enabled: root.caseState.hasProject && !root.analysisController.analyzing
                         onClicked: root.analysisController.refreshProjectConfigRecommendation()
@@ -419,6 +441,8 @@ ScrollView {
                     ActionButton {
                         tokens: root.tokens
                         text: root.textOr(configRecommendation.writeActionLabel, "生成配置")
+                        hint: "把推荐配置写入项目的 .savt/project.json，后续分析会自动加载。"
+                        disabledHint: "当前没有可写入的推荐配置，或项目正在分析中。"
                         tone: "primary"
                         enabled: root.caseState.hasProject
                                  && !root.analysisController.analyzing
@@ -537,6 +561,7 @@ ScrollView {
                                         tokens: root.tokens
                                         compact: true
                                         text: root.textOr(modelData.label, "")
+                                        hint: root.textOr(modelData.description, "选择这个配置方案。")
                                         tone: root.textOr(modelData.id, "")
                                               === root.textOr(parent.parent.parent.choiceData.selectedOptionId, "")
                                               ? "primary"
