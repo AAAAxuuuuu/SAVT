@@ -52,9 +52,12 @@ function routeStats(route, edge, routeObjectHitsFn, routeObjectStatsFn) {
 }
 
 function chooseBestCandidate(candidates, edge, routeObjectHitsFn, routeObjectStatsFn) {
+    for (var index = 0; index < candidates.length; ++index)
+        candidates[index].stats = routeStats(candidates[index].route, edge, routeObjectHitsFn, routeObjectStatsFn)
+
     candidates.sort(function(left, right) {
-        var leftStats = routeStats(left.route, edge, routeObjectHitsFn, routeObjectStatsFn)
-        var rightStats = routeStats(right.route, edge, routeObjectHitsFn, routeObjectStatsFn)
+        var leftStats = left.stats
+        var rightStats = right.stats
         if (leftStats.hitCount !== rightStats.hitCount)
             return leftStats.hitCount - rightStats.hitCount
         if (Math.abs(leftStats.hitLength - rightStats.hitLength) > 0.5)

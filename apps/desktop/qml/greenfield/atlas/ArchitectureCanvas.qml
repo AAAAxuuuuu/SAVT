@@ -24,7 +24,6 @@ Item {
     readonly property var edges: (scene.edges || [])
     readonly property var nodeLookup: buildNodeLookup(nodes)
     readonly property var nodeIndexLookup: buildNodeIndexLookup(nodes)
-    readonly property var hoverConnectedNodeIds: buildHoverConnectedNodeIds(hoverNode, edges)
     readonly property var bounds: (scene.bounds || ({}))
     readonly property var overviewMindMapLayout: buildOverviewMindMapLayout()
     readonly property bool componentOverviewMode: componentMode
@@ -36,6 +35,7 @@ Item {
     readonly property real componentOverviewCardWidth: Math.max(500, Math.min(640,
                                                                                (Math.max(1480, width - 120) - 100 - Math.max(0, componentOverviewGroups.length - 1) * componentOverviewGapX) / Math.max(1, componentOverviewGroups.length)))
     readonly property real componentOverviewCardHeight: 330
+    readonly property var componentOverviewPlacementLookup: buildComponentOverviewPlacementLookup()
     readonly property real sceneWidth: componentOverviewMode
                                        ? Math.max(980, componentOverviewSceneWidth())
                                        : Math.max(980, overviewMindMapLayout.width || 0, nodes.length === 0 ? (bounds.width || 980) : 0)
@@ -48,6 +48,7 @@ Item {
     readonly property real contentX: Math.max(18, (width - sceneWidth * effectiveScale) / 2) + panX
     readonly property real contentY: Math.max(18, (height - sceneHeight * effectiveScale) / 2) + panY
     readonly property var visibleEdges: collectVisibleEdges(edges, selectedNode, showAllEdges ? null : hoverNode, showAllEdges)
+    readonly property var hoverConnectedNodeIds: buildHoverConnectedNodeIds(hoverNode, visibleEdges)
     readonly property var focusRailLayout: buildFocusRailLayout(manualNodePositions,
                                                                 activeDraggedNodeId,
                                                                 activeDragX,
@@ -72,6 +73,17 @@ Item {
     property string activeDraggedNodeId: ""
     property real activeDragX: 0
     property real activeDragY: 0
+    readonly property var edgeRenderEntries: buildEdgeRenderEntries(visibleEdges,
+                                                                    hoverNode,
+                                                                    selectedNode,
+                                                                    manualNodePositions,
+                                                                    activeDraggedNodeId,
+                                                                    activeDragX,
+                                                                    activeDragY,
+                                                                    effectiveScale,
+                                                                    componentMode,
+                                                                    relationshipFocusActive,
+                                                                    scene)
 
     signal nodeSelected(var node)
     signal nodeDrilled(var node)
@@ -255,7 +267,8 @@ Item {
         lookup[focusKey] = true
         var list = edgeList || []
         for (var index = 0; index < list.length; ++index) {
-            var edge = list[index]
+            var item = list[index]
+            var edge = item && item.edge ? item.edge : item
             if (!edge)
                 continue
             if (String(edge.fromId) === focusKey)
@@ -951,12 +964,44 @@ Item {
         for (var groupIndex = 0; groupIndex < order.length; ++groupIndex) {
             var group = groupsByKey[order[groupIndex]]
             group.nodes.sort(function(left, right) {
-                return String(left.name || "").localeCompare(String(right.name || ""))
+                var leftScore = componentNodeConnectivityScore(left)
+                var rightScore = componentNodeConnectivityScore(right)
+                if (Math.abs(leftScore - rightScore) > 0.01)
+                    return rightScore - leftScore
+
+                var leftScope = componentNodeScopeText(left)
+                var rightScope = componentNodeScopeText(right)
+                var scopeCompare = leftScope.localeCompare(rightScope)
+                if (scopeCompare !== 0)
+                    return scopeCompare
+
+                return componentNodeTitle(left).localeCompare(componentNodeTitle(right))
             })
             if (group.nodes.length > 0)
                 groups.push(group)
         }
         return groups
+    }
+
+    function componentNodeConnectivityScore(node) {
+        if (!node || node.id === undefined)
+            return 0
+
+        var score = 0
+        for (var index = 0; index < edges.length; ++index) {
+            var edge = edges[index]
+            if (!edge)
+                continue
+            if (edge.fromId === node.id)
+                score += 2.0
+            if (edge.toId === node.id)
+                score += 1.4
+        }
+
+        var files = Number(node.fileCount || node.sourceFileCount || 0)
+        if (isFinite(files))
+            score += Math.min(3, files * 0.15)
+        return score
     }
 
     function componentOverviewSectionLeft(groupIndex) {
@@ -968,10 +1013,10 @@ Item {
 
     function componentOverviewGroupColumnCap() {
         if (componentOverviewGroups.length <= 1)
-            return 3
+            return 7
         if (componentOverviewGroups.length <= 3)
-            return 2
-        return 1
+            return 4
+        return 2
     }
 
     function componentOverviewGroupColumns(group) {
@@ -979,7 +1024,11 @@ Item {
         if (count <= 0)
             return 1
 
-        var preferredRows = componentOverviewGroups.length <= 1 ? 4 : 5
+        if (componentOverviewGroups.length <= 1)
+            return Math.max(3, Math.min(componentOverviewGroupColumnCap(),
+                                        Math.ceil(Math.sqrt(count * 1.28))))
+
+        var preferredRows = componentOverviewGroups.length <= 3 ? 4 : 5
         return Math.max(1, Math.min(componentOverviewGroupColumnCap(),
                                     Math.ceil(count / preferredRows)))
     }
@@ -1006,25 +1055,70 @@ Item {
         return maxRows
     }
 
-    function componentOverviewPlacement(nodeId, fallbackIndex) {
+    function componentOverviewSlot(index, columns, rows) {
+        var slots = []
+        var centerColumn = (columns - 1) / 2
+        var centerRow = (rows - 1) / 2
+
+        for (var row = 0; row < rows; ++row) {
+            for (var column = 0; column < columns; ++column) {
+                var dx = column - centerColumn
+                var dy = row - centerRow
+                slots.push({
+                    "column": column,
+                    "row": row,
+                    "distance": dx * dx + dy * dy,
+                    "vertical": Math.abs(dy),
+                    "horizontal": Math.abs(dx)
+                })
+            }
+        }
+
+        slots.sort(function(left, right) {
+            if (Math.abs(left.distance - right.distance) > 0.001)
+                return left.distance - right.distance
+            if (Math.abs(left.vertical - right.vertical) > 0.001)
+                return left.vertical - right.vertical
+            if (Math.abs(left.horizontal - right.horizontal) > 0.001)
+                return left.horizontal - right.horizontal
+            if (left.row !== right.row)
+                return left.row - right.row
+            return left.column - right.column
+        })
+
+        return slots[Math.max(0, Math.min(index, slots.length - 1))]
+               || {"column": index % Math.max(1, columns), "row": Math.floor(index / Math.max(1, columns))}
+    }
+
+    function buildComponentOverviewPlacementLookup() {
+        var lookup = ({})
         for (var groupIndex = 0; groupIndex < componentOverviewGroups.length; ++groupIndex) {
             var group = componentOverviewGroups[groupIndex]
+            var columns = componentOverviewGroupColumns(group)
+            var rows = componentOverviewGroupRows(group)
+            var left = componentOverviewSectionLeft(groupIndex)
+
             for (var nodeIndex = 0; nodeIndex < group.nodes.length; ++nodeIndex) {
-                if (group.nodes[nodeIndex].id !== nodeId)
+                var node = group.nodes[nodeIndex]
+                if (!node || node.id === undefined)
                     continue
 
-                var columns = componentOverviewGroupColumns(group)
-                var row = Math.floor(nodeIndex / columns)
-                var column = nodeIndex % columns
-                return {
-                    "x": componentOverviewSectionLeft(groupIndex)
-                         + column * (componentOverviewCardWidth + componentOverviewGapX),
+                var slot = componentOverviewSlot(nodeIndex, columns, rows)
+                lookup[String(node.id)] = {
+                    "x": left + slot.column * (componentOverviewCardWidth + componentOverviewGapX),
                     "y": 96 + componentOverviewHeaderHeight + 16
-                         + row * (componentOverviewCardHeight + componentOverviewGapY),
+                         + slot.row * (componentOverviewCardHeight + componentOverviewGapY),
                     "groupIndex": groupIndex
                 }
             }
         }
+        return lookup
+    }
+
+    function componentOverviewPlacement(nodeId, fallbackIndex) {
+        var cached = componentOverviewPlacementLookup[String(nodeId)]
+        if (cached)
+            return cached
 
         var fallbackColumns = componentOverviewGroups.length <= 1 ? 3 : 2
         return {
@@ -1941,7 +2035,7 @@ Item {
                 ctx.lineCap = "round"
                 ctx.translate(-edgeCanvas.frame.x, -edgeCanvas.frame.y)
 
-                var entries = root.buildEdgeRenderEntries()
+                var entries = root.edgeRenderEntries
 
                 function drawRouteStroke(entry, route) {
                     if (!route)
@@ -2031,71 +2125,6 @@ Item {
         }
 
         Repeater {
-            model: root.componentOverviewMode ? root.componentOverviewGroups : []
-
-            Rectangle {
-                x: root.componentOverviewSectionLeft(index)
-                y: 96
-                width: root.componentOverviewSectionWidth(index)
-                height: root.componentOverviewHeaderHeight
-                radius: root.tokens.radius8
-                color: root.tokens.panelStrong
-                border.color: Qt.rgba(0.12, 0.18, 0.28, 0.06)
-                visible: !root.relationshipFocusActive
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 14
-                    anchors.rightMargin: 14
-                    spacing: 10
-
-                    Rectangle {
-                        Layout.preferredWidth: 10
-                        Layout.preferredHeight: 10
-                        radius: width / 2
-                        color: modelData.key === "entry"
-                               ? root.tokens.signalTeal
-                               : modelData.key === "experience"
-                                 ? root.tokens.signalRaspberry
-                                 : modelData.key === "core"
-                                   ? root.tokens.signalCobalt
-                                   : modelData.key === "support"
-                                     ? Qt.rgba(0.96, 0.58, 0.18, 0.88)
-                                     : Qt.rgba(0.48, 0.54, 0.68, 0.82)
-                    }
-
-                    Label {
-                        text: modelData.title
-                        color: root.tokens.text1
-                        font.family: root.tokens.displayFontFamily
-                        font.pixelSize: 14
-                        font.weight: Font.DemiBold
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    Rectangle {
-                        radius: height / 2
-                        color: root.tokens.signalCobaltSoft
-                        border.color: Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.18)
-                        implicitWidth: sectionCountLabel.implicitWidth + 16
-                        implicitHeight: 24
-
-                        Label {
-                            id: sectionCountLabel
-                            anchors.centerIn: parent
-                            text: modelData.nodes.length + " 个"
-                            color: root.tokens.signalCobalt
-                            font.family: root.tokens.textFontFamily
-                            font.pixelSize: 11
-                            font.weight: Font.DemiBold
-                        }
-                    }
-                }
-            }
-        }
-
-        Repeater {
             model: root.nodes
 
             Rectangle {
@@ -2103,6 +2132,8 @@ Item {
                 clip: true
                 property bool hovered: false
                 readonly property bool selected: root.selectedNode && root.selectedNode.id === modelData.id
+                readonly property bool hoverRelated: root.hoverNode && !root.selectedNode
+                                                     && root.nodeTouchesHover(modelData)
                 readonly property var evidence: modelData.evidence || ({})
                 readonly property bool risky: (modelData.riskLevel || "") === "high"
                                         || (modelData.riskSignals || []).length > 0
@@ -2115,7 +2146,9 @@ Item {
                 color: "transparent"
                 border.color: selected ? root.tokens.signalCobalt : root.tokens.border1
                 border.width: selected ? 2 : 1
-                z: hovered || selected ? 10 : 2
+                z: root.hoverNode && !root.selectedNode
+                   ? (root.nodeTouchesHover(modelData) ? 24 : 2)
+                   : (hovered || selected ? 24 : 2)
                 opacity: root.hoverNode && !root.selectedNode
                          ? (root.nodeTouchesHover(modelData) ? 1.0 : 0.34)
                          : (root.selectedNode && !selected ? 0.50 : 1.0)
@@ -2126,25 +2159,30 @@ Item {
                     anchors.fill: parent
                     radius: card.radius
                     color: root.tokens.base0
-                    opacity: card.selected ? 0.99 : (card.hovered ? 0.98 : 0.965)
+                    opacity: card.selected || card.hoverRelated ? 1.0 : (card.hovered ? 0.98 : 0.965)
                 }
 
                 Rectangle {
                     anchors.fill: parent
                     radius: card.radius
-                    color: hovered || selected ? root.tokens.panelStrong : root.tokens.panelBase
+                    color: card.hoverRelated ? Qt.rgba(1, 1, 1, 0.985)
+                                             : (hovered || selected ? root.tokens.panelStrong : root.tokens.panelBase)
 
                     gradient: Gradient {
                         GradientStop {
                             position: 0.0
-                            color: selected
+                            color: card.hoverRelated
+                                   ? Qt.rgba(1, 1, 1, 0.985)
+                                   : selected
                                    ? root.tokens.panelStrong
                                    : (card.hovered ? root.tokens.panelStrong : root.tokens.panelBase)
                         }
 
                         GradientStop {
                             position: 1.0
-                            color: selected
+                            color: card.hoverRelated
+                                   ? Qt.rgba(1, 1, 1, 0.985)
+                                   : selected
                                    ? root.tokens.signalCobaltSoft
                                    : (card.hovered ? root.tokens.panelSoft : root.tokens.panelBase)
                         }
@@ -2360,6 +2398,242 @@ Item {
                         root.nodeDrilled(modelData)
                     }
                 }
+            }
+        }
+
+        Canvas {
+            id: hoverEdgeCanvas
+            visible: !!root.hoverNode && !root.relationshipFocusActive
+            z: 16
+            property var frame: root.edgeCanvasFrame(root.manualNodePositions,
+                                                    root.activeDraggedNodeId,
+                                                    root.activeDragX,
+                                                    root.activeDragY)
+            x: frame.x
+            y: frame.y
+            width: frame.width
+            height: frame.height
+            property bool repaintQueued: false
+
+            function schedulePaint() {
+                if (repaintQueued || !available || !visible)
+                    return
+                repaintQueued = true
+                Qt.callLater(function() {
+                    repaintQueued = false
+                    if (available && visible)
+                        hoverEdgeCanvas.requestPaint()
+                })
+            }
+
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+                ctx.lineJoin = "round"
+                ctx.lineCap = "round"
+                ctx.translate(-hoverEdgeCanvas.frame.x, -hoverEdgeCanvas.frame.y)
+
+                var entries = root.edgeRenderEntries
+
+                function entryAvoidRects(entry) {
+                    var output = []
+                    if (!entry || !entry.edge)
+                        return output
+
+                    var padding = 10
+                    var nodeIds = [
+                        String(entry.edge.fromId),
+                        String(entry.edge.toId)
+                    ]
+
+                    for (var nodeIndex = 0; nodeIndex < nodeIds.length; ++nodeIndex) {
+                        var nodeId = nodeIds[nodeIndex]
+                        var rect = root.nodeRectById(nodeId)
+                        if (!rect.valid)
+                            continue
+
+                        output.push({
+                            "x": rect.x - padding,
+                            "y": rect.y - padding,
+                            "width": rect.width + padding * 2,
+                            "height": rect.height + padding * 2
+                        })
+                    }
+                    return output
+                }
+
+                function subtractInterval(intervals, start, end) {
+                    var next = []
+                    for (var intervalIndex = 0; intervalIndex < intervals.length; ++intervalIndex) {
+                        var interval = intervals[intervalIndex]
+                        if (end <= interval.start || start >= interval.end) {
+                            next.push(interval)
+                            continue
+                        }
+                        if (start > interval.start)
+                            next.push({"start": interval.start, "end": start})
+                        if (end < interval.end)
+                            next.push({"start": end, "end": interval.end})
+                    }
+                    return next
+                }
+
+                function visibleSegmentIntervals(startPoint, endPoint, avoidRects) {
+                    var intervals = [{"start": 0, "end": 1}]
+                    var dx = endPoint.x - startPoint.x
+                    var dy = endPoint.y - startPoint.y
+                    var horizontal = Math.abs(dy) < 0.5
+                    var vertical = Math.abs(dx) < 0.5
+                    if (!horizontal && !vertical)
+                        return intervals
+
+                    for (var rectIndex = 0; rectIndex < avoidRects.length; ++rectIndex) {
+                        var rect = avoidRects[rectIndex]
+                        var start = 0
+                        var end = 1
+
+                        if (horizontal) {
+                            if (startPoint.y < rect.y || startPoint.y > rect.y + rect.height || Math.abs(dx) < 0.001)
+                                continue
+                            start = (rect.x - startPoint.x) / dx
+                            end = (rect.x + rect.width - startPoint.x) / dx
+                        } else {
+                            if (startPoint.x < rect.x || startPoint.x > rect.x + rect.width || Math.abs(dy) < 0.001)
+                                continue
+                            start = (rect.y - startPoint.y) / dy
+                            end = (rect.y + rect.height - startPoint.y) / dy
+                        }
+
+                        var clippedStart = Math.max(0, Math.min(start, end))
+                        var clippedEnd = Math.min(1, Math.max(start, end))
+                        if (clippedEnd <= 0 || clippedStart >= 1 || clippedEnd <= clippedStart)
+                            continue
+                        intervals = subtractInterval(intervals, clippedStart, clippedEnd)
+                    }
+
+                    return intervals
+                }
+
+                function drawAvoidedRoutePath(route, avoidRects) {
+                    var points = EdgePainter.routePoints(route)
+                    if (!points || points.length < 2)
+                        return
+
+                    var gap = 4
+                    for (var pointIndex = 0; pointIndex < points.length - 1; ++pointIndex) {
+                        var startPoint = points[pointIndex]
+                        var endPoint = points[pointIndex + 1]
+                        var intervals = visibleSegmentIntervals(startPoint, endPoint, avoidRects)
+                        var segmentLength = EdgeUtils.pointDistance(startPoint, endPoint)
+                        var trim = segmentLength > gap * 3 ? gap / segmentLength : 0
+
+                        for (var intervalIndex = 0; intervalIndex < intervals.length; ++intervalIndex) {
+                            var interval = intervals[intervalIndex]
+                            var t0 = Math.min(interval.end, interval.start + trim)
+                            var t1 = Math.max(t0, interval.end - trim)
+                            if (t1 - t0 < 0.01)
+                                continue
+
+                            var segmentStart = EdgeUtils.interpolatePoint(startPoint, endPoint, t0)
+                            var segmentEnd = EdgeUtils.interpolatePoint(startPoint, endPoint, t1)
+                            ctx.moveTo(segmentStart.x, segmentStart.y)
+                            ctx.lineTo(segmentEnd.x, segmentEnd.y)
+                        }
+                    }
+                }
+
+                function drawHoverRouteStroke(entry, route, avoidRects) {
+                    if (!route || !entry.emphasized)
+                        return
+
+                    ctx.globalAlpha = Math.min(1.0, Math.max(0.96, entry.visualState.lineOpacity))
+
+                    ctx.beginPath()
+                    drawAvoidedRoutePath(route, avoidRects)
+                    ctx.strokeStyle = Qt.rgba(1, 1, 1, root.componentMode ? 0.72 : 0.64)
+                    ctx.lineWidth = (entry.visualState.haloStrokeWidth + 2.6) / entry.strokeScale
+                    ctx.stroke()
+
+                    ctx.beginPath()
+                    drawAvoidedRoutePath(route, avoidRects)
+                    ctx.strokeStyle = entry.lineColor
+                    ctx.lineWidth = (entry.visualState.lineStrokeWidth + 0.8) / entry.strokeScale
+                    ctx.stroke()
+                }
+
+                function pointInsideAvoidRects(point, avoidRects) {
+                    for (var index = 0; index < avoidRects.length; ++index) {
+                        var rect = avoidRects[index]
+                        if (point.x >= rect.x && point.x <= rect.x + rect.width
+                                && point.y >= rect.y && point.y <= rect.y + rect.height) {
+                            return true
+                        }
+                    }
+                    return false
+                }
+
+                function drawHoverRouteArrow(entry, route, avoidRects) {
+                    if (!route || !entry.emphasized)
+                        return
+
+                    var arrowTip = EdgePainter.routeEndPoint(route)
+                    if (pointInsideAvoidRects(arrowTip, avoidRects))
+                        return
+
+                    var arrowTail = EdgePainter.routeArrowTail(route)
+                    var arrowLeft = root.arrowWing(arrowTip, arrowTail, entry.arrowSize + 1.4, -1)
+                    var arrowRight = root.arrowWing(arrowTip, arrowTail, entry.arrowSize + 1.4, 1)
+
+                    ctx.globalAlpha = 1.0
+                    ctx.beginPath()
+                    ctx.moveTo(arrowTip.x, arrowTip.y)
+                    ctx.lineTo(arrowLeft.x, arrowLeft.y)
+                    ctx.lineTo(arrowRight.x, arrowRight.y)
+                    ctx.closePath()
+                    ctx.fillStyle = entry.lineColor
+                    ctx.fill()
+                }
+
+                var hoverEntries = []
+                for (var index = 0; index < entries.length; ++index) {
+                    var entry = entries[index]
+                    if (!entry.emphasized)
+                        continue
+                    hoverEntries.push(entry)
+                }
+
+                for (var hoverIndex = 0; hoverIndex < hoverEntries.length; ++hoverIndex) {
+                    entry = hoverEntries[hoverIndex]
+                    var avoidRects = entryAvoidRects(entry)
+                    drawHoverRouteStroke(entry, entry.route, avoidRects)
+                    drawHoverRouteArrow(entry, entry.route, avoidRects)
+                }
+
+                ctx.globalAlpha = 1.0
+            }
+
+            onWidthChanged: schedulePaint()
+            onHeightChanged: schedulePaint()
+            onXChanged: schedulePaint()
+            onYChanged: schedulePaint()
+            onAvailableChanged: schedulePaint()
+            onVisibleChanged: schedulePaint()
+
+            Connections {
+                target: root
+
+                function onVisibleEdgesChanged() { hoverEdgeCanvas.schedulePaint() }
+                function onHoverNodeChanged() { hoverEdgeCanvas.schedulePaint() }
+                function onSelectedNodeChanged() { hoverEdgeCanvas.schedulePaint() }
+                function onDraggingNodeCardChanged() { hoverEdgeCanvas.schedulePaint() }
+                function onActiveDraggedNodeIdChanged() { hoverEdgeCanvas.schedulePaint() }
+                function onActiveDragXChanged() { hoverEdgeCanvas.schedulePaint() }
+                function onActiveDragYChanged() { hoverEdgeCanvas.schedulePaint() }
+                function onManualNodePositionsChanged() { hoverEdgeCanvas.schedulePaint() }
+                function onEffectiveScaleChanged() { hoverEdgeCanvas.schedulePaint() }
+                function onComponentModeChanged() { hoverEdgeCanvas.schedulePaint() }
+                function onRelationshipFocusActiveChanged() { hoverEdgeCanvas.schedulePaint() }
+                function onSceneChanged() { hoverEdgeCanvas.schedulePaint() }
             }
         }
     }
