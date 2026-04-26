@@ -14,6 +14,11 @@ Item {
     required property QtObject caseState
     required property QtObject focusState
     property var componentFileDetail: ({})
+    readonly property var semanticReadiness: (root.analysisController.systemContextData || ({})).semanticReadiness || ({})
+    readonly property bool showingQuickModelResult: root.caseState.route === "overview"
+                                                   && root.caseState.hasSystemBrief
+                                                   && (String(root.semanticReadiness.modeKey || "") === "syntax-only"
+                                                       || String(root.semanticReadiness.modeLabel || "") === "快速建模")
     readonly property bool componentNodeDetailActive: root.caseState.route === "component"
                                                       && !!root.focusState.focusedNode
                                                       && root.focusState.focusedNode.id !== undefined
@@ -212,38 +217,85 @@ Item {
                                 }
                             }
 
-                            ColumnLayout {
-                                Layout.preferredWidth: 196
-                                spacing: 6
+                            Item {
+                                visible: root.showingQuickModelResult
+                                Layout.preferredWidth: visible ? 156 : 0
+                                Layout.fillHeight: true
 
-                                ActionButton {
-                                    Layout.fillWidth: true
-                                    tokens: root.tokens
-                                    text: "快速建模"
-                                    compact: true
-                                    tone: "primary"
+                                Button {
+                                    anchors.top: parent.top
+                                    anchors.right: parent.right
+                                    anchors.topMargin: 2
+                                    width: 136
+                                    height: 36
+                                    text: "精度推演"
                                     enabled: root.caseState.hasProject
-                                    onClicked: root.analysisController.analyzeCurrentProject()
-                                }
-
-                                ActionButton {
-                                    Layout.fillWidth: true
-                                    tokens: root.tokens
-                                    text: "精确推演"
-                                    compact: true
-                                    tone: "analysis"
-                                    enabled: root.caseState.hasProject
+                                    hoverEnabled: true
+                                    focusPolicy: Qt.StrongFocus
+                                    scale: down ? 0.98 : (hovered ? 1.015 : 1.0)
                                     onClicked: root.analysisController.analyzeCurrentProjectHighPrecision()
-                                }
 
-                                ActionButton {
-                                    Layout.fillWidth: true
-                                    tokens: root.tokens
-                                    text: overviewBusy ? "刷新摘要中..." : "刷新算法摘要"
-                                    tone: "ai"
-                                    compact: true
-                                    enabled: root.analysisController.aiAvailable && !overviewBusy
-                                    onClicked: root.analysisController.requestProjectOverviewRefresh()
+                                    Behavior on scale {
+                                        NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+                                    }
+
+                                    HoverHandler {
+                                        cursorShape: parent.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    }
+
+                                    contentItem: Text {
+                                        text: parent.text
+                                        color: parent.enabled
+                                               ? (parent.hovered ? Qt.darker(root.tokens.signalCobalt, 1.06)
+                                                                 : root.tokens.signalCobalt)
+                                               : root.tokens.text3
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                        font.family: root.tokens.textFontFamily
+                                        font.pixelSize: 13
+                                        font.weight: Font.DemiBold
+                                    }
+
+                                    background: Rectangle {
+                                        radius: height / 2
+                                        border.width: 1
+                                        border.color: parent.enabled
+                                                      ? Qt.rgba(root.tokens.signalCobalt.r,
+                                                                root.tokens.signalCobalt.g,
+                                                                root.tokens.signalCobalt.b,
+                                                                parent.hovered ? 0.34 : 0.22)
+                                                      : root.tokens.border1
+                                        gradient: Gradient {
+                                            GradientStop {
+                                                position: 0.0
+                                                color: parent.enabled
+                                                       ? Qt.rgba(1, 1, 1, parent.hovered ? 0.98 : 0.94)
+                                                       : Qt.rgba(1, 1, 1, 0.58)
+                                            }
+                                            GradientStop {
+                                                position: 1.0
+                                                color: parent.enabled
+                                                       ? Qt.rgba(root.tokens.signalCobalt.r,
+                                                                 root.tokens.signalCobalt.g,
+                                                                 root.tokens.signalCobalt.b,
+                                                                 parent.hovered ? 0.13 : 0.08)
+                                                       : Qt.rgba(0.93, 0.94, 0.96, 0.56)
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            anchors.left: parent.left
+                                            anchors.right: parent.right
+                                            anchors.top: parent.top
+                                            anchors.leftMargin: 8
+                                            anchors.rightMargin: 8
+                                            anchors.topMargin: 3
+                                            height: 1
+                                            radius: 1
+                                            color: Qt.rgba(1, 1, 1, 0.76)
+                                            visible: parent.parent.enabled
+                                        }
+                                    }
                                 }
                             }
                         }
