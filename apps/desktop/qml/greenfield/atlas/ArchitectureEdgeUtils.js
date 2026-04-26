@@ -643,21 +643,21 @@ function edgeSemanticColor(tokens, edge, alpha) {
     if (kind === "activates")
         return colorWithAlpha(tokens ? tokens.signalCobalt : Qt.rgba(0.0, 0.478, 1.0, 1.0), resolvedAlpha)
     if (kind === "uses_infrastructure" || kind === "uses_support")
-        return colorWithAlpha(tokens ? tokens.signalAmber : Qt.rgba(1.0, 0.584, 0.0, 1.0), resolvedAlpha)
+        return Qt.rgba(1.0, 0.455, 0.075, resolvedAlpha)
     if (kind === "enables" || kind === "coordinates" || kind === "depends_on")
-        return Qt.rgba(0.290, 0.478, 0.710, resolvedAlpha)
-    return colorWithAlpha(tokens ? tokens.graphEdge : Qt.rgba(0.636, 0.636, 0.667, 1.0), resolvedAlpha)
+        return Qt.rgba(0.080, 0.410, 0.800, resolvedAlpha)
+    return Qt.rgba(0.210, 0.385, 0.630, resolvedAlpha)
 }
 
 function overviewEdgeBaseColor(edge, tokens) {
     var kind = String(edge && edge.kind ? edge.kind : "").toLowerCase()
     if (kind === "activates")
-        return edgeSemanticColor(tokens, edge, 0.74)
-    if (kind === "uses_infrastructure")
-        return edgeSemanticColor(tokens, edge, 0.72)
-    if (kind === "enables")
-        return edgeSemanticColor(tokens, edge, 0.64)
-    return edgeSemanticColor(tokens, edge, 0.62)
+        return edgeSemanticColor(tokens, edge, 0.94)
+    if (kind === "uses_infrastructure" || kind === "uses_support")
+        return edgeSemanticColor(tokens, edge, 0.92)
+    if (kind === "enables" || kind === "coordinates" || kind === "depends_on")
+        return edgeSemanticColor(tokens, edge, 0.90)
+    return edgeSemanticColor(tokens, edge, 0.88)
 }
 
 function edgeColor(config) {
@@ -665,7 +665,7 @@ function edgeColor(config) {
     if (!config.componentMode) {
         var hoverRelation = overviewHoverRelation(config.hoverNode, edge)
         if (hoverRelation === "incoming" || hoverRelation === "outgoing")
-            return edgeSemanticColor(config.tokens, edge, 0.88)
+            return colorWithAlpha(config.tokens ? config.tokens.signalCobalt : Qt.rgba(0.0, 0.478, 1.0, 1.0), 0.96)
         if (config.isOverviewPrimaryEdge(edge))
             return overviewEdgeBaseColor(edge, config.tokens)
         return mixColor(Qt.rgba(0.455, 0.565, 0.690, 0.50), overviewEdgeBaseColor(edge, config.tokens), 0.30)
@@ -682,14 +682,14 @@ function edgeBundleColor(baseColor, relativeIndex, count) {
 
     var halfSpan = Math.max(1, (count - 1) / 2)
     var normalized = Math.max(-1, Math.min(1, relativeIndex / halfSpan))
-    var coolAccent = Qt.rgba(1.0, 1.0, 1.0, baseColor.a)
-    var warmAccent = Qt.rgba(0.42, 0.42, 0.45, baseColor.a)
+    var coolAccent = Qt.rgba(0.0, 0.478, 1.0, baseColor.a)
+    var warmAccent = Qt.rgba(0.345, 0.337, 0.839, baseColor.a)
     var accent = normalized >= 0 ? coolAccent : warmAccent
-    var accentMix = 0.04 + Math.abs(normalized) * 0.10
+    var accentMix = 0.02 + Math.abs(normalized) * 0.045
     var toned = mixColor(baseColor, accent, accentMix)
     return normalized >= 0
-            ? mixColor(toned, Qt.rgba(1, 1, 1, baseColor.a), 0.05)
-            : mixColor(toned, Qt.rgba(0.10, 0.18, 0.34, baseColor.a), 0.06)
+            ? mixColor(toned, Qt.rgba(1, 1, 1, baseColor.a), 0.015)
+            : mixColor(toned, Qt.rgba(0.10, 0.18, 0.34, baseColor.a), 0.02)
 }
 
 function edgeVisuals(config) {
@@ -697,14 +697,16 @@ function edgeVisuals(config) {
             ? (config.hasFocus ? (config.emphasized ? 0.96 : 0.34) : 0.7)
             : (config.overviewPrimary
                ? (config.hasHover
-                  ? (config.overviewRelation === "incoming" || config.overviewRelation === "outgoing" ? 0.94 : 0.22)
-                  : 0.84)
-               : (config.emphasized ? 0.82 : 0.22))
+                  ? (config.overviewRelation === "incoming" || config.overviewRelation === "outgoing" ? 0.98 : 0.08)
+                  : 0.88)
+               : (config.hasHover ? (config.emphasized ? 0.90 : 0.07) : (config.emphasized ? 0.82 : 0.22)))
     var haloOpacity = config.componentMode
             ? (config.hasFocus ? (config.emphasized ? 0.24 : 0.09) : 0.16)
             : (config.overviewPrimary
-               ? (config.hasHover ? 0.1 : 0.13)
-               : (config.emphasized ? 0.1 : 0.04))
+               ? (config.hasHover
+                  ? (config.overviewRelation === "incoming" || config.overviewRelation === "outgoing" ? 0.24 : 0.03)
+                  : 0.18)
+               : (config.hasHover ? (config.emphasized ? 0.20 : 0.02) : (config.emphasized ? 0.1 : 0.04)))
 
     return {
         "lineOpacity": lineOpacity,
@@ -714,11 +716,11 @@ function edgeVisuals(config) {
                 : Qt.rgba(config.lineColor.r, config.lineColor.g, config.lineColor.b, haloOpacity * 0.42),
         "haloStrokeWidth": config.componentMode
                 ? (config.hasFocus ? 5.4 : 4.2)
-                : (config.overviewPrimary ? 4.0 : 3.0),
+                : (config.hasHover && config.emphasized ? 5.2 : (config.overviewPrimary ? 4.0 : 3.0)),
         "lineStrokeWidth": config.componentMode
                 ? (config.hasFocus ? 2.6 : 2.0)
-                : (config.overviewPrimary ? 2.2 : 1.6),
-        "z": config.overviewPrimary ? 1 : (config.emphasized ? 2 : 0)
+                : (config.hasHover && config.emphasized ? 2.8 : (config.overviewPrimary ? 2.25 : 1.5)),
+        "z": config.emphasized ? 3 : (config.overviewPrimary ? 1 : 0)
     }
 }
 

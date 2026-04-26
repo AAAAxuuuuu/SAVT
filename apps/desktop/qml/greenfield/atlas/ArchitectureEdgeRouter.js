@@ -295,35 +295,74 @@ function placementRelative(placement) {
     return placement.index - (placement.count - 1) / 2
 }
 
+function compactBundleOffset(relative, count, maxOffset) {
+    var numericRelative = Number(relative)
+    if (!isFinite(numericRelative) || count <= 1)
+        return 0
+
+    var step = count > 8 ? 2.6 : (count > 4 ? 3.2 : 4.0)
+    return Math.max(-maxOffset, Math.min(maxOffset, numericRelative * step))
+}
+
+function overviewExpressForwardRoute(config, fromRect, toRect, metrics, preferred) {
+    var outgoingOffset = metrics.outgoingOffset
+    var incomingOffset = metrics.incomingOffset
+    var topY = Math.min(fromRect.y, toRect.y)
+    var bottomY = Math.max(fromRect.y + fromRect.height, toRect.y + toRect.height)
+    var sceneHeight = Number(config.overviewMindMapLayout && config.overviewMindMapLayout.height || 0)
+    var sourceAboveTarget = EdgeUtils.nodeCenter(fromRect).y <= EdgeUtils.nodeCenter(toRect).y
+    var canUseTop = topY > 104
+    var canUseBottom = !sceneHeight || bottomY < sceneHeight - 104
+    var useTop = sourceAboveTarget
+            ? (canUseTop || !canUseBottom)
+            : (!canUseBottom && canUseTop)
+
+    var side = useTop ? "top" : "bottom"
+    var sourcePort = EdgeUtils.portPoint(fromRect, side, outgoingOffset)
+    var targetPort = EdgeUtils.portPoint(toRect, side, incomingOffset)
+
+    var trackStep = metrics.trackCount > 8 ? 8 : 10
+    var routeY = useTop
+            ? Math.min(topY - 42, topY - 76 + (metrics.trackRelative || 0) * trackStep)
+            : Math.max(bottomY + 42, bottomY + 76 + (metrics.trackRelative || 0) * trackStep)
+
+    return {
+        "route": makePolylineRoute([
+                                        sourcePort,
+                                        Qt.point(sourcePort.x, routeY),
+                                        Qt.point(targetPort.x, routeY),
+                                        targetPort
+                                    ],
+                                    "orthogonal"),
+        "preferred": preferred
+    }
+}
+
 function overviewForwardBusCandidate(config, fromRect, toRect, metrics, preferred) {
     var outgoingOffset = metrics.outgoingOffset
     var incomingOffset = metrics.incomingOffset
     var sourcePort = EdgeUtils.portPoint(fromRect, "right", outgoingOffset)
     var targetPort = EdgeUtils.portPoint(toRect, "left", incomingOffset)
-    var sourceBusBaseX = layoutNumber(config.overviewMindMapLayout, "outgoingBusXByNodeId",
-                                      config.edge.fromId, sourcePort.x + 52)
     var targetBusBaseX = layoutNumber(config.overviewMindMapLayout, "incomingBusXByNodeId",
                                       config.edge.toId, targetPort.x - 52)
-    var sourceBusX = Math.max(sourcePort.x + 30,
-                              sourceBusBaseX + (metrics.outgoingRelative || 0) * 12 + (metrics.trackRelative || 0) * 6)
-    var targetBusX = Math.min(targetPort.x - 30,
-                              targetBusBaseX + (metrics.incomingRelative || 0) * 12 - (metrics.trackRelative || 0) * 6)
-    var trackStep = metrics.trackCount > 8 ? 14 : (metrics.trackCount > 4 ? 16 : 18)
-    var midY = (sourcePort.y + targetPort.y) / 2
-               + (metrics.trackRelative || 0) * trackStep
-               + (metrics.bundleRelative || 0) * 4
-
-    if (targetBusX <= sourceBusX + 36) {
-        var centerX = (sourcePort.x + targetPort.x) / 2
-        sourceBusX = Math.min(sourceBusX, centerX - 18)
-        targetBusX = Math.max(targetBusX, centerX + 18)
+    var gap = targetPort.x - sourcePort.x
+    if (gap > 42 && Math.abs(sourcePort.y - targetPort.y) < 10) {
+        return {
+            "route": makePolylineRoute([sourcePort, targetPort], "orthogonal"),
+            "preferred": preferred
+        }
     }
+
+    var targetBusOffset = compactBundleOffset(metrics.incomingRelative || 0,
+                                             metrics.incomingCount || 1,
+                                             12)
+    var targetBusX = Math.min(targetPort.x - 30, targetBusBaseX + targetBusOffset)
+    if (targetBusX <= sourcePort.x + 28)
+        targetBusX = sourcePort.x + Math.max(34, gap * 0.46)
 
     var points = [
         sourcePort,
-        Qt.point(sourceBusX, sourcePort.y),
-        Qt.point(sourceBusX, midY),
-        Qt.point(targetBusX, midY),
+        Qt.point(targetBusX, sourcePort.y),
         Qt.point(targetBusX, targetPort.y),
         targetPort
     ]
@@ -385,6 +424,12 @@ function overviewSameLayerBusCandidate(config, fromRect, toRect, metrics, prefer
     }
 }
 
+function componentEndpointOffset(config, edge, endpointKey) {
+    if (config.endpointPeerOffset)
+        return config.endpointPeerOffset(edge, endpointKey, 8)
+    return 0
+}
+
 function overviewMindMapRoute(config) {
     var edge = config.edge
     if (config.componentMode)
@@ -424,9 +469,6 @@ function overviewMindMapRoute(config) {
                         : 1
     var outgoingRelative = outgoingSlot ? (outgoingSlot.index - (outgoingCount - 1) / 2) : 0
     var incomingRelative = incomingSlot ? (incomingSlot.index - (incomingCount - 1) / 2) : 0
-    var slotSpacing = Math.max(18, Math.min(34, 18 + (Math.max(outgoingCount, incomingCount) - 1) * 2.6))
-    var outgoingOffset = outgoingRelative * slotSpacing
-    var incomingOffset = incomingRelative * slotSpacing
     var bundleRelative = outgoingSlot && incomingSlot
                        ? (outgoingRelative * 0.55 + incomingRelative * 0.45)
                        : (outgoingSlot ? outgoingRelative : incomingRelative)
@@ -435,7 +477,6 @@ function overviewMindMapRoute(config) {
     var trackCount = routeTrackPlacement && routeTrackPlacement.count !== undefined
             ? routeTrackPlacement.count
             : 1
-    var turnSpread = bundleRelative * Math.min(44, 20 + Math.max(outgoingCount, incomingCount) * 2.8)
     var fromLayer = config.overviewMindMapLayout.layerById
                     ? config.overviewMindMapLayout.layerById[edge.fromId]
                     : undefined
@@ -445,61 +486,28 @@ function overviewMindMapRoute(config) {
     var layerDelta = fromLayer !== undefined && toLayer !== undefined
             ? toLayer - fromLayer
             : (toCenter.x >= fromCenter.x ? 1 : -1)
-    var preferVertical = Math.abs(toCenter.y - fromCenter.y) >= Math.abs(toCenter.x - fromCenter.x) * 0.72
-    var candidates = []
+    var portSpacing = Math.max(8, Math.min(12, 8 + (Math.max(outgoingCount, incomingCount) - 1) * 0.7))
     var busMetrics = {
         "fromCenter": fromCenter,
         "toCenter": toCenter,
-        "outgoingOffset": outgoingOffset,
-        "incomingOffset": incomingOffset,
+        "outgoingOffset": outgoingRelative * portSpacing,
+        "incomingOffset": incomingRelative * portSpacing,
         "outgoingRelative": outgoingRelative,
         "incomingRelative": incomingRelative,
+        "outgoingCount": outgoingCount,
+        "incomingCount": incomingCount,
         "bundleRelative": bundleRelative,
         "trackRelative": trackRelative,
         "trackCount": trackCount
     }
 
-    if (layerDelta > 0) {
-        candidates.push(overviewForwardBusCandidate(config, fromRect, toRect, busMetrics, 0))
-    } else if (layerDelta < 0) {
-        candidates.push(overviewBackflowCandidate(config, fromRect, toRect, busMetrics, 0))
-    } else {
-        candidates.push(overviewSameLayerBusCandidate(config, fromRect, toRect, busMetrics, 0))
-    }
-
-    var startVerticalSide = toCenter.y >= fromCenter.y ? "bottom" : "top"
-    var endVerticalSide = toCenter.y >= fromCenter.y ? "top" : "bottom"
-    var verticalStart = EdgeUtils.portPoint(fromRect, startVerticalSide, outgoingOffset)
-    var verticalEnd = EdgeUtils.portPoint(toRect, endVerticalSide, incomingOffset)
-    var verticalMidY = (verticalStart.y + verticalEnd.y) / 2 + turnSpread * 0.46
-    candidates.push({
-        "route": makeOrthogonalRoute(
-                    verticalStart,
-                    Qt.point(verticalStart.x, verticalMidY),
-                    Qt.point(verticalEnd.x, verticalMidY),
-                    verticalEnd),
-        "preferred": preferVertical ? 2 : 3
-    })
-
-    var horizontalDirection = toCenter.x >= fromCenter.x ? 1 : -1
-    var horizontalStart = EdgeUtils.portPoint(fromRect, horizontalDirection > 0 ? "right" : "left", outgoingOffset)
-    var horizontalEnd = EdgeUtils.portPoint(toRect, horizontalDirection > 0 ? "left" : "right", incomingOffset)
-    var horizontalMidX = (horizontalStart.x + horizontalEnd.x) / 2 + turnSpread * 0.82
-    candidates.push({
-        "route": makeOrthogonalRoute(
-                    horizontalStart,
-                    Qt.point(horizontalMidX, horizontalStart.y),
-                    Qt.point(horizontalMidX, horizontalEnd.y),
-                    horizontalEnd),
-        "preferred": preferVertical ? 3 : 2
-    })
-
-    var bypassHorizontal = EdgeUtils.orthogonalRouteObject(config.bypassRoute(fromRect, toRect, config.laneIndex, false))
-    var bypassVertical = EdgeUtils.orthogonalRouteObject(config.bypassRoute(fromRect, toRect, config.laneIndex, true))
-    candidates.push({"route": bypassHorizontal, "preferred": preferVertical ? 5 : 4})
-    candidates.push({"route": bypassVertical, "preferred": preferVertical ? 4 : 5})
-
-    return chooseBestCandidate(candidates, edge, config.routeObjectHitsModules, config.routeObjectHitStats)
+    if (layerDelta > 1)
+        return overviewExpressForwardRoute(config, fromRect, toRect, busMetrics, 0).route
+    if (layerDelta > 0)
+        return overviewForwardBusCandidate(config, fromRect, toRect, busMetrics, 0).route
+    if (layerDelta < 0)
+        return overviewBackflowCandidate(config, fromRect, toRect, busMetrics, 0).route
+    return overviewSameLayerBusCandidate(config, fromRect, toRect, busMetrics, 0).route
 }
 
 function componentOverviewRoute(config) {
@@ -514,21 +522,40 @@ function componentOverviewRoute(config) {
 
     var fromCenter = EdgeUtils.nodeCenter(fromRect)
     var toCenter = EdgeUtils.nodeCenter(toRect)
-    var preferVertical = Math.abs(toCenter.y - fromCenter.y) > Math.abs(toCenter.x - fromCenter.x) * 1.1
-    var directHorizontal = EdgeUtils.orthogonalRouteObject(config.directRoute(edge, fromRect, toRect, config.laneIndex, false))
-    var directVertical = EdgeUtils.orthogonalRouteObject(config.directRoute(edge, fromRect, toRect, config.laneIndex, true))
-    var bypassHorizontal = EdgeUtils.orthogonalRouteObject(config.bypassRoute(fromRect, toRect, config.laneIndex, false))
-    var bypassVertical = EdgeUtils.orthogonalRouteObject(config.bypassRoute(fromRect, toRect, config.laneIndex, true))
+    var sourceOffset = componentEndpointOffset(config, edge, "fromId")
+    var targetOffset = componentEndpointOffset(config, edge, "toId")
+    var horizontalRelation = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) * 0.62
 
-    return chooseBestCandidate([
-                                   { "route": directHorizontal, "preferred": preferVertical ? 1 : 0 },
-                                   { "route": directVertical, "preferred": preferVertical ? 0 : 1 },
-                                   { "route": bypassHorizontal, "preferred": preferVertical ? 3 : 2 },
-                                   { "route": bypassVertical, "preferred": preferVertical ? 2 : 3 }
-                               ],
-                               edge,
-                               config.routeObjectHitsModules,
-                               config.routeObjectHitStats)
+    if (horizontalRelation) {
+        var forward = toCenter.x >= fromCenter.x
+        var sourceSide = forward ? "right" : "left"
+        var targetSide = forward ? "left" : "right"
+        var sourcePort = EdgeUtils.portPoint(fromRect, sourceSide, sourceOffset)
+        var targetPort = EdgeUtils.portPoint(toRect, targetSide, targetOffset)
+        var direction = forward ? 1 : -1
+        var gap = Math.abs(targetPort.x - sourcePort.x)
+
+        if (gap > 46 && Math.abs(sourcePort.y - targetPort.y) < 10)
+            return makePolylineRoute([sourcePort, targetPort], "orthogonal")
+
+        var railOffset = compactBundleOffset(targetOffset / 8, 5, 10)
+        var railX = targetPort.x - direction * (38 + railOffset)
+        if (forward && railX <= sourcePort.x + 32)
+            railX = sourcePort.x + Math.max(36, (targetPort.x - sourcePort.x) * 0.48)
+        else if (!forward && railX >= sourcePort.x - 32)
+            railX = sourcePort.x - Math.max(36, (sourcePort.x - targetPort.x) * 0.48)
+
+        return makePolylineRoute([
+                                     sourcePort,
+                                     Qt.point(railX, sourcePort.y),
+                                     Qt.point(railX, targetPort.y),
+                                     targetPort
+                                 ],
+                                 "orthogonal")
+    }
+
+    return makePolylineRoute(config.bypassRoute(fromRect, toRect, config.laneIndex, true),
+                             "orthogonal")
 }
 
 function dragPreviewRoute(config, edge, fromRect, toRect) {

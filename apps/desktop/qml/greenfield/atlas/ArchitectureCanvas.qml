@@ -22,6 +22,9 @@ Item {
     readonly property int overviewEdgeLimit: 26
     readonly property var nodes: (scene.nodes || [])
     readonly property var edges: (scene.edges || [])
+    readonly property var nodeLookup: buildNodeLookup(nodes)
+    readonly property var nodeIndexLookup: buildNodeIndexLookup(nodes)
+    readonly property var hoverConnectedNodeIds: buildHoverConnectedNodeIds(hoverNode, edges)
     readonly property var bounds: (scene.bounds || ({}))
     readonly property var overviewMindMapLayout: buildOverviewMindMapLayout()
     readonly property bool componentOverviewMode: componentMode
@@ -44,7 +47,7 @@ Item {
     readonly property real effectiveScale: baseScale * zoom
     readonly property real contentX: Math.max(18, (width - sceneWidth * effectiveScale) / 2) + panX
     readonly property real contentY: Math.max(18, (height - sceneHeight * effectiveScale) / 2) + panY
-    readonly property var visibleEdges: collectVisibleEdges(edges, selectedNode, hoverNode, showAllEdges)
+    readonly property var visibleEdges: collectVisibleEdges(edges, selectedNode, showAllEdges ? null : hoverNode, showAllEdges)
     readonly property var focusRailLayout: buildFocusRailLayout(manualNodePositions,
                                                                 activeDraggedNodeId,
                                                                 activeDragX,
@@ -221,6 +224,54 @@ Item {
         return selectedNode || hoverNode
     }
 
+    function buildNodeLookup(nodeList) {
+        var lookup = ({})
+        var list = nodeList || []
+        for (var index = 0; index < list.length; ++index) {
+            var node = list[index]
+            if (node && node.id !== undefined)
+                lookup[String(node.id)] = node
+        }
+        return lookup
+    }
+
+    function buildNodeIndexLookup(nodeList) {
+        var lookup = ({})
+        var list = nodeList || []
+        for (var index = 0; index < list.length; ++index) {
+            var node = list[index]
+            if (node && node.id !== undefined)
+                lookup[String(node.id)] = index
+        }
+        return lookup
+    }
+
+    function buildHoverConnectedNodeIds(node, edgeList) {
+        var lookup = ({})
+        if (!node || node.id === undefined)
+            return lookup
+
+        var focusKey = String(node.id)
+        lookup[focusKey] = true
+        var list = edgeList || []
+        for (var index = 0; index < list.length; ++index) {
+            var edge = list[index]
+            if (!edge)
+                continue
+            if (String(edge.fromId) === focusKey)
+                lookup[String(edge.toId)] = true
+            else if (String(edge.toId) === focusKey)
+                lookup[String(edge.fromId)] = true
+        }
+        return lookup
+    }
+
+    function nodeTouchesHover(node) {
+        if (!hoverNode || hoverNode.id === undefined || !node || node.id === undefined)
+            return false
+        return !!hoverConnectedNodeIds[String(node.id)]
+    }
+
     function relationshipFocusItems(direction) {
         if (!relationshipFocusActive)
             return []
@@ -256,19 +307,16 @@ Item {
     }
 
     function nodeById(nodeId) {
-        for (var index = 0; index < nodes.length; ++index) {
-            if (nodes[index].id === nodeId)
-                return nodes[index]
-        }
-        return null
+        if (nodeId === undefined || nodeId === null)
+            return null
+        return nodeLookup[String(nodeId)] || null
     }
 
     function nodeIndexById(nodeId) {
-        for (var index = 0; index < nodes.length; ++index) {
-            if (nodes[index].id === nodeId)
-                return index
-        }
-        return -1
+        if (nodeId === undefined || nodeId === null)
+            return -1
+        var index = nodeIndexLookup[String(nodeId)]
+        return index === undefined ? -1 : index
     }
 
     function overviewRootNode() {
@@ -341,7 +389,7 @@ Item {
         var marginX = 64
         var marginY = 64
         var laneGapY = 104
-        var baseLaneGapX = 148
+        var baseLaneGapX = 188
         var minX = 999999
         var maxX = -999999
         var minY = 999999
@@ -654,7 +702,7 @@ Item {
             laneRightByIndex[laneIndex] = currentX
             if (laneIndex < laneBuckets.length - 1) {
                 var corridorLoad = corridorLoadByGap[laneIndex] || 0
-                var corridorBonus = Math.min(124, corridorLoad * 12)
+                var corridorBonus = Math.min(148, corridorLoad * 12)
                 currentX += baseLaneGapX + corridorBonus
             }
         }
@@ -1670,19 +1718,7 @@ Item {
         }
 
         var sortedEntries = EdgePainter.sortRenderEntries(entries)
-        return EdgeUtils.spreadOverlappingRouteMiddles(sortedEntries, {
-            "laneStep": root.componentMode ? 14 : 20,
-            "maxOffset": root.componentMode ? 38 : 64,
-            "laneBucketSize": root.componentMode ? 7 : 8,
-            "minSegmentLength": 24,
-            "overlapPadding": root.componentMode ? 18 : 30,
-            "routeObjectHitStats": function(route, edge) {
-                return root.routeObjectHitStats(route, edge)
-            },
-            "routeObjectAnyNodeHitStats": function(route, edge) {
-                return root.routeObjectAnyNodeHitStats(route, edge)
-            }
-        })
+        return sortedEntries
     }
 
     function edgeCanvasFrame(_manualNodePositions, _activeDraggedNodeId, _activeDragX, _activeDragY) {
@@ -2080,7 +2116,9 @@ Item {
                 border.color: selected ? root.tokens.signalCobalt : root.tokens.border1
                 border.width: selected ? 2 : 1
                 z: hovered || selected ? 10 : 2
-                opacity: root.selectedNode && !selected ? 0.58 : 1.0
+                opacity: root.hoverNode && !root.selectedNode
+                         ? (root.nodeTouchesHover(modelData) ? 1.0 : 0.34)
+                         : (root.selectedNode && !selected ? 0.50 : 1.0)
 
                 Behavior on opacity { NumberAnimation { duration: 140 } }
 
