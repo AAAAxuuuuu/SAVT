@@ -630,33 +630,50 @@ function portPoint(rect, side, lane) {
     return makePoint(rect.x + rect.width / 2 + lane, rect.y)
 }
 
-function overviewEdgeBaseColor(edge) {
+function colorWithAlpha(color, alpha) {
+    if (!color)
+        return Qt.rgba(0.636, 0.636, 0.667, alpha)
+    return Qt.rgba(color.r, color.g, color.b, alpha)
+}
+
+function edgeSemanticColor(tokens, edge, alpha) {
+    var kind = String(edge && edge.kind ? edge.kind : "").toLowerCase()
+    var resolvedAlpha = alpha === undefined ? 0.82 : alpha
+
+    if (kind === "activates")
+        return colorWithAlpha(tokens ? tokens.signalCobalt : Qt.rgba(0.0, 0.478, 1.0, 1.0), resolvedAlpha)
+    if (kind === "uses_infrastructure" || kind === "uses_support")
+        return colorWithAlpha(tokens ? tokens.signalAmber : Qt.rgba(1.0, 0.584, 0.0, 1.0), resolvedAlpha)
+    if (kind === "enables" || kind === "coordinates" || kind === "depends_on")
+        return Qt.rgba(0.290, 0.478, 0.710, resolvedAlpha)
+    return colorWithAlpha(tokens ? tokens.graphEdge : Qt.rgba(0.636, 0.636, 0.667, 1.0), resolvedAlpha)
+}
+
+function overviewEdgeBaseColor(edge, tokens) {
     var kind = String(edge && edge.kind ? edge.kind : "").toLowerCase()
     if (kind === "activates")
-        return Qt.rgba(0.20, 0.68, 0.90, 0.92)
+        return edgeSemanticColor(tokens, edge, 0.74)
     if (kind === "uses_infrastructure")
-        return Qt.rgba(0.92, 0.62, 0.18, 0.88)
+        return edgeSemanticColor(tokens, edge, 0.72)
     if (kind === "enables")
-        return Qt.rgba(0.00, 0.48, 1.00, 0.92)
-    return Qt.rgba(0.42, 0.42, 1.00, 0.9)
+        return edgeSemanticColor(tokens, edge, 0.64)
+    return edgeSemanticColor(tokens, edge, 0.62)
 }
 
 function edgeColor(config) {
     var edge = config.edge
     if (!config.componentMode) {
         var hoverRelation = overviewHoverRelation(config.hoverNode, edge)
-        if (hoverRelation === "incoming")
-            return config.tokens.signalRaspberry
-        if (hoverRelation === "outgoing")
-            return config.tokens.signalCobalt
+        if (hoverRelation === "incoming" || hoverRelation === "outgoing")
+            return edgeSemanticColor(config.tokens, edge, 0.88)
         if (config.isOverviewPrimaryEdge(edge))
-            return overviewEdgeBaseColor(edge)
-        return mixColor(Qt.rgba(0.33, 0.43, 0.56, 0.62), overviewEdgeBaseColor(edge), 0.32)
+            return overviewEdgeBaseColor(edge, config.tokens)
+        return mixColor(Qt.rgba(0.455, 0.565, 0.690, 0.50), overviewEdgeBaseColor(edge, config.tokens), 0.30)
     }
 
-    if (config.focusNode && edge.toId === config.focusNode.id)
-        return config.tokens.signalRaspberry
-    return config.tokens.signalCobalt
+    if (config.focusNode && edgeTouchesFocus(config.focusNode, edge))
+        return edgeSemanticColor(config.tokens, edge, 0.92)
+    return edgeSemanticColor(config.tokens, edge, 0.72)
 }
 
 function edgeBundleColor(baseColor, relativeIndex, count) {
@@ -665,10 +682,10 @@ function edgeBundleColor(baseColor, relativeIndex, count) {
 
     var halfSpan = Math.max(1, (count - 1) / 2)
     var normalized = Math.max(-1, Math.min(1, relativeIndex / halfSpan))
-    var coolAccent = Qt.rgba(0.12, 0.72, 1.0, baseColor.a)
-    var warmAccent = Qt.rgba(0.62, 0.42, 1.0, baseColor.a)
+    var coolAccent = Qt.rgba(1.0, 1.0, 1.0, baseColor.a)
+    var warmAccent = Qt.rgba(0.42, 0.42, 0.45, baseColor.a)
     var accent = normalized >= 0 ? coolAccent : warmAccent
-    var accentMix = 0.08 + Math.abs(normalized) * 0.16
+    var accentMix = 0.04 + Math.abs(normalized) * 0.10
     var toned = mixColor(baseColor, accent, accentMix)
     return normalized >= 0
             ? mixColor(toned, Qt.rgba(1, 1, 1, baseColor.a), 0.05)

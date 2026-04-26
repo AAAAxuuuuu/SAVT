@@ -174,7 +174,7 @@ ScrollView {
                             text: "精确推演"
                             hint: "检查或生成 compile_commands.json 后，执行精确推演。"
                             disabledHint: "先选择项目目录，再启动精确推演。"
-                            tone: "secondary"
+                            tone: "analysis"
                             enabled: root.caseState.hasProject
                             onClicked: root.analysisController.analyzeCurrentProjectHighPrecision()
                         }

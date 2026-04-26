@@ -28,13 +28,13 @@ QtObject {
 
     readonly property color accentStrong: tokens.brand600
     readonly property color accentBase: tokens.brand500
-    readonly property color accentMuted: "#4B7FB2"
-    readonly property color accentSoft: "#DCE8F3"
-    readonly property color accentWash: "#EEF5FB"
-    readonly property color accentCanvas: "#F2F7FB"
+    readonly property color accentMuted: "#5AC8FA"
+    readonly property color accentSoft: "#EAF4FF"
+    readonly property color accentWash: "#F2F8FF"
+    readonly property color accentCanvas: "#F5F5F7"
     readonly property color aiAccent: tokens.ai500
-    readonly property color aiSoft: "#DCEFEB"
-    readonly property color aiWash: "#EEF8F6"
+    readonly property color aiSoft: "#E9EDFF"
+    readonly property color aiWash: "#F1F4FF"
 
     readonly property color success: tokens.success
     readonly property color warning: tokens.warning
@@ -70,17 +70,17 @@ QtObject {
 
     function statusColors(tone) {
         if (tone === "success")
-            return {"fill": "#EAF6F2", "border": "#A8D0C1", "text": success}
+            return {"fill": "#EDF9FF", "border": "#B8E7FF", "text": success}
         if (tone === "warning")
             return {"fill": "#FFF6E8", "border": "#E2C18B", "text": warning}
         if (tone === "danger")
             return {"fill": "#F8ECEA", "border": "#D9ADA7", "text": danger}
         if (tone === "info")
-            return {"fill": "#EAF2FA", "border": "#A9C7E1", "text": info}
+            return {"fill": "#EAF4FF", "border": "#BBD9FF", "text": info}
         if (tone === "brand")
-            return {"fill": "#E8F0F8", "border": "#A9C3DD", "text": accentStrong}
+            return {"fill": "#EAF4FF", "border": "#BBD9FF", "text": accentStrong}
         if (tone === "ai")
-            return {"fill": "#E7F3F1", "border": "#A8D3CE", "text": aiAccent}
+            return {"fill": "#E9EDFF", "border": "#B8C2FF", "text": aiAccent}
         return {"fill": surfaceSecondary, "border": borderSubtle, "text": inkNormal}
     }
 
@@ -88,12 +88,12 @@ QtObject {
         if (selected)
             return accentStrong
         if (kind === "entry" || kind === "entry_component")
-            return "#E3F4EE"
+            return "#EDF9FF"
         if (kind === "infrastructure")
             return "#FFF2DC"
         if (kind === "support_component")
-            return "#F6F0E3"
-        return "#EDF3F8"
+            return "#F2F2F7"
+        return "#EAF4FF"
     }
 
     function nodeBorder(kind, selected, pinned) {
@@ -102,23 +102,23 @@ QtObject {
         if (pinned)
             return "#B78228"
         if (kind === "entry" || kind === "entry_component")
-            return "#7CB4A5"
+            return "#5AC8FA"
         if (kind === "infrastructure")
             return "#D1A24F"
         if (kind === "support_component")
-            return "#B89A65"
-        return "#9FB4C8"
+            return "#AEAEB2"
+        return "#A2A2AA"
     }
 
     function nodeAccent(kind, selected) {
         if (selected)
-            return "#D9E7F3"
+            return "#E5E5EA"
         if (kind === "entry" || kind === "entry_component")
-            return "#2E8176"
+            return "#5AC8FA"
         if (kind === "infrastructure")
             return "#B87417"
         if (kind === "support_component")
-            return "#8D6F34"
+            return "#5856D6"
         return accentBase
     }
 
@@ -131,7 +131,7 @@ QtObject {
     }
 
     function groupFill(index) {
-        var fills = ["#F6FAFC", "#F9F7FB", "#FBF9F5", "#F4F8FB"]
+        var fills = ["#FFFFFF", "#F5F5F7", "#F2F2F7", "#FBFBFD"]
         return fills[index % fills.length]
     }
 

@@ -16,32 +16,38 @@ Button {
     readonly property color fillColor: {
         if (tone === "primary")
             return tokens.signalCobalt
+        if (tone === "analysis")
+            return tokens.signalCobaltSoft
         if (tone === "danger")
             return tokens.signalCoral
         if (tone === "ai")
             return tokens.signalRaspberry
         if (tone === "ghost")
             return Qt.rgba(1, 1, 1, 0.0)
-        return Qt.rgba(1, 1, 1, 0.82)
+        return tokens.panelStrong
     }
     readonly property color fillColor2: {
         if (tone === "primary")
-            return Qt.lighter(tokens.signalMoss, 1.08)
+            return Qt.darker(tokens.signalCobalt, 1.10)
+        if (tone === "analysis")
+            return tokens.panelStrong
         if (tone === "danger")
-            return Qt.lighter(tokens.signalCoral, 1.05)
+            return Qt.darker(tokens.signalCoral, 1.04)
         if (tone === "ai")
-            return Qt.rgba(0.63, 0.35, 0.96, 0.96)
+            return Qt.lighter(tokens.signalRaspberry, 1.06)
         if (tone === "ghost")
             return Qt.rgba(1, 1, 1, 0.0)
-        return Qt.rgba(1, 1, 1, 0.64)
+        return tokens.panelSoft
     }
     readonly property color strokeColor: {
         if (tone === "primary")
-            return Qt.rgba(tokens.signalCobalt.r, tokens.signalCobalt.g, tokens.signalCobalt.b, 0.34)
+            return Qt.rgba(tokens.signalCobalt.r, tokens.signalCobalt.g, tokens.signalCobalt.b, 0.22)
+        if (tone === "analysis")
+            return Qt.rgba(tokens.signalCobalt.r, tokens.signalCobalt.g, tokens.signalCobalt.b, 0.28)
         if (tone === "danger")
             return Qt.rgba(tokens.signalCoral.r, tokens.signalCoral.g, tokens.signalCoral.b, 0.3)
         if (tone === "ai")
-            return Qt.rgba(tokens.signalRaspberry.r, tokens.signalRaspberry.g, tokens.signalRaspberry.b, 0.34)
+            return Qt.rgba(tokens.signalRaspberry.r, tokens.signalRaspberry.g, tokens.signalRaspberry.b, 0.26)
         if (tone === "ghost")
             return tokens.border2
         return tokens.border1
@@ -49,6 +55,8 @@ Button {
     readonly property color labelColor: {
         if (tone === "primary" || tone === "danger" || tone === "ai")
             return "#FFFFFF"
+        if (tone === "analysis")
+            return tokens.signalCobalt
         return tokens.text1
     }
 
@@ -118,10 +126,12 @@ Button {
                         return Qt.rgba(control.fillColor.r, control.fillColor.g, control.fillColor.b, 0.36)
                     if (control.down && control.tone !== "ghost")
                         return Qt.darker(control.fillColor, 1.08)
+                    if (control.hovered && control.tone === "analysis")
+                        return Qt.rgba(control.tokens.signalCobalt.r, control.tokens.signalCobalt.g, control.tokens.signalCobalt.b, 0.11)
                     if (control.hovered && control.tone === "secondary")
                         return Qt.rgba(1, 1, 1, 0.94)
                     if (control.hovered && control.tone === "ghost")
-                        return Qt.rgba(1, 1, 1, 0.24)
+                        return Qt.rgba(1, 1, 1, 0.34)
                     if (control.hovered)
                         return Qt.lighter(control.fillColor, 1.04)
                     return control.fillColor
@@ -139,10 +149,12 @@ Button {
                         return Qt.rgba(control.fillColor2.r, control.fillColor2.g, control.fillColor2.b, 0.28)
                     if (control.down && control.tone !== "ghost")
                         return Qt.darker(control.fillColor2, 1.08)
+                    if (control.hovered && control.tone === "analysis")
+                        return Qt.rgba(1, 1, 1, 0.94)
                     if (control.hovered && control.tone === "secondary")
-                        return Qt.rgba(1, 1, 1, 0.76)
+                        return Qt.rgba(0.952, 0.952, 0.968, 0.86)
                     if (control.hovered && control.tone === "ghost")
-                        return Qt.rgba(1, 1, 1, 0.08)
+                        return Qt.rgba(0.952, 0.952, 0.968, 0.38)
                     if (control.hovered)
                         return Qt.lighter(control.fillColor2, 1.04)
                     return control.fillColor2
@@ -160,7 +172,7 @@ Button {
             color: "transparent"
             border.color: control.tone === "ghost" ? "transparent" : control.tokens.shineBorder
             border.width: control.enabled ? 1 : 0
-            opacity: control.tone === "secondary" ? 0.72 : 0.46
+            opacity: control.tone === "secondary" || control.tone === "analysis" ? 0.28 : 0.18
         }
 
         Rectangle {

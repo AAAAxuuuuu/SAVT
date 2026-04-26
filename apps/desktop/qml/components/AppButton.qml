@@ -70,39 +70,39 @@ Button {
 
     function fillColor() {
         if (!enabled)
-            return "#edf2f6"
+            return "#F2F2F7"
         if (tone === "accent")
-            return down || checked ? "#173958" : (hovered ? "#2d5f91" : "#214d77")
+            return down || checked ? "#006EDB" : (hovered ? "#1A86FF" : "#007AFF")
         if (tone === "danger")
-            return down || checked ? "#7e3d33" : (hovered ? "#ad5a4b" : "#9c4c3e")
+            return down || checked ? "#D70015" : (hovered ? "#FF453A" : "#FF3B30")
         if (tone === "ghost")
-            return down || checked ? "#dbe6ef" : (hovered ? "#f7fbff" : "#edf3f8")
+            return down || checked ? "#E5E5EA" : (hovered ? "#FFFFFF" : "#F2F2F7")
         if (tone === "ai")
-            return down || checked ? "#6842c2" : (hovered ? "#8264d8" : "#7657cf")
-        return down || checked ? "#eef4f9" : (hovered ? "#f8fbfd" : "#ffffff")
+            return down || checked ? "#4846C8" : (hovered ? "#6866E0" : "#5856D6")
+        return down || checked ? "#F2F2F7" : (hovered ? "#FFFFFF" : "#FFFFFF")
     }
 
     function borderColor() {
         if (!enabled)
-            return "#d7e0e8"
+            return "#D1D1D6"
         if (activeFocus)
-            return "#78AEE4"
+            return "#5AC8FA"
         if (tone === "accent")
-            return "#173958"
+            return "#006EDB"
         if (tone === "danger")
-            return "#7e3d33"
+            return "#D70015"
         if (tone === "ai")
-            return "#6842c2"
+            return "#4846C8"
         if (tone === "ghost")
-            return "#cedae5"
-        return checked ? "#7f98ae" : "#c8d5e2"
+            return "#D1D1D6"
+        return checked ? "#5AC8FA" : "#D1D1D6"
     }
 
     function textColor() {
         if (!enabled)
-            return "#91a1af"
+            return "#8E8E93"
         if (tone === "accent" || tone === "danger" || tone === "ai")
             return "#f8fbff"
-        return "#1c3148"
+        return "#1D1D1F"
     }
 }

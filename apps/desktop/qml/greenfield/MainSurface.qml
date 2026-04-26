@@ -30,34 +30,33 @@ Item {
             return Qt.rgba(color.r, color.g, color.b, alpha)
         }
 
-        function paintGlow(ctx, cx, cy, radius, color, coreAlpha, edgeAlpha) {
-            var gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius)
-            gradient.addColorStop(0.0, rgbaWithAlpha(color, coreAlpha))
-            gradient.addColorStop(0.42, rgbaWithAlpha(color, coreAlpha * 0.48))
-            gradient.addColorStop(1.0, rgbaWithAlpha(color, edgeAlpha))
-            ctx.fillStyle = gradient
-            ctx.beginPath()
-            ctx.arc(cx, cy, radius, 0, Math.PI * 2)
-            ctx.fill()
-        }
-
         onPaint: {
             var ctx = getContext("2d")
             var gradient = ctx.createLinearGradient(0, 0, 0, height)
+            var beam = ctx.createLinearGradient(width * 0.08, height * 0.06,
+                                                width * 0.92, height * 0.78)
+            var horizon = ctx.createLinearGradient(0, height * 0.18,
+                                                   width, height * 0.86)
 
             ctx.reset()
             gradient.addColorStop(0.0, tokens.base0)
-            gradient.addColorStop(0.52, tokens.base1)
+            gradient.addColorStop(0.58, tokens.base1)
             gradient.addColorStop(1.0, tokens.base2)
             ctx.fillStyle = gradient
             ctx.fillRect(0, 0, width, height)
 
-            paintGlow(ctx, width * 0.12, height * 0.16, Math.max(width, height) * 0.22,
-                      tokens.ambientCyan, 0.26, 0.0)
-            paintGlow(ctx, width * 0.84, height * 0.12, Math.max(width, height) * 0.2,
-                      tokens.ambientViolet, 0.22, 0.0)
-            paintGlow(ctx, width * 0.54, height * 0.72, Math.max(width, height) * 0.26,
-                      tokens.ambientBlue, 0.16, 0.0)
+            beam.addColorStop(0.0, "transparent")
+            beam.addColorStop(0.34, rgbaWithAlpha(tokens.signalCobalt, 0.030))
+            beam.addColorStop(0.62, rgbaWithAlpha(tokens.signalMoss, 0.022))
+            beam.addColorStop(1.0, "transparent")
+            ctx.fillStyle = beam
+            ctx.fillRect(0, 0, width, height)
+
+            horizon.addColorStop(0.0, "transparent")
+            horizon.addColorStop(0.48, rgbaWithAlpha(tokens.signalCobalt, 0.018))
+            horizon.addColorStop(1.0, "transparent")
+            ctx.fillStyle = horizon
+            ctx.fillRect(0, 0, width, height)
         }
 
         onWidthChanged: requestPaint()

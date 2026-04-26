@@ -231,7 +231,7 @@ Item {
                                     tokens: root.tokens
                                     text: "精确推演"
                                     compact: true
-                                    tone: "secondary"
+                                    tone: "analysis"
                                     enabled: root.caseState.hasProject
                                     onClicked: root.analysisController.analyzeCurrentProjectHighPrecision()
                                 }
@@ -586,7 +586,7 @@ Item {
                 ActionButton {
                     tokens: startOverlay.tokens
                     text: caseState.hasProject ? "切换项目" : "选择项目"
-                    tone: "secondary"
+                    tone: caseState.hasProject ? "secondary" : "primary"
                     onClicked: chooseProjectRequested()
                 }
 
@@ -601,7 +601,7 @@ Item {
                 ActionButton {
                     tokens: startOverlay.tokens
                     text: "精确推演"
-                    tone: "secondary"
+                    tone: "analysis"
                     enabled: caseState.hasProject
                     onClicked: analysisController.analyzeCurrentProjectHighPrecision()
                 }

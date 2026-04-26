@@ -544,14 +544,14 @@ Item {
         implicitHeight: 26
         implicitWidth: chipLabel.implicitWidth + 16
         color: tone === "brand"
-               ? Qt.rgba(0.00, 0.48, 1.00, 0.10)
+               ? root.tokens.signalCobaltSoft
                : (tone === "success"
-                  ? Qt.rgba(0.20, 0.78, 0.34, 0.12)
+                  ? root.tokens.signalTealSoft
                   : Qt.rgba(0.12, 0.18, 0.28, 0.06))
         border.color: tone === "brand"
-                      ? Qt.rgba(0.00, 0.48, 1.00, 0.20)
+                      ? Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.20)
                       : (tone === "success"
-                         ? Qt.rgba(0.20, 0.78, 0.34, 0.18)
+                         ? Qt.rgba(root.tokens.signalTeal.r, root.tokens.signalTeal.g, root.tokens.signalTeal.b, 0.18)
                          : tokens.border1)
 
         Label {

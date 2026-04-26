@@ -20,8 +20,8 @@ Rectangle {
     clip: true
 
     gradient: Gradient {
-        GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.74) }
-        GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.54) }
+        GradientStop { position: 0.0; color: root.tokens.sidebarBase }
+        GradientStop { position: 1.0; color: root.tokens.panelSoft }
     }
 
     Rectangle {
@@ -99,7 +99,7 @@ Rectangle {
                 radius: root.tokens.radiusLg
                 color: "transparent"
                 border.color: active
-                              ? Qt.rgba(1, 1, 1, 0.24)
+                              ? Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.28)
                               : (hovered ? root.tokens.border1 : "transparent")
 
                 gradient: Gradient {
@@ -107,17 +107,17 @@ Rectangle {
                         position: 0.0
                         color: navItem.active
                                ? root.tokens.signalCobalt
-                               : (navItem.hovered ? Qt.rgba(1, 1, 1, 0.46) : "transparent")
+                               : (navItem.hovered ? root.tokens.signalCobaltSoft : "transparent")
                     }
 
                     GradientStop {
                         position: 1.0
                         color: navItem.active
-                               ? Qt.rgba(root.tokens.signalRaspberry.r,
-                                         root.tokens.signalRaspberry.g,
-                                         root.tokens.signalRaspberry.b,
-                                         0.92)
-                               : (navItem.hovered ? Qt.rgba(1, 1, 1, 0.18) : "transparent")
+                               ? Qt.darker(root.tokens.signalCobalt, 1.08)
+                               : (navItem.hovered ? Qt.rgba(root.tokens.signalCobalt.r,
+                                                            root.tokens.signalCobalt.g,
+                                                            root.tokens.signalCobalt.b,
+                                                            0.05) : "transparent")
                     }
                 }
 
@@ -183,14 +183,14 @@ Rectangle {
                     GradientStop {
                         position: 0.0
                         color: searchField.activeFocus
-                               ? Qt.rgba(1, 1, 1, 0.96)
-                               : Qt.rgba(1, 1, 1, 0.9)
+                               ? root.tokens.panelStrong
+                               : root.tokens.searchBase
                     }
                     GradientStop {
                         position: 1.0
                         color: searchField.activeFocus
-                               ? Qt.rgba(1, 1, 1, 0.82)
-                               : Qt.rgba(1, 1, 1, 0.72)
+                               ? root.tokens.panelBase
+                               : root.tokens.panelSoft
                     }
                 }
             }
@@ -292,7 +292,7 @@ Rectangle {
                 hint: "接入 compile_commands.json 和语义后端，提升关系推断精度。"
                 disabledHint: "先选择项目，再启动精确推演。"
                 compact: true
-                tone: "secondary"
+                tone: "analysis"
                 enabled: root.caseState.hasProject
                 onClicked: root.analysisController.analyzeCurrentProjectHighPrecision()
             }

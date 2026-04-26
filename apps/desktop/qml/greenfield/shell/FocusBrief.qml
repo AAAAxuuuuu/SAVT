@@ -18,8 +18,8 @@ Rectangle {
     clip: true
 
     gradient: Gradient {
-        GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.76) }
-        GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.56) }
+        GradientStop { position: 0.0; color: root.tokens.panelStrong }
+        GradientStop { position: 1.0; color: root.tokens.panelSoft }
     }
 
     Rectangle {

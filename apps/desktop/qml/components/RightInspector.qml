@@ -19,7 +19,7 @@ Item {
 
     function confidenceFillColor(label) {
         if (label === "high")
-            return "#edf7ee"
+            return "#EDF9FF"
         if (label === "medium")
             return "#fff7e8"
         if (label === "low")
@@ -29,7 +29,7 @@ Item {
 
     function confidenceBorderColor(label) {
         if (label === "high")
-            return "#9fc8aa"
+            return "#B8E7FF"
         if (label === "medium")
             return "#e1c27b"
         if (label === "low")

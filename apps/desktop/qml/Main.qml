@@ -110,7 +110,7 @@ ApplicationWindow {
     minimumHeight: 780
     visible: false
     title: "SAVT"
-    color: "#F6F7F9"
+    color: "#F5F5F7"
 
     MainSurface {
         anchors.fill: parent

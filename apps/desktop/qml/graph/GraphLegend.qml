@@ -42,13 +42,13 @@ Item {
                 Repeater {
                     model: root.mode === "component"
                            ? [
-                                 {"label": "入口组件", "fill": "#E3F4EE", "border": "#7CB4A5"},
-                                 {"label": "核心组件", "fill": "#EDF3F8", "border": "#9FB4C8"},
-                                 {"label": "支撑组件", "fill": "#F6F0E3", "border": "#B89A65"}
+                                 {"label": "入口组件", "fill": "#EDF9FF", "border": "#B8E7FF"},
+                                 {"label": "核心组件", "fill": "#F2F2F7", "border": "#C7C7CC"},
+                                 {"label": "支撑组件", "fill": "#EFEFFF", "border": "#C7C7CC"}
                              ]
                            : [
-                                 {"label": "入口能力", "fill": "#E3F4EE", "border": "#7CB4A5"},
-                                 {"label": "核心能力", "fill": "#EDF3F8", "border": "#9FB4C8"},
+                                 {"label": "入口能力", "fill": "#EDF9FF", "border": "#B8E7FF"},
+                                 {"label": "核心能力", "fill": "#F2F2F7", "border": "#C7C7CC"},
                                  {"label": "基础设施", "fill": "#FFF2DC", "border": "#D1A24F"}
                              ]
 

@@ -7,46 +7,46 @@ QtObject {
                                              : Qt.platform.os === "osx" ? "Menlo"
                                              : "monospace"
 
-    readonly property color base0: "#FCFEFF"
-    readonly property color base1: "#F4F6FB"
-    readonly property color base2: "#EEF2F8"
-    readonly property color base3: "#DCE5EF"
-    readonly property color sidebarBase: Qt.rgba(1.0, 1.0, 1.0, 0.62)
-    readonly property color topbarBase: Qt.rgba(1.0, 1.0, 1.0, 0.48)
-    readonly property color panelBase: Qt.rgba(1.0, 1.0, 1.0, 0.72)
-    readonly property color panelStrong: Qt.rgba(1.0, 1.0, 1.0, 0.82)
-    readonly property color panelSoft: Qt.rgba(1.0, 1.0, 1.0, 0.58)
-    readonly property color searchBase: Qt.rgba(1.0, 1.0, 1.0, 0.82)
-    readonly property color border1: Qt.rgba(0.0588, 0.0902, 0.1647, 0.08)
-    readonly property color border2: Qt.rgba(0.0588, 0.0902, 0.1647, 0.14)
-    readonly property color shineBorder: Qt.rgba(1.0, 1.0, 1.0, 0.64)
-    readonly property color shadowColor: Qt.rgba(0.0588, 0.0902, 0.1647, 0.12)
+    readonly property color base0: "#F5F5F7"
+    readonly property color base1: "#F2F2F7"
+    readonly property color base2: "#E8E8ED"
+    readonly property color base3: "#D1D1D6"
+    readonly property color sidebarBase: Qt.rgba(1.0, 1.0, 1.0, 0.72)
+    readonly property color topbarBase: Qt.rgba(1.0, 1.0, 1.0, 0.66)
+    readonly property color panelBase: Qt.rgba(1.0, 1.0, 1.0, 0.78)
+    readonly property color panelStrong: Qt.rgba(1.0, 1.0, 1.0, 0.90)
+    readonly property color panelSoft: Qt.rgba(0.972, 0.972, 0.984, 0.74)
+    readonly property color searchBase: Qt.rgba(1.0, 1.0, 1.0, 0.86)
+    readonly property color border1: Qt.rgba(0.235, 0.235, 0.263, 0.12)
+    readonly property color border2: Qt.rgba(0.235, 0.235, 0.263, 0.20)
+    readonly property color shineBorder: Qt.rgba(1.0, 1.0, 1.0, 0.66)
+    readonly property color shadowColor: Qt.rgba(0.0, 0.0, 0.0, 0.12)
 
-    readonly property color text1: "#0F172A"
-    readonly property color text2: "#334155"
-    readonly property color text3: "#64748B"
+    readonly property color text1: "#1D1D1F"
+    readonly property color text2: "#3C3C43"
+    readonly property color text3: "#8E8E93"
     readonly property color textInverse: "#FFFFFF"
 
-    readonly property color signalTeal: "#22C55E"
-    readonly property color signalTealSoft: "#E9FAEF"
+    readonly property color signalTeal: "#5AC8FA"
+    readonly property color signalTealSoft: "#EDF9FF"
     readonly property color signalCobalt: "#007AFF"
-    readonly property color signalCobaltSoft: "#E7F1FF"
-    readonly property color signalAmber: "#F59E0B"
-    readonly property color signalAmberSoft: "#FFF5DF"
-    readonly property color signalCoral: "#EF4444"
-    readonly property color signalCoralSoft: "#FDECEC"
-    readonly property color signalRaspberry: "#8B5CF6"
-    readonly property color signalRaspberrySoft: "#F3EDFF"
-    readonly property color signalMoss: "#32ADE6"
-    readonly property color signalMossSoft: "#E8F7FD"
+    readonly property color signalCobaltSoft: "#EAF4FF"
+    readonly property color signalAmber: "#FF9500"
+    readonly property color signalAmberSoft: "#FFF4E5"
+    readonly property color signalCoral: "#FF3B30"
+    readonly property color signalCoralSoft: "#FFEDEC"
+    readonly property color signalRaspberry: "#5856D6"
+    readonly property color signalRaspberrySoft: "#EFEFFF"
+    readonly property color signalMoss: "#64D2FF"
+    readonly property color signalMossSoft: "#EFFBFF"
 
-    readonly property color graphCanvas: Qt.rgba(0.9725, 0.9804, 0.9922, 0.82)
-    readonly property color graphGrid: Qt.rgba(0.0588, 0.0902, 0.1647, 0.055)
-    readonly property color graphEdge: "#97A7BA"
+    readonly property color graphCanvas: "#F5F5F7"
+    readonly property color graphGrid: Qt.rgba(0.235, 0.235, 0.263, 0.055)
+    readonly property color graphEdge: "#A2A2AA"
     readonly property color graphEdgeFocus: "#007AFF"
-    readonly property color ambientBlue: Qt.rgba(0.0, 0.4784, 1.0, 0.18)
-    readonly property color ambientViolet: Qt.rgba(0.4314, 0.4196, 1.0, 0.16)
-    readonly property color ambientCyan: Qt.rgba(0.1961, 0.6784, 0.9020, 0.14)
+    readonly property color ambientBlue: Qt.rgba(0.0, 0.478, 1.0, 0.07)
+    readonly property color ambientViolet: Qt.rgba(0.345, 0.337, 0.839, 0.045)
+    readonly property color ambientCyan: Qt.rgba(0.353, 0.784, 0.980, 0.055)
 
     readonly property int radiusXs: 6
     readonly property int radiusSm: 8

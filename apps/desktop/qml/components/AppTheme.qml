@@ -5,92 +5,92 @@ QtObject {
     readonly property string textFontFamily: Qt.platform.os === "windows" ? "Segoe UI" : "PingFang SC"
     readonly property string monoFontFamily: Qt.platform.os === "windows" ? "Cascadia Mono" : "Menlo"
 
-    readonly property color windowBase: "#ebf1f4"
-    readonly property color windowTop: "#f6f8fb"
-    readonly property color windowWash: "#dbe7f0"
-    readonly property color surfacePrimary: "#fbfdff"
-    readonly property color surfaceSecondary: "#f2f6fa"
-    readonly property color surfaceMuted: "#e9eff5"
-    readonly property color borderSubtle: "#d7e0e8"
-    readonly property color borderStrong: "#b6c5d3"
-    readonly property color inkStrong: "#112133"
-    readonly property color inkNormal: "#32465a"
-    readonly property color inkMuted: "#65788a"
-    readonly property color accentStrong: "#214d77"
-    readonly property color accentSoft: "#d8e5f0"
-    readonly property color accentMuted: "#8ea8c1"
-    readonly property color tealSoft: "#dbefe8"
-    readonly property color amberSoft: "#f9ecd4"
-    readonly property color roseSoft: "#f5e3de"
-    readonly property color success: "#1f7a69"
-    readonly property color warning: "#b77319"
-    readonly property color danger: "#9c4c3e"
-    readonly property color graphGrid: "#dfe7ee"
+    readonly property color windowBase: "#F5F5F7"
+    readonly property color windowTop: "#FBFBFD"
+    readonly property color windowWash: "#E8E8ED"
+    readonly property color surfacePrimary: "#FFFFFF"
+    readonly property color surfaceSecondary: "#F2F2F7"
+    readonly property color surfaceMuted: "#E5E5EA"
+    readonly property color borderSubtle: "#D1D1D6"
+    readonly property color borderStrong: "#C7C7CC"
+    readonly property color inkStrong: "#1D1D1F"
+    readonly property color inkNormal: "#3C3C43"
+    readonly property color inkMuted: "#8E8E93"
+    readonly property color accentStrong: "#007AFF"
+    readonly property color accentSoft: "#EAF4FF"
+    readonly property color accentMuted: "#5AC8FA"
+    readonly property color tealSoft: "#EDF9FF"
+    readonly property color amberSoft: "#FFF4E5"
+    readonly property color roseSoft: "#FFEDEC"
+    readonly property color success: "#5AC8FA"
+    readonly property color warning: "#FF9500"
+    readonly property color danger: "#FF3B30"
+    readonly property color graphGrid: "#E5E5EA"
 
     function nodeFill(kind, selected) {
         if (selected)
-            return "#214d77"
+            return "#007AFF"
         if (kind === "entry" || kind === "entry_component")
-            return "#e0f2ec"
+            return "#EDF9FF"
         if (kind === "infrastructure")
-            return "#fff2db"
+            return "#FFF4E5"
         if (kind === "support_component")
-            return "#f4efe4"
-        return "#eef4f9"
+            return "#F2F2F7"
+        return "#EAF4FF"
     }
 
     function nodeBorder(kind, selected, pinned) {
         if (selected)
-            return "#163754"
+            return "#006EDB"
         if (pinned)
-            return "#c0892e"
+            return "#FF9500"
         if (kind === "entry" || kind === "entry_component")
-            return "#8bb8ad"
+            return "#5AC8FA"
         if (kind === "infrastructure")
-            return "#d1a24f"
+            return "#FF9500"
         if (kind === "support_component")
-            return "#b79c6e"
-        return "#9bb2c7"
+            return "#AEAEB2"
+        return "#A2A2AA"
     }
 
     function nodeAccent(kind, selected) {
         if (selected)
-            return "#d8e5f0"
+            return "#E5E5EA"
         if (kind === "entry" || kind === "entry_component")
-            return "#2f7f70"
+            return "#5AC8FA"
         if (kind === "infrastructure")
-            return "#b87818"
+            return "#FF9500"
         if (kind === "support_component")
-            return "#8d6f34"
-        return "#35608b"
+            return "#5856D6"
+        return "#007AFF"
     }
 
     function edgeColor(kind) {
         if (kind === "activates")
-            return "#2f6aa0"
+            return "#007AFF"
         if (kind === "uses_infrastructure" || kind === "uses_support")
-            return "#bf8b2d"
-        return "#71879c"
+            return "#FF9500"
+        return "#A2A2AA"
     }
 
     function groupFill(index) {
-        var fills = ["#f6fafc", "#f8f6fb", "#fbf8f3"]
+        var fills = ["#FFFFFF", "#F5F5F7", "#F2F2F7"]
         return fills[index % fills.length]
     }
 
     function levelFill(index, selected) {
         if (selected)
-            return index === 1 ? "#e1ebf4" : "#eaf1f7"
-        return "#f7fafc"
+            return index === 1 ? "#EAF4FF" : "#F2F2F7"
+        return "#FFFFFF"
     }
 
     function levelBorder(index, selected) {
         if (selected)
-            return index === 1 ? "#5f7d99" : "#8aa2b8"
-        return "#d7e0e8"
+            return index === 1 ? "#5AC8FA" : "#C7C7CC"
+        return "#D1D1D6"
     }
 
     function levelInk(selected) {
-        return selected ? "#163552" : "#55687a"
+        return selected ? "#006EDB" : "#6E6E73"
     }
 }

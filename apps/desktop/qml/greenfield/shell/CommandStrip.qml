@@ -17,8 +17,8 @@ Rectangle {
     border.color: tokens.border1
 
     gradient: Gradient {
-        GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.54) }
-        GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.24) }
+        GradientStop { position: 0.0; color: root.tokens.topbarBase }
+        GradientStop { position: 1.0; color: root.tokens.panelSoft }
     }
 
     Rectangle {
@@ -86,14 +86,14 @@ Rectangle {
                     GradientStop {
                         position: 0.0
                         color: searchField.activeFocus
-                               ? Qt.rgba(1, 1, 1, 0.96)
-                               : Qt.rgba(1, 1, 1, 0.88)
+                               ? root.tokens.panelStrong
+                               : root.tokens.searchBase
                     }
                     GradientStop {
                         position: 1.0
                         color: searchField.activeFocus
-                               ? Qt.rgba(1, 1, 1, 0.82)
-                               : Qt.rgba(1, 1, 1, 0.68)
+                               ? root.tokens.panelBase
+                               : root.tokens.panelSoft
                     }
                 }
 
@@ -112,7 +112,7 @@ Rectangle {
             Layout.preferredHeight: 30
             Layout.minimumWidth: 126
             radius: root.tokens.radiusLg
-            color: Qt.rgba(1, 1, 1, 0.72)
+            color: root.tokens.panelStrong
             border.color: Qt.rgba(root.tokens.toneColor(root.caseState.trustTone()).r,
                                   root.tokens.toneColor(root.caseState.trustTone()).g,
                                   root.tokens.toneColor(root.caseState.trustTone()).b,

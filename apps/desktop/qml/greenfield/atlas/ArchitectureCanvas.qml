@@ -1733,17 +1733,10 @@ Item {
             var gradient = ctx.createLinearGradient(0, 0, 0, height)
 
             ctx.reset()
-            gradient.addColorStop(0.0, Qt.rgba(1, 1, 1, 0.28))
-            gradient.addColorStop(1.0, Qt.rgba(1, 1, 1, 0.08))
+            gradient.addColorStop(0.0, Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.012))
+            gradient.addColorStop(1.0, Qt.rgba(root.tokens.signalMoss.r, root.tokens.signalMoss.g, root.tokens.signalMoss.b, 0.010))
             ctx.fillStyle = gradient
             ctx.fillRect(0, 0, width, height)
-
-            paintGlow(ctx, width * 0.16, height * 0.14, Math.max(width, height) * 0.16,
-                      root.tokens.signalMoss, 0.22, 0.0)
-            paintGlow(ctx, width * 0.84, height * 0.12, Math.max(width, height) * 0.15,
-                      root.tokens.signalRaspberry, 0.16, 0.0)
-            paintGlow(ctx, width * 0.52, height * 0.72, Math.max(width, height) * 0.24,
-                      root.tokens.signalCobalt, 0.1, 0.0)
         }
 
         onWidthChanged: requestPaint()
@@ -2010,7 +2003,7 @@ Item {
                 width: root.componentOverviewSectionWidth(index)
                 height: root.componentOverviewHeaderHeight
                 radius: root.tokens.radius8
-                color: Qt.rgba(1, 1, 1, 0.72)
+                color: root.tokens.panelStrong
                 border.color: Qt.rgba(0.12, 0.18, 0.28, 0.06)
                 visible: !root.relationshipFocusActive
 
@@ -2047,8 +2040,8 @@ Item {
 
                     Rectangle {
                         radius: height / 2
-                        color: Qt.rgba(0.14, 0.48, 1, 0.08)
-                        border.color: Qt.rgba(0.14, 0.48, 1, 0.18)
+                        color: root.tokens.signalCobaltSoft
+                        border.color: Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.18)
                         implicitWidth: sectionCountLabel.implicitWidth + 16
                         implicitHeight: 24
 
@@ -2101,21 +2094,21 @@ Item {
                 Rectangle {
                     anchors.fill: parent
                     radius: card.radius
-                    color: hovered || selected ? Qt.rgba(1, 1, 1, 0.96) : Qt.rgba(1, 1, 1, 0.92)
+                    color: hovered || selected ? root.tokens.panelStrong : root.tokens.panelBase
 
                     gradient: Gradient {
                         GradientStop {
                             position: 0.0
                             color: selected
-                                   ? Qt.rgba(1, 1, 1, 0.99)
-                                   : (card.hovered ? Qt.rgba(1, 1, 1, 0.98) : Qt.rgba(1, 1, 1, 0.94))
+                                   ? root.tokens.panelStrong
+                                   : (card.hovered ? root.tokens.panelStrong : root.tokens.panelBase)
                         }
 
                         GradientStop {
                             position: 1.0
                             color: selected
-                                   ? Qt.rgba(0.94, 0.97, 1.0, 0.98)
-                                   : (card.hovered ? Qt.rgba(0.97, 0.98, 1.0, 0.95) : Qt.rgba(1, 1, 1, 0.9))
+                                   ? root.tokens.signalCobaltSoft
+                                   : (card.hovered ? root.tokens.panelSoft : root.tokens.panelBase)
                         }
                     }
                 }
@@ -2223,8 +2216,8 @@ Item {
                         Rectangle {
                             visible: root.componentMode && root.componentNodeScopeText(modelData).length > 0
                             radius: height / 2
-                            color: Qt.rgba(0.14, 0.48, 1, 0.08)
-                            border.color: Qt.rgba(0.14, 0.48, 1, 0.16)
+                            color: root.tokens.signalCobaltSoft
+                            border.color: Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.16)
                             implicitWidth: scopeLabel.implicitWidth + 14
                             implicitHeight: 22
 
@@ -2437,7 +2430,7 @@ Item {
                                 ctx,
                                 root.relationAnchorPoint("incoming", index, root.focusedIncomingRelations.length),
                                 incomingTarget,
-                                root.tokens.signalRaspberry,
+                                EdgeUtils.edgeSemanticColor(root.tokens, root.focusedIncomingRelations[index].edge, 0.94),
                                 "incoming")
                 }
 
@@ -2447,7 +2440,7 @@ Item {
                                 ctx,
                                 outgoingStart,
                                 root.relationAnchorPoint("outgoing", outIndex, root.focusedOutgoingRelations.length),
-                                root.tokens.signalCobalt,
+                                EdgeUtils.edgeSemanticColor(root.tokens, root.focusedOutgoingRelations[outIndex].edge, 0.94),
                                 "outgoing")
                 }
             }
@@ -2470,7 +2463,7 @@ Item {
             width: metrics.width
             height: metrics.height
             radius: root.tokens.radiusXxl
-            color: root.componentMode ? Qt.rgba(1, 1, 1, 0.6) : Qt.rgba(1, 1, 1, 0.76)
+            color: root.componentMode ? Qt.rgba(root.tokens.panelStrong.r, root.tokens.panelStrong.g, root.tokens.panelStrong.b, 0.84) : root.tokens.panelStrong
             border.color: Qt.rgba(0.12, 0.18, 0.28, 0.07)
 
             Label {
@@ -2506,8 +2499,8 @@ Item {
 
                         Rectangle {
                             radius: height / 2
-                            color: root.componentMode ? Qt.rgba(0.83, 0.34, 0.92, 0.1) : Qt.rgba(0.14, 0.48, 1, 0.1)
-                            border.color: root.componentMode ? Qt.rgba(0.83, 0.34, 0.92, 0.26) : Qt.rgba(0.14, 0.48, 1, 0.24)
+                            color: root.componentMode ? root.tokens.signalRaspberrySoft : root.tokens.signalCobaltSoft
+                            border.color: root.componentMode ? Qt.rgba(root.tokens.signalRaspberry.r, root.tokens.signalRaspberry.g, root.tokens.signalRaspberry.b, 0.24) : Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.24)
                             implicitWidth: modeLabel.implicitWidth + 18
                             implicitHeight: 26
 
@@ -2526,8 +2519,8 @@ Item {
 
                         Rectangle {
                             radius: height / 2
-                            color: Qt.rgba(0.17, 0.46, 0.94, 0.1)
-                            border.color: Qt.rgba(0.17, 0.46, 0.94, 0.22)
+                            color: root.tokens.signalRaspberrySoft
+                            border.color: Qt.rgba(root.tokens.signalRaspberry.r, root.tokens.signalRaspberry.g, root.tokens.signalRaspberry.b, 0.22)
                             implicitWidth: label1.implicitWidth + 18
                             implicitHeight: 28
 
@@ -2544,8 +2537,8 @@ Item {
 
                         Rectangle {
                             radius: height / 2
-                            color: Qt.rgba(0.09, 0.56, 0.92, 0.1)
-                            border.color: Qt.rgba(0.09, 0.56, 0.92, 0.22)
+                            color: root.tokens.signalCobaltSoft
+                            border.color: Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.22)
                             implicitWidth: label2.implicitWidth + 18
                             implicitHeight: 28
 
@@ -2611,7 +2604,7 @@ Item {
                     height: rect.height
                     radius: root.tokens.radius8
                     color: root.tokens.panelStrong
-                    border.color: Qt.rgba(0.83, 0.34, 0.92, 0.34)
+                    border.color: Qt.rgba(root.tokens.signalRaspberry.r, root.tokens.signalRaspberry.g, root.tokens.signalRaspberry.b, 0.3)
                     border.width: 1
 
                     ColumnLayout {
@@ -2664,7 +2657,7 @@ Item {
                     height: rect.height
                     radius: root.tokens.radius8
                     color: root.tokens.panelStrong
-                    border.color: Qt.rgba(0.14, 0.48, 1, 0.28)
+                    border.color: Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.28)
                     border.width: 1
 
                     ColumnLayout {
@@ -2726,13 +2719,13 @@ Item {
         width: 272
         height: 40
         radius: root.tokens.radiusLg
-        color: Qt.rgba(1, 1, 1, 0.74)
+        color: root.tokens.panelStrong
         border.color: root.tokens.border1
         z: 30
 
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.84) }
-            GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.64) }
+            GradientStop { position: 0.0; color: root.tokens.panelStrong }
+            GradientStop { position: 1.0; color: root.tokens.panelSoft }
         }
 
         RowLayout {

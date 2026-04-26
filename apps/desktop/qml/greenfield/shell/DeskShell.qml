@@ -112,8 +112,8 @@ Item {
             clip: true
 
             gradient: Gradient {
-                GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.72) }
-                GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.46) }
+                GradientStop { position: 0.0; color: root.tokens.panelStrong }
+                GradientStop { position: 1.0; color: root.tokens.panelSoft }
             }
 
             Rectangle {
@@ -132,7 +132,7 @@ Item {
                 radius: parent.radius
                 color: "transparent"
                 gradient: Gradient {
-                    GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.32) }
+                    GradientStop { position: 0.0; color: Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.045) }
                     GradientStop { position: 1.0; color: "transparent" }
                 }
             }
