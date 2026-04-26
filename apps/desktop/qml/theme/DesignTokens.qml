@@ -3,7 +3,9 @@ import QtQuick
 QtObject {
     readonly property string displayFontFamily: "IBM Plex Sans, Segoe UI Variable Display, PingFang SC"
     readonly property string textFontFamily: "IBM Plex Sans, Segoe UI Variable Text, PingFang SC"
-    readonly property string monoFontFamily: "IBM Plex Mono, Cascadia Code, Consolas"
+    readonly property string monoFontFamily: Qt.platform.os === "windows" ? "Consolas"
+                                             : Qt.platform.os === "osx" ? "Menlo"
+                                             : "monospace"
 
     readonly property color neutral0: "#FBFCFD"
     readonly property color neutral25: "#F6F8FA"

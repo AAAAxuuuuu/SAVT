@@ -51,12 +51,12 @@ Item {
     Shortcut { sequence: "Ctrl+3"; onActivated: root.caseState.navigate("report") }
     Shortcut { sequence: "Ctrl+4"; onActivated: root.caseState.navigate("config") }
     Shortcut {
-        sequence: StandardKey.Close
+        sequences: [StandardKey.Close]
         context: Qt.ApplicationShortcut
         onActivated: root.closeCurrentWindow()
     }
     Shortcut {
-        sequence: StandardKey.Quit
+        sequences: [StandardKey.Quit]
         context: Qt.ApplicationShortcut
         onActivated: Qt.quit()
     }

@@ -8,12 +8,18 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
+#include <QtGlobal>
 
 #include <algorithm>
 
 namespace savt::ui {
 
 namespace {
+
+bool aiDebugLoggingEnabled() {
+    const QByteArray value = qgetenv("SAVT_AI_DEBUG").trimmed().toLower();
+    return value == "1" || value == "true" || value == "yes" || value == "on";
+}
 
 QStringList toQStringList(const QVariant& value) {
     QStringList items;
@@ -1636,6 +1642,10 @@ AiReplyState AiService::parseReply(
 
 void AiService::logRequest(const AiPreparedRequest& request,
                            const QString& targetDebug) {
+    if (!aiDebugLoggingEnabled()) {
+        return;
+    }
+
     qDebug().noquote() << "\n========== [AI Request] ==========";
     qDebug().noquote() << "scope:" << request.scope;
     qDebug().noquote() << "target:" << targetDebug;
@@ -1648,6 +1658,10 @@ void AiService::logRequest(const AiPreparedRequest& request,
 
 void AiService::logResponse(const QByteArray& responseBytes,
                             const QString& scope) {
+    if (!aiDebugLoggingEnabled()) {
+        return;
+    }
+
     qDebug().noquote() << "\n========== [AI Response] ==========";
     qDebug().noquote() << "scope:"
                        << (scope.isEmpty() ? QStringLiteral("unknown") : scope);

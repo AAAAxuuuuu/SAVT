@@ -109,7 +109,7 @@ QString stripProjectOverviewBoilerplate(QString text) {
 
     static const QList<QRegularExpression> patterns = {
         QRegularExpression(QStringLiteral(
-            R"(^(从当前(?:仓库|项目|静态结构|代码结构|目录结构)(?:[^，。]*?)(?:看|来看)[，,、\s]*)")),
+            R"(^(从当前(?:仓库|项目|静态结构|代码结构|目录结构)(?:[^，。]*?)(?:看|来看)[，,、\s]*))")),
         QRegularExpression(QStringLiteral(R"(^(整体来看[，,、\s]*))")),
         QRegularExpression(QStringLiteral(R"(^(总体来看[，,、\s]*))")),
         QRegularExpression(QStringLiteral(R"(^(大体上看[，,、\s]*))")),

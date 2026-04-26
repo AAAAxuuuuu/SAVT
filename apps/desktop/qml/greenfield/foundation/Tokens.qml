@@ -3,7 +3,9 @@ import QtQuick
 QtObject {
     readonly property string displayFontFamily: "Segoe UI Variable Display, Microsoft YaHei UI, PingFang SC"
     readonly property string textFontFamily: "Segoe UI Variable Text, Microsoft YaHei UI, PingFang SC"
-    readonly property string monoFontFamily: "Cascadia Code, IBM Plex Mono, Consolas"
+    readonly property string monoFontFamily: Qt.platform.os === "windows" ? "Consolas"
+                                             : Qt.platform.os === "osx" ? "Menlo"
+                                             : "monospace"
 
     readonly property color base0: "#FCFEFF"
     readonly property color base1: "#F4F6FB"
