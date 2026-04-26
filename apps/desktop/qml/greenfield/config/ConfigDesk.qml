@@ -33,6 +33,11 @@ ScrollView {
     readonly property var draftEntryOverrides: draftConfig.entryOverrides || []
     readonly property var draftDependencyFoldRules: draftConfig.dependencyFoldRules || []
     readonly property var configChoiceItems: configRecommendation.choiceItems || []
+    readonly property int detailColumns: width >= 1120 ? 2 : 1
+    readonly property var draftRulePanelItems: buildDraftRulePanelItems()
+    readonly property var draftRulePanelColumns: splitPanelItems(draftRulePanelItems, detailColumns)
+    readonly property var activeRulePanelItems: buildActiveRulePanelItems()
+    readonly property var activeRulePanelColumns: splitPanelItems(activeRulePanelItems, detailColumns)
 
     clip: true
     contentWidth: availableWidth
@@ -101,6 +106,121 @@ ScrollView {
 
     function aiTone() {
         return analysisController.aiAvailable ? "ai" : "warning"
+    }
+
+    function rulePanelSpec(title, subtitle, items, emptyText, formatter) {
+        return {
+            "kind": "rule",
+            "title": title,
+            "subtitle": subtitle,
+            "items": items || [],
+            "emptyText": emptyText,
+            "formatter": formatter
+        }
+    }
+
+    function buildDraftRulePanelItems() {
+        return [
+            rulePanelSpec("忽略目录", "草案", root.draftIgnoreDirectories, "草案里还没有忽略目录。",
+                          function(item) { return String(item || "").trim() }),
+            rulePanelSpec("模块归并", "草案", root.draftModuleMerges, "草案里还没有模块归并。",
+                          function(item) {
+                              return String(item.match || "").trim() + " -> " + String(item.target || "").trim()
+                          }),
+            rulePanelSpec("角色覆盖", "草案", root.draftRoleOverrides, "草案里还没有角色覆盖。",
+                          function(item) {
+                              return String(item.match || "").trim() + " -> " + String(item.role || "").trim()
+                          }),
+            rulePanelSpec("入口覆盖", "草案", root.draftEntryOverrides, "草案里还没有入口覆盖。",
+                          function(item) {
+                              var label = item.entry ? "入口" : "非入口"
+                              return String(item.match || "").trim() + " -> " + label
+                          }),
+            rulePanelSpec("依赖折叠", "草案", root.draftDependencyFoldRules, "草案里还没有依赖折叠。",
+                          function(item) {
+                              var flags = []
+                              if (item.collapse)
+                                  flags.push("默认折叠")
+                              if (item.hideByDefault)
+                                  flags.push("默认隐藏")
+                              return String(item.match || "").trim() + " -> " + (flags.length > 0 ? flags.join(" / ") : "保留显示")
+                          })
+        ]
+    }
+
+    function buildActiveRulePanelItems() {
+        return [
+            rulePanelSpec("忽略目录", "不进入扫描", root.ignoreDirectories, "当前没有配置忽略目录。",
+                          function(item) { return String(item || "").trim() }),
+            rulePanelSpec("模块归并", "收敛模块命名", root.moduleMerges, "当前没有配置模块归并。",
+                          function(item) {
+                    return String(item.match || "").trim() + " -> " + String(item.target || "").trim()
+                }),
+            rulePanelSpec("角色覆盖", "覆盖角色推断", root.roleOverrides, "当前没有配置角色覆盖。",
+                          function(item) {
+                    return String(item.match || "").trim() + " -> " + String(item.role || "").trim()
+                }),
+            rulePanelSpec("入口覆盖", "显式声明入口", root.entryOverrides, "当前没有配置入口覆盖。",
+                          function(item) {
+                    var label = item.entry ? "入口" : "非入口"
+                    return String(item.match || "").trim() + " -> " + label
+                }),
+            rulePanelSpec("依赖折叠", "控制默认显隐", root.dependencyFoldRules, "当前没有配置依赖折叠。",
+                          function(item) {
+                    var flags = []
+                    if (item.collapse)
+                        flags.push("默认折叠")
+                    if (item.hideByDefault)
+                        flags.push("默认隐藏")
+                    return String(item.match || "").trim() + " -> " + (flags.length > 0 ? flags.join(" / ") : "保留显示")
+                }),
+            rulePanelSpec("查找路径", "按顺序搜索", root.configSearchPaths, "当前没有可用的查找路径。",
+                          function(item) { return String(item || "").trim() }),
+            {
+                "kind": "diagnostics",
+                "title": "配置诊断",
+                "items": root.configDiagnostics
+            }
+        ]
+    }
+
+    function estimatePanelWeight(item) {
+        if (!item)
+            return 0
+
+        var source = item.items || []
+        var totalLength = String(item.title || "").length
+                + String(item.subtitle || "").length
+                + String(item.emptyText || "").length
+        for (var index = 0; index < source.length; ++index) {
+            var row = item.formatter ? item.formatter(source[index]) : String(source[index] || "")
+            totalLength += String(row || "").length
+        }
+        return 1.8 + Math.max(1, source.length) * 1.1 + Math.ceil(totalLength / 150)
+    }
+
+    function splitPanelItems(items, columnCount) {
+        var source = items || []
+        if (columnCount <= 1)
+            return [source]
+
+        var columns = []
+        var weights = []
+        for (var columnIndex = 0; columnIndex < columnCount; ++columnIndex) {
+            columns.push([])
+            weights.push(0)
+        }
+
+        for (var itemIndex = 0; itemIndex < source.length; ++itemIndex) {
+            var lightestIndex = 0
+            for (var compareIndex = 1; compareIndex < columnCount; ++compareIndex) {
+                if (weights[compareIndex] < weights[lightestIndex])
+                    lightestIndex = compareIndex
+            }
+            columns[lightestIndex].push(source[itemIndex])
+            weights[lightestIndex] += estimatePanelWeight(source[itemIndex])
+        }
+        return columns
     }
 
     ColumnLayout {
@@ -597,80 +717,10 @@ ScrollView {
                     }
                 }
 
-                GridLayout {
+                Loader {
                     Layout.fillWidth: true
-                    columns: width >= 1560 ? 3 : 2
-                    columnSpacing: 16
-                    rowSpacing: 16
-
-                    RuleGroupCard {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        tokens: root.tokens
-                        title: "忽略目录"
-                        subtitle: "草案"
-                        items: root.draftIgnoreDirectories
-                        emptyText: "草案里还没有忽略目录。"
-                        formatter: function(item) { return String(item || "").trim() }
-                    }
-
-                    RuleGroupCard {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        tokens: root.tokens
-                        title: "模块归并"
-                        subtitle: "草案"
-                        items: root.draftModuleMerges
-                        emptyText: "草案里还没有模块归并。"
-                        formatter: function(item) {
-                            return String(item.match || "").trim() + " -> " + String(item.target || "").trim()
-                        }
-                    }
-
-                    RuleGroupCard {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        tokens: root.tokens
-                        title: "角色覆盖"
-                        subtitle: "草案"
-                        items: root.draftRoleOverrides
-                        emptyText: "草案里还没有角色覆盖。"
-                        formatter: function(item) {
-                            return String(item.match || "").trim() + " -> " + String(item.role || "").trim()
-                        }
-                    }
-
-                    RuleGroupCard {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        tokens: root.tokens
-                        title: "入口覆盖"
-                        subtitle: "草案"
-                        items: root.draftEntryOverrides
-                        emptyText: "草案里还没有入口覆盖。"
-                        formatter: function(item) {
-                            var label = item.entry ? "入口" : "非入口"
-                            return String(item.match || "").trim() + " -> " + label
-                        }
-                    }
-
-                    RuleGroupCard {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        tokens: root.tokens
-                        title: "依赖折叠"
-                        subtitle: "草案"
-                        items: root.draftDependencyFoldRules
-                        emptyText: "草案里还没有依赖折叠。"
-                        formatter: function(item) {
-                            var flags = []
-                            if (item.collapse)
-                                flags.push("默认折叠")
-                            if (item.hideByDefault)
-                                flags.push("默认隐藏")
-                            return String(item.match || "").trim() + " -> " + (flags.length > 0 ? flags.join(" / ") : "保留显示")
-                        }
-                    }
+                    Layout.preferredHeight: item ? item.implicitHeight : 0
+                    sourceComponent: root.detailColumns > 1 ? draftRulePanelsTwoColumns : draftRulePanelsSingleColumn
                 }
             }
         }
@@ -684,151 +734,181 @@ ScrollView {
             font.weight: Font.DemiBold
         }
 
-        GridLayout {
+        Loader {
             Layout.fillWidth: true
-            columns: width >= 1560 ? 3 : 2
-            columnSpacing: 16
-            rowSpacing: 16
+            Layout.preferredHeight: item ? item.implicitHeight : 0
+            sourceComponent: root.detailColumns > 1 ? activeRulePanelsTwoColumns : activeRulePanelsSingleColumn
+        }
+    }
 
-            RuleGroupCard {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                tokens: root.tokens
-                title: "忽略目录"
-                subtitle: "不进入扫描"
-                items: root.ignoreDirectories
-                emptyText: "当前没有配置忽略目录。"
-                formatter: function(item) { return String(item || "").trim() }
-            }
+    Component {
+        id: activeRulePanelsSingleColumn
 
-            RuleGroupCard {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                tokens: root.tokens
-                title: "模块归并"
-                subtitle: "收敛模块命名"
-                items: root.moduleMerges
-                emptyText: "当前没有配置模块归并。"
-                formatter: function(item) {
-                    return String(item.match || "").trim() + " -> " + String(item.target || "").trim()
+        ColumnLayout {
+            width: parent ? parent.width : 0
+            spacing: 16
+
+            Repeater {
+                model: root.activeRulePanelItems
+
+                Loader {
+                    Layout.fillWidth: true
+                    property var panelSpec: modelData
+                    sourceComponent: panelSpec.kind === "diagnostics" ? diagnosticsPanelCard : rulePanelCard
+                    onLoaded: {
+                        if (item)
+                            item.panelSpec = panelSpec
+                    }
                 }
-            }
-
-            RuleGroupCard {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                tokens: root.tokens
-                title: "角色覆盖"
-                subtitle: "覆盖角色推断"
-                items: root.roleOverrides
-                emptyText: "当前没有配置角色覆盖。"
-                formatter: function(item) {
-                    return String(item.match || "").trim() + " -> " + String(item.role || "").trim()
-                }
-            }
-
-            RuleGroupCard {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                tokens: root.tokens
-                title: "入口覆盖"
-                subtitle: "显式声明入口"
-                items: root.entryOverrides
-                emptyText: "当前没有配置入口覆盖。"
-                formatter: function(item) {
-                    var label = item.entry ? "入口" : "非入口"
-                    return String(item.match || "").trim() + " -> " + label
-                }
-            }
-
-            RuleGroupCard {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                tokens: root.tokens
-                title: "依赖折叠"
-                subtitle: "控制默认显隐"
-                items: root.dependencyFoldRules
-                emptyText: "当前没有配置依赖折叠。"
-                formatter: function(item) {
-                    var flags = []
-                    if (item.collapse)
-                        flags.push("默认折叠")
-                    if (item.hideByDefault)
-                        flags.push("默认隐藏")
-                    return String(item.match || "").trim() + " -> " + (flags.length > 0 ? flags.join(" / ") : "保留显示")
-                }
-            }
-
-            RuleGroupCard {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                tokens: root.tokens
-                title: "查找路径"
-                subtitle: "按顺序搜索"
-                items: root.configSearchPaths
-                emptyText: "当前没有可用的查找路径。"
-                formatter: function(item) { return String(item || "").trim() }
             }
         }
+    }
 
-        Rectangle {
-            Layout.fillWidth: true
-            radius: root.tokens.radius8
-            color: root.tokens.panelStrong
-            border.color: root.tokens.border1
-            implicitHeight: diagnosticsColumn.implicitHeight + 32
+    Component {
+        id: draftRulePanelsSingleColumn
+
+        ColumnLayout {
+            width: parent ? parent.width : 0
+            spacing: 16
+
+            Repeater {
+                model: root.draftRulePanelItems
+
+                Loader {
+                    Layout.fillWidth: true
+                    property var panelSpec: modelData
+                    sourceComponent: rulePanelCard
+                    onLoaded: {
+                        if (item)
+                            item.panelSpec = panelSpec
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: activeRulePanelsTwoColumns
+
+        RowLayout {
+            width: parent ? parent.width : 0
+            spacing: 16
 
             ColumnLayout {
-                id: diagnosticsColumn
-                anchors.fill: parent
-                anchors.margins: 18
-                spacing: 12
-
-                Label {
-                    text: "配置诊断"
-                    color: root.tokens.text1
-                    font.family: root.tokens.displayFontFamily
-                    font.pixelSize: 18
-                    font.weight: Font.DemiBold
-                }
-
-                Label {
-                    Layout.fillWidth: true
-                    text: root.configDiagnostics.length > 0
-                          ? "这里显示配置加载、解析和规则忽略的结果。"
-                          : "当前没有额外的配置诊断。配置状态正常时，这里会保持干净。"
-                    wrapMode: Text.WordWrap
-                    color: root.tokens.text3
-                    font.family: root.tokens.textFontFamily
-                    font.pixelSize: 12
-                }
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignTop
+                spacing: 16
 
                 Repeater {
-                    model: root.configDiagnostics
+                    model: root.activeRulePanelColumns.length > 0 ? root.activeRulePanelColumns[0] : []
 
-                    Rectangle {
+                    Loader {
                         Layout.fillWidth: true
-                        width: diagnosticsColumn.width
-                        radius: root.tokens.radius6
-                        color: root.tokens.base1
-                        border.color: root.tokens.border1
-                        implicitHeight: diagnosticText.implicitHeight + 20
-
-                        Label {
-                            id: diagnosticText
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.top: parent.top
-                            anchors.margins: 10
-                            text: String(modelData || "")
-                            wrapMode: Text.WordWrap
-                            color: root.tokens.text2
-                            font.family: root.tokens.textFontFamily
-                            font.pixelSize: 12
+                        property var panelSpec: modelData
+                        sourceComponent: panelSpec.kind === "diagnostics" ? diagnosticsPanelCard : rulePanelCard
+                        onLoaded: {
+                            if (item)
+                                item.panelSpec = panelSpec
                         }
                     }
                 }
             }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignTop
+                spacing: 16
+
+                Repeater {
+                    model: root.activeRulePanelColumns.length > 1 ? root.activeRulePanelColumns[1] : []
+
+                    Loader {
+                        Layout.fillWidth: true
+                        property var panelSpec: modelData
+                        sourceComponent: panelSpec.kind === "diagnostics" ? diagnosticsPanelCard : rulePanelCard
+                        onLoaded: {
+                            if (item)
+                                item.panelSpec = panelSpec
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: draftRulePanelsTwoColumns
+
+        RowLayout {
+            width: parent ? parent.width : 0
+            spacing: 16
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignTop
+                spacing: 16
+
+                Repeater {
+                    model: root.draftRulePanelColumns.length > 0 ? root.draftRulePanelColumns[0] : []
+
+                    Loader {
+                        Layout.fillWidth: true
+                        property var panelSpec: modelData
+                        sourceComponent: rulePanelCard
+                        onLoaded: {
+                            if (item)
+                                item.panelSpec = panelSpec
+                        }
+                    }
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignTop
+                spacing: 16
+
+                Repeater {
+                    model: root.draftRulePanelColumns.length > 1 ? root.draftRulePanelColumns[1] : []
+
+                    Loader {
+                        Layout.fillWidth: true
+                        property var panelSpec: modelData
+                        sourceComponent: rulePanelCard
+                        onLoaded: {
+                            if (item)
+                                item.panelSpec = panelSpec
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: rulePanelCard
+
+        RuleGroupCard {
+            property var panelSpec: ({})
+
+            tokens: root.tokens
+            title: String(panelSpec.title || "")
+            subtitle: String(panelSpec.subtitle || "")
+            items: panelSpec.items || []
+            emptyText: String(panelSpec.emptyText || "")
+            formatter: panelSpec.formatter
+        }
+    }
+
+    Component {
+        id: diagnosticsPanelCard
+
+        DiagnosticsCard {
+            property var panelSpec: ({})
+
+            tokens: root.tokens
+            title: String(panelSpec.title || "配置诊断")
+            items: panelSpec.items || []
         }
     }
 
@@ -966,6 +1046,73 @@ ScrollView {
         }
     }
 
+    component DiagnosticsCard: Rectangle {
+        id: diagnosticsCard
+        required property QtObject tokens
+        property string title: "配置诊断"
+        property var items: []
+
+        radius: tokens.radius8
+        color: tokens.panelStrong
+        border.color: tokens.border1
+        implicitHeight: Math.max(154, diagnosticsColumn.implicitHeight + 28)
+
+        ColumnLayout {
+            id: diagnosticsColumn
+            anchors.fill: parent
+            anchors.margins: 14
+            spacing: 8
+
+            Label {
+                text: diagnosticsCard.title
+                color: diagnosticsCard.tokens.text1
+                font.family: diagnosticsCard.tokens.displayFontFamily
+                font.pixelSize: 18
+                font.weight: Font.DemiBold
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: diagnosticsCard.items.length > 0
+                      ? "这里显示配置加载、解析和规则忽略的结果。"
+                      : "当前没有额外的配置诊断。配置状态正常时，这里会保持干净。"
+                wrapMode: Text.WordWrap
+                color: diagnosticsCard.tokens.text3
+                font.family: diagnosticsCard.tokens.textFontFamily
+                font.pixelSize: 12
+            }
+
+            Repeater {
+                model: diagnosticsCard.items
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    width: diagnosticsColumn.width
+                    radius: diagnosticsCard.tokens.radius6
+                    color: diagnosticsCard.tokens.base1
+                    border.color: diagnosticsCard.tokens.border1
+                    implicitHeight: diagnosticText.implicitHeight + 14
+
+                    Label {
+                        id: diagnosticText
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 7
+                        text: String(modelData || "")
+                        wrapMode: Text.WordWrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                        color: diagnosticsCard.tokens.text2
+                        font.family: diagnosticsCard.tokens.textFontFamily
+                        font.pixelSize: 12
+                        lineHeight: 1.12
+                    }
+                }
+            }
+        }
+    }
+
     component RuleGroupCard: Rectangle {
         id: ruleGroupCard
         required property QtObject tokens
@@ -978,13 +1125,13 @@ ScrollView {
         radius: tokens.radius8
         color: tokens.panelStrong
         border.color: tokens.border1
-        implicitHeight: Math.max(172, ruleColumn.implicitHeight + 28)
+        implicitHeight: Math.max(154, ruleColumn.implicitHeight + 24)
 
         ColumnLayout {
             id: ruleColumn
             anchors.fill: parent
-            anchors.margins: 16
-            spacing: 10
+            anchors.margins: 14
+            spacing: 8
 
             RowLayout {
                 Layout.fillWidth: true
@@ -1015,21 +1162,24 @@ ScrollView {
                     radius: ruleGroupCard.tokens.radius6
                     color: ruleGroupCard.tokens.base1
                     border.color: ruleGroupCard.tokens.border1
-                    implicitHeight: ruleText.implicitHeight + 18
+                    implicitHeight: ruleText.implicitHeight + 14
 
                     Label {
                         id: ruleText
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
-                        anchors.margins: 9
+                        anchors.margins: 7
                         text: ruleGroupCard.formatter
                               ? ruleGroupCard.formatter(modelData)
                               : String(modelData || "")
                         wrapMode: Text.WordWrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
                         color: ruleGroupCard.tokens.text2
                         font.family: ruleGroupCard.tokens.textFontFamily
                         font.pixelSize: 12
+                        lineHeight: 1.12
                     }
                 }
             }
@@ -1048,6 +1198,7 @@ ScrollView {
                     color: ruleGroupCard.tokens.text3
                     font.family: ruleGroupCard.tokens.textFontFamily
                     font.pixelSize: 12
+                    lineHeight: 1.12
                 }
             }
         }

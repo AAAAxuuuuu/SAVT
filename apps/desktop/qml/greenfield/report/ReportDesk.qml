@@ -22,6 +22,9 @@ ScrollView {
     readonly property var readingOrder: guide.readingOrder || []
     readonly property string reportHtml: renderMarkdown(root.analysisController.analysisReport)
     readonly property string contextHtml: renderMarkdown(root.analysisController.systemContextReport)
+    readonly property int detailColumns: width >= 1120 ? 2 : 1
+    readonly property var reportPanelItems: buildReportPanelItems()
+    readonly property var reportPanelColumns: splitPanelItems(reportPanelItems, detailColumns)
 
     clip: true
     contentWidth: availableWidth
@@ -69,6 +72,55 @@ ScrollView {
         if (uncertainty.length > 0)
             parts.push("边界提醒：" + uncertainty)
         return parts.join("\n\n").trim()
+    }
+
+    function buildReportPanelItems() {
+        return [
+            {"title": "证据计量", "items": root.algorithmEvidence, "emptyText": "暂无证据统计。", "tone": "ai"},
+            {"title": "增量缓存", "items": root.algorithmCaches, "emptyText": "暂无缓存层状态。", "tone": "moss"},
+            {"title": "阅读路径", "items": root.readingOrder, "emptyText": "暂无推荐阅读路径。", "tone": "info"},
+            {"title": "结构热点", "items": root.hotspotSignals, "emptyText": "暂无显著热点。", "tone": "warning"},
+            {"title": "关键风险", "items": root.riskSignals, "emptyText": "暂无显著风险。", "tone": "danger"}
+        ]
+    }
+
+    function estimatePanelWeight(item) {
+        if (!item)
+            return 0
+
+        var source = item.items || []
+        var totalLength = String(item.title || "").length + String(item.emptyText || "").length
+        for (var index = 0; index < source.length; ++index) {
+            var entry = source[index] || ({})
+            totalLength += String(entry.title || entry.label || "").length
+                    + String(entry.value || "").length
+                    + String(entry.detail || entry.summary || entry.body || "").length
+        }
+        return 1.8 + Math.max(1, source.length) * 1.2 + Math.ceil(totalLength / 150)
+    }
+
+    function splitPanelItems(items, columnCount) {
+        var source = items || []
+        if (columnCount <= 1)
+            return [source]
+
+        var columns = []
+        var weights = []
+        for (var columnIndex = 0; columnIndex < columnCount; ++columnIndex) {
+            columns.push([])
+            weights.push(0)
+        }
+
+        for (var itemIndex = 0; itemIndex < source.length; ++itemIndex) {
+            var lightestIndex = 0
+            for (var compareIndex = 1; compareIndex < columnCount; ++compareIndex) {
+                if (weights[compareIndex] < weights[lightestIndex])
+                    lightestIndex = compareIndex
+            }
+            columns[lightestIndex].push(source[itemIndex])
+            weights[lightestIndex] += estimatePanelWeight(source[itemIndex])
+        }
+        return columns
     }
 
     ColumnLayout {
@@ -227,19 +279,6 @@ ScrollView {
             }
         }
 
-        GridLayout {
-            Layout.fillWidth: true
-            columns: width >= 1400 ? 3 : 2
-            columnSpacing: 14
-            rowSpacing: 14
-
-            SignalPanel { Layout.fillWidth: true; tokens: root.tokens; title: "证据计量"; items: root.algorithmEvidence; emptyText: "暂无证据统计。"; tone: "ai" }
-            SignalPanel { Layout.fillWidth: true; tokens: root.tokens; title: "增量缓存"; items: root.algorithmCaches; emptyText: "暂无缓存层状态。"; tone: "moss" }
-            SignalPanel { Layout.fillWidth: true; tokens: root.tokens; title: "阅读路径"; items: root.readingOrder; emptyText: "暂无推荐阅读路径。"; tone: "info" }
-            SignalPanel { Layout.fillWidth: true; tokens: root.tokens; title: "结构热点"; items: root.hotspotSignals; emptyText: "暂无显著热点。"; tone: "warning" }
-            SignalPanel { Layout.fillWidth: true; tokens: root.tokens; title: "关键风险"; items: root.riskSignals; emptyText: "暂无显著风险。"; tone: "danger" }
-        }
-
         Rectangle {
             Layout.fillWidth: true
             visible: root.analysisController.aiAvailable
@@ -301,6 +340,98 @@ ScrollView {
                 rawText: root.analysisController.analysisReport
                 emptyText: "当前还没有生成工程分析报告。"
             }
+        }
+
+        Loader {
+            Layout.fillWidth: true
+            Layout.preferredHeight: item ? item.implicitHeight : 0
+            sourceComponent: root.detailColumns > 1 ? reportPanelsTwoColumns : reportPanelsSingleColumn
+        }
+    }
+
+    Component {
+        id: reportPanelsSingleColumn
+
+        ColumnLayout {
+            width: parent ? parent.width : 0
+            spacing: 14
+
+            Repeater {
+                model: root.reportPanelItems
+
+                Loader {
+                    Layout.fillWidth: true
+                    property var panelSpec: modelData
+                    sourceComponent: reportSignalPanelCard
+                    onLoaded: {
+                        if (item)
+                            item.panelSpec = panelSpec
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: reportPanelsTwoColumns
+
+        RowLayout {
+            width: parent ? parent.width : 0
+            spacing: 14
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignTop
+                spacing: 14
+
+                Repeater {
+                    model: root.reportPanelColumns.length > 0 ? root.reportPanelColumns[0] : []
+
+                    Loader {
+                        Layout.fillWidth: true
+                        property var panelSpec: modelData
+                        sourceComponent: reportSignalPanelCard
+                        onLoaded: {
+                            if (item)
+                                item.panelSpec = panelSpec
+                        }
+                    }
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignTop
+                spacing: 14
+
+                Repeater {
+                    model: root.reportPanelColumns.length > 1 ? root.reportPanelColumns[1] : []
+
+                    Loader {
+                        Layout.fillWidth: true
+                        property var panelSpec: modelData
+                        sourceComponent: reportSignalPanelCard
+                        onLoaded: {
+                            if (item)
+                                item.panelSpec = panelSpec
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: reportSignalPanelCard
+
+        SignalPanel {
+            property var panelSpec: ({})
+
+            tokens: root.tokens
+            title: String(panelSpec.title || "")
+            items: panelSpec.items || []
+            emptyText: String(panelSpec.emptyText || "")
+            tone: String(panelSpec.tone || "info")
         }
     }
 
