@@ -76,7 +76,10 @@ Item {
     FolderDialog {
         id: folderDialog
         title: "选择项目文件夹"
-        onAccepted: root.analysisController.analyzeProjectUrl(selectedFolder)
+        onAccepted: {
+            root.analysisController.selectProjectUrl(selectedFolder)
+            caseState.navigate("overview")
+        }
     }
 
     Component.onCompleted: root.analysisController.refreshAiAvailability()

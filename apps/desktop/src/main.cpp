@@ -10,6 +10,8 @@
 #include <QQuickStyle>
 #include <QWindow>
 
+#include <cstdlib>
+
 namespace {
 
 void centerAndShowRootWindow(QQmlApplicationEngine &engine) {
@@ -51,6 +53,27 @@ int main(int argc, char *argv[]) {
     analysisController.setProjectRootPath(
         QDir::cleanPath(QString::fromLocal8Bit(argv[1])));
   }
+  QObject::connect(
+      &app,
+      &QGuiApplication::lastWindowClosed,
+      &app,
+      [&analysisController, &app]() {
+        if (analysisController.analyzing()) {
+          analysisController.stopAnalysis();
+          std::_Exit(0);
+        }
+        app.quit();
+      });
+  QObject::connect(
+      &app,
+      &QGuiApplication::aboutToQuit,
+      &app,
+      [&analysisController]() {
+        if (analysisController.analyzing()) {
+          analysisController.stopAnalysis();
+          std::_Exit(0);
+        }
+      });
 
   QQmlApplicationEngine engine;
   engine.rootContext()->setContextProperty("_analysisController",

@@ -8,6 +8,16 @@ bool isCancellationRequested(const ArchitectureReconstructionOptions& options) {
     return options.cancellationRequested && options.cancellationRequested();
 }
 
+void publishProgress(
+    const ArchitectureReconstructionOptions& options,
+    const std::size_t completed,
+    const std::size_t total,
+    const std::string& label) {
+    if (options.progressReporter && total > 0) {
+        options.progressReporter(completed, total, label);
+    }
+}
+
 }  // namespace
 
 CapabilityDrilldown buildCapabilityDrilldown(
@@ -41,15 +51,23 @@ ArchitectureReconstructionResult buildArchitectureReconstruction(
     const ArchitectureReconstructionOptions& options) {
     ArchitectureReconstructionResult result;
     savt::layout::LayeredGraphLayout layoutEngine;
+    const std::size_t totalWork =
+        (options.buildCapabilitySceneLayout ? 1u : 0u) +
+        (options.buildModuleLayout ? 1u : 0u) +
+        (options.buildCapabilityDrilldowns ? aggregation.capabilityGraph.nodes.size() : 0u);
+    std::size_t completedWork = 0;
 
     if (isCancellationRequested(options)) {
         result.canceled = true;
         return result;
     }
+    publishProgress(options, completedWork, totalWork, "准备架构视图...");
 
     if (options.buildCapabilitySceneLayout) {
         result.capabilitySceneLayout =
             layoutEngine.layoutCapabilityScene(aggregation.capabilityGraph);
+        ++completedWork;
+        publishProgress(options, completedWork, totalWork, "计算能力图布局...");
     }
 
     if (isCancellationRequested(options)) {
@@ -59,6 +77,8 @@ ArchitectureReconstructionResult buildArchitectureReconstruction(
 
     if (options.buildModuleLayout) {
         result.moduleLayout = layoutEngine.layoutModules(report);
+        ++completedWork;
+        publishProgress(options, completedWork, totalWork, "计算模块布局...");
     }
 
     if (!options.buildCapabilityDrilldowns) {
@@ -78,6 +98,8 @@ ArchitectureReconstructionResult buildArchitectureReconstruction(
                 aggregation.overview,
                 aggregation.capabilityGraph,
                 capabilityNode.id));
+        ++completedWork;
+        publishProgress(options, completedWork, totalWork, "生成能力域钻取视图...");
     }
 
     return result;

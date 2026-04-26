@@ -119,6 +119,7 @@ public:
     Q_INVOKABLE void analyzeProject(const QString& projectRootPath);
     Q_INVOKABLE void analyzeProjectHighPrecision(const QString& projectRootPath);
     Q_INVOKABLE void analyzeProjectUrl(const QUrl& projectRootUrl);
+    Q_INVOKABLE void selectProjectUrl(const QUrl& projectRootUrl);
     Q_INVOKABLE void ensureComponentSceneForCapability(qulonglong capabilityId);
     Q_INVOKABLE void refreshAiAvailability();
     Q_INVOKABLE void clearAiExplanation();
@@ -181,6 +182,7 @@ private:
         const QString& cleanedPath,
         savt::analyzer::AnalyzerPrecision precision);
     void finishAnalysis();
+    void applyAnalysisResult(const PendingAnalysisResult& result, bool canceled);
     void clearVisualizationState();
     void scheduleBackgroundCapabilityAnnotation();
     void scheduleBackgroundComponentAnnotation(qulonglong capabilityId);
@@ -275,6 +277,7 @@ private:
     QNetworkReply* m_aiReply = nullptr;
     QFutureWatcher<void>* m_analysisWatcher = nullptr;
     std::shared_ptr<PendingAnalysisResult> m_pendingAnalysisResult;
+    std::unordered_map<std::string, std::shared_ptr<PendingAnalysisResult>> m_completedAnalysisResults;
 };
 
 }  // namespace savt::ui

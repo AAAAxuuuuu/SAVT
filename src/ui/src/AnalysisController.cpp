@@ -4,6 +4,7 @@
 #include "savt/ui/AnalysisOrchestrator.h"
 #include "savt/ui/AstPreviewService.h"
 #include "savt/ui/FileInsightService.h"
+#include "savt/ui/IncrementalAnalysisPipeline.h"
 #include "savt/ui/ProjectConfigRecommendationService.h"
 #include "savt/reconstruction/ArchitectureReconstruction.h"
 
@@ -19,6 +20,7 @@
 #include <QtConcurrent/qtconcurrentrun.h>
 
 #include <algorithm>
+#include <string>
 
 namespace savt::ui {
 
@@ -154,6 +156,13 @@ QVariantMap recommendationOptionById(const QVariantMap& choice, const QString& o
         }
     }
     return {};
+}
+
+std::string analysisCacheKey(
+    const QString& cleanedPath,
+    const analyzer::AnalyzerPrecision precision) {
+    return QDir::cleanPath(cleanedPath).toStdString() + "#" +
+           std::to_string(static_cast<int>(precision));
 }
 
 }  // namespace
@@ -323,11 +332,16 @@ void AnalysisController::stopAnalysis() {
         return;
     }
     setStopRequested(true);
-    setAnalysisPhase(QStringLiteral("正在停止..."));
-    setStatusMessage(QStringLiteral("已发出停止请求，会在当前阶段结束后安全退出。"));
     if (m_analysisWatcher != nullptr) {
         m_analysisWatcher->cancel();
     }
+    IncrementalAnalysisPipeline::clear();
+    m_pendingAnalysisResult.reset();
+    setAnalyzing(false);
+    setAnalysisProgress(0.0);
+    setAnalysisPhase(QStringLiteral("已停止"));
+    setStatusMessage(QStringLiteral("当前计算已停止。"));
+    clearVisualizationState();
 }
 
 void AnalysisController::analyzeProject(const QString& projectRootPath) {
@@ -371,6 +385,21 @@ void AnalysisController::analyzeProjectWithPrecision(
     }
 
     setProjectRootPathInternal(cleanedPath, true);
+    const auto cachedResultIt = m_completedAnalysisResults.find(
+        analysisCacheKey(cleanedPath, precision));
+    if (cachedResultIt != m_completedAnalysisResults.end() && cachedResultIt->second) {
+        setStopRequested(false);
+        setAnalysisProgress(1.0);
+        setAnalysisPhase(QStringLiteral("分析完成"));
+        setAnalysisReport(
+            cachedResultIt->second->analysisReport.isEmpty()
+                ? QStringLiteral("没有可显示的分析报告。")
+                : cachedResultIt->second->analysisReport);
+        applyAnalysisResult(*cachedResultIt->second, false);
+        setStatusMessage(QStringLiteral("已切换到已计算结果。"));
+        return;
+    }
+
     beginAnalysis(cleanedPath, precision);
 }
 
@@ -380,6 +409,33 @@ void AnalysisController::analyzeProjectUrl(const QUrl& projectRootUrl) {
     } else {
         analyzeProject(projectRootUrl.toString());
     }
+}
+
+void AnalysisController::selectProjectUrl(const QUrl& projectRootUrl) {
+    const QString selectedPath = projectRootUrl.isLocalFile()
+        ? projectRootUrl.toLocalFile()
+        : projectRootUrl.toString();
+    const QString cleanedPath = QDir::cleanPath(selectedPath.trimmed());
+    if (cleanedPath.isEmpty()) {
+        setStatusMessage(QStringLiteral("请先选择一个项目目录。"));
+        return;
+    }
+    if (m_analyzing) {
+        setStatusMessage(QStringLiteral("当前正在计算，请等待完成或停止后再切换项目。"));
+        return;
+    }
+
+    setProjectRootPathInternal(cleanedPath, true);
+    clearVisualizationState();
+    setAnalysisProgress(0.0);
+    setAnalysisPhase(QStringLiteral("等待开始"));
+    setStatusMessage(
+        QStringLiteral("已选择项目：%1。请选择快速建模或精确推演。")
+            .arg(QDir::toNativeSeparators(cleanedPath)));
+    setAnalysisReport(QStringLiteral(
+        "项目已选择，尚未开始计算。\n\n"
+        "点击“快速建模”可以先生成架构全景；点击“精确推演”会尝试接入 compile_commands.json 和语义后端。"));
+    setProjectConfigRecommendation({});
 }
 
 void AnalysisController::ensureComponentSceneForCapability(const qulonglong capabilityId) {
@@ -820,11 +876,11 @@ void AnalysisController::beginAnalysis(
         : QStringLiteral("准备快速建模...");
 
     clearVisualizationState();
-    setAnalyzing(true);
     setStopRequested(false);
     setAnalysisProgress(0.0);
     setAnalysisPhase(phaseText);
     setStatusMessage(phaseText);
+    setAnalyzing(true);
     setAnalysisReport(
         (highPrecision
              ? QStringLiteral(
@@ -883,25 +939,42 @@ void AnalysisController::finishAnalysis() {
         result->analysisReport.isEmpty()
             ? QStringLiteral("没有可显示的分析报告。")
             : result->analysisReport);
-    m_lastReport = result->report;
-    m_lastOverview = result->overview;
-    m_lastCapabilityGraph = result->capabilityGraph;
-    setAstFileItems(result->astFileItems);
-    setSelectedAstFilePathInternal(result->selectedAstFilePath, true);
-    setAstPreviewTitle(result->astPreviewTitle);
-    setAstPreviewSummary(result->astPreviewSummary);
-    setAstPreviewText(result->astPreviewText);
-    setCapabilityScene(result->capabilityScene);
-    setComponentSceneCatalog(result->componentSceneCatalog);
-    if (m_systemContextReport != result->systemContextReport) {
-        m_systemContextReport = result->systemContextReport;
-        emit systemContextReportChanged();
+    applyAnalysisResult(*result, canceled || result->canceled);
+    if (!canceled && !result->canceled) {
+        m_completedAnalysisResults[analysisCacheKey(
+            m_projectRootPath,
+            result->report.semanticAnalysisRequested
+                ? analyzer::AnalyzerPrecision::SemanticPreferred
+                : analyzer::AnalyzerPrecision::SyntaxOnly)] =
+            std::make_shared<PendingAnalysisResult>(*result);
     }
-    setSystemContextData(result->systemContextData);
-    setSystemContextCards(result->systemContextCards);
     if (!canceled && !result->canceled && !m_systemContextData.isEmpty()) {
         requestProjectOverviewRefreshInternal({});
     }
+}
+
+void AnalysisController::applyAnalysisResult(
+    const PendingAnalysisResult& result,
+    const bool canceled) {
+    if (!canceled) {
+        clearAiExplanation();
+    }
+    m_lastReport = result.report;
+    m_lastOverview = result.overview;
+    m_lastCapabilityGraph = result.capabilityGraph;
+    setAstFileItems(result.astFileItems);
+    setSelectedAstFilePathInternal(result.selectedAstFilePath, true);
+    setAstPreviewTitle(result.astPreviewTitle);
+    setAstPreviewSummary(result.astPreviewSummary);
+    setAstPreviewText(result.astPreviewText);
+    setCapabilityScene(result.capabilityScene);
+    setComponentSceneCatalog(result.componentSceneCatalog);
+    if (m_systemContextReport != result.systemContextReport) {
+        m_systemContextReport = result.systemContextReport;
+        emit systemContextReportChanged();
+    }
+    setSystemContextData(result.systemContextData);
+    setSystemContextCards(result.systemContextCards);
 }
 
 void AnalysisController::clearVisualizationState() {

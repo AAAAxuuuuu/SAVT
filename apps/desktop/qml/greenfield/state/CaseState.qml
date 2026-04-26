@@ -11,6 +11,7 @@ QtObject {
     readonly property bool hasSystemBrief: (analysisController.systemContextReport || "").length > 0
                                            || ((analysisController.systemContextData || ({})).headline || "").length > 0
     readonly property bool hasAtlas: (((analysisController.capabilityScene || ({})).nodes || []).length > 0)
+    readonly property bool hasWorkspaceChrome: hasAtlas || hasSystemBrief
     readonly property var semanticReadiness: (analysisController.systemContextData || ({})).semanticReadiness || ({})
 
     function navigate(nextRoute) {
@@ -31,8 +32,6 @@ QtObject {
     }
 
     function trustLabel() {
-        if (analysisController.analyzing)
-            return analysisController.analysisPhase || "分析中"
         return semanticReadiness.modeLabel || (hasSystemBrief ? "分析已就绪" : "未分析")
     }
 

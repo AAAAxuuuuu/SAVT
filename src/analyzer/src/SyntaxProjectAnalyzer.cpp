@@ -950,6 +950,22 @@ savt::core::AnalysisReport analyzeSyntaxProject(
     }
 
     std::vector<PendingCall> pendingCalls;
+    std::size_t totalFileWork = 0;
+    for (const FileRecord& file : builder.files()) {
+        if (hasSourceExtension(file.absolutePath)) {
+            ++totalFileWork;
+        }
+        if (isHeuristicAnalyzableFile(file.absolutePath)) {
+            ++totalFileWork;
+        }
+    }
+    std::size_t completedFileWork = 0;
+    auto reportFileProgress = [&](const std::string& label) {
+        if (options.progressReporter && totalFileWork > 0) {
+            options.progressReporter(completedFileWork, totalFileWork, label);
+        }
+    };
+    reportFileProgress("解析源码文件...");
     for (const FileRecord& file : builder.files()) {
         if (isCancellationRequested(options)) {
             break;
@@ -958,10 +974,15 @@ savt::core::AnalysisReport analyzeSyntaxProject(
         if (!hasSourceExtension(file.absolutePath)) {
             continue;
         }
+        const auto progressGuard = [&]() {
+            ++completedFileWork;
+            reportFileProgress("解析源码文件: " + file.relativePath);
+        };
 
         const auto source = readAllText(file.absolutePath);
         if (!source.has_value()) {
             builder.report().diagnostics.push_back("Unable to read source file: " + file.relativePath);
+            progressGuard();
             continue;
         }
 
@@ -975,6 +996,7 @@ savt::core::AnalysisReport analyzeSyntaxProject(
 
         if (tree == nullptr) {
             builder.report().diagnostics.push_back("Parser returned null tree for: " + file.relativePath);
+            progressGuard();
             continue;
         }
 
@@ -982,6 +1004,7 @@ savt::core::AnalysisReport analyzeSyntaxProject(
         std::vector<ScopeInfo> scopes;
         analyzeNode(ts_tree_root_node(tree), *source, file.relativePath, file.nodeId, scopes, pendingCalls, builder);
         ts_tree_delete(tree);
+        progressGuard();
     }
 
     ts_parser_delete(parser);
@@ -992,6 +1015,8 @@ savt::core::AnalysisReport analyzeSyntaxProject(
         if (!isHeuristicAnalyzableFile(file.absolutePath)) continue;
         const SourceLanguage lang = detectLanguage(file.absolutePath);
         analyzeHeuristicFile(file, lang, builder);
+        ++completedFileWork;
+        reportFileProgress("提取启发式关系: " + file.relativePath);
     }
 
     if (isCancellationRequested(options)) {
@@ -1004,7 +1029,6 @@ savt::core::AnalysisReport analyzeSyntaxProject(
 }
 
 }  // namespace savt::analyzer::detail
-
 
 
 

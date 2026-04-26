@@ -90,6 +90,7 @@ ApplicationWindow {
         function analyzeProject(projectRootPath) {}
         function analyzeProjectHighPrecision(projectRootPath) {}
         function analyzeProjectUrl(projectRootUrl) {}
+        function selectProjectUrl(projectRootUrl) {}
         function ensureComponentSceneForCapability(capabilityId) {}
         function refreshAiAvailability() {}
         function clearAiExplanation() {}

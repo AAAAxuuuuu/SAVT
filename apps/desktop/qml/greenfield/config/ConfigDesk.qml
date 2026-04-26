@@ -161,30 +161,21 @@ ScrollView {
 
                         ActionButton {
                             tokens: root.tokens
-                            text: root.analysisController.analyzing ? "停止任务" : "快速建模"
-                            hint: root.analysisController.analyzing
-                                  ? "停止当前分析任务，保留已生成的结果。"
-                                  : "使用快速建模重新生成当前项目的架构结果。"
+                            text: "快速建模"
+                            hint: "使用快速建模重新生成当前项目的架构结果。"
                             disabledHint: "先选择项目目录，才能启动快速建模。"
-                            tone: root.analysisController.analyzing ? "danger" : "primary"
+                            tone: "primary"
                             enabled: root.caseState.hasProject
-                            onClicked: {
-                                if (root.analysisController.analyzing)
-                                    root.analysisController.stopAnalysis()
-                                else
-                                    root.analysisController.analyzeCurrentProject()
-                            }
+                            onClicked: root.analysisController.analyzeCurrentProject()
                         }
 
                         ActionButton {
                             tokens: root.tokens
                             text: "精确推演"
                             hint: "检查或生成 compile_commands.json 后，执行精确推演。"
-                            disabledHint: root.analysisController.analyzing
-                                          ? "当前正在分析，请等待完成。"
-                                          : "先选择项目目录，再启动精确推演。"
+                            disabledHint: "先选择项目目录，再启动精确推演。"
                             tone: "secondary"
-                            enabled: root.caseState.hasProject && !root.analysisController.analyzing
+                            enabled: root.caseState.hasProject
                             onClicked: root.analysisController.analyzeCurrentProjectHighPrecision()
                         }
 

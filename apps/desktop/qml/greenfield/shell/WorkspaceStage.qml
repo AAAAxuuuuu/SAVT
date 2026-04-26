@@ -149,7 +149,7 @@ Item {
                 spacing: 8
 
                 Rectangle {
-                    visible: root.caseState.hasProject
+                    visible: root.caseState.hasWorkspaceChrome
                     Layout.fillWidth: true
                     radius: root.tokens.radius8
                     color: root.tokens.panelStrong
@@ -219,16 +219,11 @@ Item {
                                 ActionButton {
                                     Layout.fillWidth: true
                                     tokens: root.tokens
-                                    text: root.analysisController.analyzing ? "停止任务" : "快速建模"
+                                    text: "快速建模"
                                     compact: true
-                                    tone: root.analysisController.analyzing ? "danger" : "primary"
+                                    tone: "primary"
                                     enabled: root.caseState.hasProject
-                                    onClicked: {
-                                        if (root.analysisController.analyzing)
-                                            root.analysisController.stopAnalysis()
-                                        else
-                                            root.analysisController.analyzeCurrentProject()
-                                    }
+                                    onClicked: root.analysisController.analyzeCurrentProject()
                                 }
 
                                 ActionButton {
@@ -237,7 +232,7 @@ Item {
                                     text: "精确推演"
                                     compact: true
                                     tone: "secondary"
-                                    enabled: root.caseState.hasProject && !root.analysisController.analyzing
+                                    enabled: root.caseState.hasProject
                                     onClicked: root.analysisController.analyzeCurrentProjectHighPrecision()
                                 }
 
@@ -259,10 +254,7 @@ Item {
 
                             PillChip {
                                 tokens: root.tokens
-                                text: root.analysisController.analyzing
-                                      ? ((root.analysisController.analysisPhase || "计算中")
-                                         + " · " + Math.round(root.analysisController.analysisProgress) + "%")
-                                      : String(algorithmSummary.modeLine || root.caseState.trustLabel())
+                                text: String(algorithmSummary.modeLine || root.caseState.trustLabel())
                                 tone: root.caseState.trustTone()
                             }
 
@@ -329,9 +321,7 @@ Item {
                                 tokens: root.tokens
                                 scene: root.analysisController.capabilityScene || ({})
                                 selectedNode: root.focusState.focusedNode
-                                emptyText: root.analysisController.analyzing
-                                           ? "正在生成能力全景，画布会随着布局结果逐步刷新..."
-                                           : "选择项目并运行快速建模或精确推演后，这里会显示 L2 能力域全景图。"
+                                emptyText: ""
                                 onNodeSelected: root.focusState.setCapability(node)
                                 onNodeDrilled: root.openComponentLab(node)
                                 onBlankClicked: root.focusState.clear()
@@ -339,7 +329,7 @@ Item {
 
                             StartOverlay {
                                 anchors.centerIn: parent
-                                visible: !root.caseState.hasProject || (!root.caseState.hasAtlas && !root.analysisController.analyzing)
+                                visible: !root.caseState.hasWorkspaceChrome
                                 tokens: root.tokens
                                 analysisController: root.analysisController
                                 caseState: root.caseState
@@ -602,9 +592,9 @@ Item {
 
                 ActionButton {
                     tokens: startOverlay.tokens
-                    text: analysisController.analyzing ? "计算中..." : "快速建模"
+                    text: "快速建模"
                     tone: "primary"
-                    enabled: caseState.hasProject && !analysisController.analyzing
+                    enabled: caseState.hasProject
                     onClicked: analysisController.analyzeCurrentProject()
                 }
 
@@ -612,7 +602,7 @@ Item {
                     tokens: startOverlay.tokens
                     text: "精确推演"
                     tone: "secondary"
-                    enabled: caseState.hasProject && !analysisController.analyzing
+                    enabled: caseState.hasProject
                     onClicked: analysisController.analyzeCurrentProjectHighPrecision()
                 }
             }

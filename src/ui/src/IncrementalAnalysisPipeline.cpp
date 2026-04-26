@@ -8,6 +8,7 @@
 #include <QDebug>
 #include <QElapsedTimer>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <fstream>
@@ -297,6 +298,11 @@ AnalysisArtifacts IncrementalAnalysisPipeline::analyze(
 
     if (!result.scanLayer.hit) {
         scanEntry = buildScanEntry(manifest);
+        if (isCancellationRequested(options)) {
+            result.canceled = true;
+            result.canceledPhase = "计算缓存指纹";
+            return result;
+        }
         std::lock_guard<std::mutex> lock(cacheMutex());
         scanCache()[result.scanLayer.key] = scanEntry;
     }
@@ -332,8 +338,39 @@ AnalysisArtifacts IncrementalAnalysisPipeline::analyze(
         }
     }
 
+    int parseDoneProgress = 75;
     if (!result.parseLayer.hit) {
-        result.report = analyzer.analyzeProject(normalizedRoot, options);
+        savt::analyzer::AnalyzerOptions parseOptions = options;
+        int lastParseProgress = 25;
+        parseDoneProgress = 37;
+        parseOptions.progressReporter =
+            [&progress, &lastParseProgress, &parseDoneProgress](
+                const std::size_t completed,
+                const std::size_t total,
+                const std::string& label) {
+                if (total == 0) {
+                    return;
+                }
+                const std::size_t boundedCompleted = std::min(completed, total);
+                const int parseSpan =
+                    std::clamp(static_cast<int>(total) * 3, 8, 52);
+                parseDoneProgress = 25 + parseSpan;
+                int progressValue =
+                    25 + static_cast<int>((boundedCompleted * parseSpan) / total);
+                progressValue = std::clamp(progressValue, 25, parseDoneProgress);
+                if (progressValue < lastParseProgress) {
+                    progressValue = lastParseProgress;
+                }
+                lastParseProgress = progressValue;
+                publishProgress(progress, progressValue, label);
+            };
+        result.report = analyzer.analyzeProject(normalizedRoot, parseOptions);
+        if (isCancellationRequested(options)) {
+            result.canceled = true;
+            result.canceledPhase = "解析源码并构建关系图";
+            return result;
+        }
+        publishProgress(progress, parseDoneProgress, "整理解析结果...");
         std::lock_guard<std::mutex> lock(cacheMutex());
         parseCache()[result.parseLayer.key] = result.report;
     }
@@ -352,11 +389,13 @@ AnalysisArtifacts IncrementalAnalysisPipeline::analyze(
         normalizedRoot,
         {"aggregate"},
         {result.parseLayer.key});
+    const int aggregateProgress = std::clamp(parseDoneProgress + 8, parseDoneProgress, 84);
+    const int layoutProgress = std::clamp(aggregateProgress + 12, aggregateProgress, 92);
     QElapsedTimer aggregateTimer;
     aggregateTimer.start();
     publishProgress(
         progress,
-        75,
+        aggregateProgress,
         result.aggregateLayer.hit ? "命中聚合缓存..." : "提炼架构总览...");
     {
         std::lock_guard<std::mutex> lock(cacheMutex());
@@ -375,6 +414,11 @@ AnalysisArtifacts IncrementalAnalysisPipeline::analyze(
         result.overview = aggregation.overview;
         result.capabilityGraph = aggregation.capabilityGraph;
         result.ruleReport = aggregation.ruleReport;
+        if (isCancellationRequested(options)) {
+            result.canceled = true;
+            result.canceledPhase = "提炼架构总览";
+            return result;
+        }
         std::lock_guard<std::mutex> lock(cacheMutex());
         aggregateCache()[result.aggregateLayer.key] = CachedAggregateEntry{aggregation};
     }
@@ -397,7 +441,7 @@ AnalysisArtifacts IncrementalAnalysisPipeline::analyze(
     layoutTimer.start();
     publishProgress(
         progress,
-        92,
+        layoutProgress,
         result.layoutLayer.hit ? "命中布局缓存..." : "计算模块布局...");
     {
         std::lock_guard<std::mutex> lock(cacheMutex());
@@ -421,6 +465,26 @@ AnalysisArtifacts IncrementalAnalysisPipeline::analyze(
         reconstructionOptions.cancellationRequested = [&options]() {
             return isCancellationRequested(options);
         };
+        int lastLayoutProgress = layoutProgress;
+        reconstructionOptions.progressReporter =
+            [&progress, &lastLayoutProgress, layoutProgress](
+                const std::size_t completed,
+                const std::size_t total,
+                const std::string& label) {
+                if (total == 0) {
+                    return;
+                }
+                const std::size_t boundedCompleted = std::min(completed, total);
+                int progressValue =
+                    layoutProgress +
+                    static_cast<int>((boundedCompleted * (94 - layoutProgress)) / total);
+                progressValue = std::clamp(progressValue, layoutProgress, 94);
+                if (progressValue < lastLayoutProgress) {
+                    progressValue = lastLayoutProgress;
+                }
+                lastLayoutProgress = progressValue;
+                publishProgress(progress, progressValue, label);
+            };
         const auto reconstruction = savt::reconstruction::buildArchitectureReconstruction(
             result.report,
             aggregation,
@@ -433,7 +497,6 @@ AnalysisArtifacts IncrementalAnalysisPipeline::analyze(
 
         result.capabilitySceneLayout = reconstruction.capabilitySceneLayout;
         result.moduleLayout = reconstruction.moduleLayout;
-        publishProgress(progress, 94, "生成 L3 组件视图...");
         for (const auto& [capabilityId, drilldown] : reconstruction.capabilityDrilldowns) {
             if (isCancellationRequested(options)) {
                 result.canceled = true;
@@ -443,6 +506,11 @@ AnalysisArtifacts IncrementalAnalysisPipeline::analyze(
 
             result.componentGraphs.emplace(capabilityId, drilldown.graph);
             result.componentLayouts.emplace(capabilityId, drilldown.layout);
+        }
+        if (isCancellationRequested(options)) {
+            result.canceled = true;
+            result.canceledPhase = "生成 L3 组件视图";
+            return result;
         }
         std::lock_guard<std::mutex> lock(cacheMutex());
         layoutCache()[result.layoutLayer.key] = CachedLayoutEntry{

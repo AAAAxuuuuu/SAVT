@@ -1386,6 +1386,28 @@ SemanticBackendResult analyzeSemanticProject(
         return result;
     }
 
+    std::unordered_set<std::string> eligibleTranslationUnitPaths;
+    for (unsigned commandIndex = 0; commandIndex < commandCount; ++commandIndex) {
+        const CXCompileCommand command = clang_CompileCommands_getCommand(compileCommands, commandIndex);
+        const std::filesystem::path sourceFile = std::filesystem::path(
+            cxStringToStdString(clang_CompileCommand_getFilename(command))).lexically_normal();
+        if (sourceFile.empty() || !builder.isProjectFilePath(sourceFile) || !hasSourceExtension(sourceFile)) {
+            continue;
+        }
+        eligibleTranslationUnitPaths.insert(normalizePath(sourceFile));
+    }
+
+    std::size_t completedTranslationUnits = 0;
+    auto reportTranslationUnitProgress = [&](const std::string& label) {
+        if (options.progressReporter && !eligibleTranslationUnitPaths.empty()) {
+            options.progressReporter(
+                completedTranslationUnits,
+                eligibleTranslationUnitPaths.size(),
+                label);
+        }
+    };
+    reportTranslationUnitProgress("解析编译单元...");
+
     std::unordered_set<std::string> seenTranslationUnits;
     std::size_t eligibleTranslationUnits = 0;
     std::size_t systemHeaderFailureCount = 0;
@@ -1393,6 +1415,10 @@ SemanticBackendResult analyzeSemanticProject(
     bool reportedMacOsSdkFallback = false;
     SemanticRegistry semanticRegistry{&builder};
     for (unsigned commandIndex = 0; commandIndex < commandCount; ++commandIndex) {
+        if (isCancellationRequested(options)) {
+            break;
+        }
+
         const CXCompileCommand command = clang_CompileCommands_getCommand(compileCommands, commandIndex);
         const std::filesystem::path sourceFile = std::filesystem::path(
             cxStringToStdString(clang_CompileCommand_getFilename(command))).lexically_normal();
@@ -1410,6 +1436,8 @@ SemanticBackendResult analyzeSemanticProject(
         if (argumentStorage.empty()) {
             builder.report().diagnostics.push_back("Compile command had no arguments: " + normalizedSourcePath);
             ++parseFailureCount;
+            ++completedTranslationUnits;
+            reportTranslationUnitProgress("跳过编译单元: " + normalizedSourcePath);
             continue;
         }
         applyCompileCommandWorkingDirectory(command, argumentStorage);
@@ -1465,6 +1493,8 @@ SemanticBackendResult analyzeSemanticProject(
             } else {
                 ++parseFailureCount;
             }
+            ++completedTranslationUnits;
+            reportTranslationUnitProgress("解析编译单元失败: " + normalizedSourcePath);
             continue;
         }
 
@@ -1475,6 +1505,8 @@ SemanticBackendResult analyzeSemanticProject(
                 "Semantic analysis blocked by unresolved system headers for: " + normalizedSourcePath);
             ++systemHeaderFailureCount;
             clang_disposeTranslationUnit(translationUnit);
+            ++completedTranslationUnits;
+            reportTranslationUnitProgress("解析编译单元失败: " + normalizedSourcePath);
             continue;
         }
 
@@ -1485,6 +1517,8 @@ SemanticBackendResult analyzeSemanticProject(
 
         traverseCursor(clang_getTranslationUnitCursor(translationUnit), semanticRegistry, TraversalFrame{});
         clang_disposeTranslationUnit(translationUnit);
+        ++completedTranslationUnits;
+        reportTranslationUnitProgress("解析编译单元: " + normalizedSourcePath);
     }
 
     clang_disposeIndex(index);

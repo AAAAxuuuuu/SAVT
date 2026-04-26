@@ -24,6 +24,7 @@ struct AnalyzerOptions {
     AnalyzerPrecision precision = AnalyzerPrecision::SemanticPreferred;
     std::filesystem::path compilationDatabasePath;
     std::function<bool()> cancellationRequested;
+    std::function<void(std::size_t completed, std::size_t total, const std::string& label)> progressReporter;
 };
 
 struct ProjectScanManifest {

@@ -2710,7 +2710,7 @@ Item {
 
     Label {
         anchors.centerIn: parent
-        visible: root.nodes.length === 0
+        visible: root.nodes.length === 0 && root.emptyText.length > 0
         text: root.emptyText
         color: root.tokens.text3
         font.family: root.tokens.textFontFamily
@@ -2722,6 +2722,7 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 18
+        visible: root.nodes.length > 0
         width: 272
         height: 40
         radius: root.tokens.radiusLg

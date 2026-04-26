@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <string>
 #include <unordered_map>
 
 namespace savt::reconstruction {
@@ -15,6 +16,7 @@ struct ArchitectureReconstructionOptions {
     bool buildCapabilitySceneLayout = true;
     bool buildCapabilityDrilldowns = true;
     std::function<bool()> cancellationRequested;
+    std::function<void(std::size_t completed, std::size_t total, const std::string& label)> progressReporter;
 };
 
 struct CapabilityDrilldown {
