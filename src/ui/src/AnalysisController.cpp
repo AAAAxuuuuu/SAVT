@@ -587,7 +587,7 @@ void AnalysisController::generateRecommendedProjectConfig() {
     }
 
     setStatusMessage(
-        QStringLiteral("已写入配置文件：%1，正在重新分析项目。")
+        QStringLiteral("已写入配置文件：%1，正在启动快速建模。")
             .arg(writtenPath));
     analyzeCurrentProject();
 }
@@ -816,8 +816,8 @@ void AnalysisController::beginAnalysis(
     const analyzer::AnalyzerPrecision precision) {
     const bool highPrecision = precision != analyzer::AnalyzerPrecision::SyntaxOnly;
     const QString phaseText = highPrecision
-        ? QStringLiteral("准备高精度分析...")
-        : QStringLiteral("准备分析...");
+        ? QStringLiteral("准备精确推演...")
+        : QStringLiteral("准备快速建模...");
 
     clearVisualizationState();
     setAnalyzing(true);
@@ -828,10 +828,10 @@ void AnalysisController::beginAnalysis(
     setAnalysisReport(
         (highPrecision
              ? QStringLiteral(
-                   "正在以高精度模式分析项目：%1\n\n"
+                   "正在执行精确推演：%1\n\n"
                    "系统会优先准备 compile_commands.json，并尝试进入 Clang/LibTooling 语义分析。")
              : QStringLiteral(
-                   "正在分析项目：%1\n\n"
+                   "正在执行快速建模：%1\n\n"
                    "系统会先整理项目的主要分工，再为程序员准备详细分析报告和 AST 预览。"))
             .arg(QDir::toNativeSeparators(cleanedPath)));
     m_pendingAnalysisResult = std::make_shared<PendingAnalysisResult>();

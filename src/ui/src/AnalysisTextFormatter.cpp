@@ -265,19 +265,19 @@ QString formatRatio(const std::size_t count, const std::size_t total) {
 QString precisionModeLabel(const core::AnalysisReport& report) {
     const QString precisionLevel = QString::fromStdString(report.precisionLevel);
     if (precisionLevel == QStringLiteral("semantic")) {
-        return QStringLiteral("语义分析");
+        return QStringLiteral("精确推演");
     }
     if (precisionLevel == QStringLiteral("syntax_fallback")) {
-        return QStringLiteral("语义失败后回退到语法分析");
+        return QStringLiteral("精确推演回退到快速建模");
     }
     if (precisionLevel == QStringLiteral("blocked_semantic_required")) {
-        return QStringLiteral("语义阻断");
+        return QStringLiteral("精确推演阻断");
     }
     if (precisionLevel == QStringLiteral("semantic_startup_failed")) {
-        return QStringLiteral("语义启动失败");
+        return QStringLiteral("精确推演启动失败");
     }
     if (precisionLevel == QStringLiteral("syntax")) {
-        return QStringLiteral("语法分析");
+        return QStringLiteral("快速建模");
     }
     return precisionLevel.isEmpty() ? QStringLiteral("未知") : precisionLevel;
 }
@@ -387,7 +387,7 @@ QString formatCapabilityReportMarkdown(
     output += QStringLiteral("| 当前精度 | %1 |\n").arg(precisionModeLabel(analysisReport));
     output += QStringLiteral("| 主引擎 | %1 |\n")
                   .arg(QString::fromStdString(analysisReport.primaryEngine.empty() ? std::string("none") : analysisReport.primaryEngine));
-    output += QStringLiteral("| 语义状态 | %1 |\n").arg(semanticBackendLabel(analysisReport));
+    output += QStringLiteral("| 精确推演状态 | %1 |\n").arg(semanticBackendLabel(analysisReport));
     output += QStringLiteral("| 语义状态码 | `%1` |\n")
                   .arg(QString::fromStdString(analysisReport.semanticStatusCode.empty() ? std::string("none") : analysisReport.semanticStatusCode));
     output += QStringLiteral("| 编译数据库 | %1 |\n")

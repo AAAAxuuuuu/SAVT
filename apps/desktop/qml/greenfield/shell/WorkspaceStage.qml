@@ -219,7 +219,7 @@ Item {
                                 ActionButton {
                                     Layout.fillWidth: true
                                     tokens: root.tokens
-                                    text: root.analysisController.analyzing ? "停止重建" : "重新重建"
+                                    text: root.analysisController.analyzing ? "停止任务" : "快速建模"
                                     compact: true
                                     tone: root.analysisController.analyzing ? "danger" : "primary"
                                     enabled: root.caseState.hasProject
@@ -234,7 +234,7 @@ Item {
                                 ActionButton {
                                     Layout.fillWidth: true
                                     tokens: root.tokens
-                                    text: "高精度重建"
+                                    text: "精确推演"
                                     compact: true
                                     tone: "secondary"
                                     enabled: root.caseState.hasProject && !root.analysisController.analyzing
@@ -260,7 +260,7 @@ Item {
                             PillChip {
                                 tokens: root.tokens
                                 text: root.analysisController.analyzing
-                                      ? ((root.analysisController.analysisPhase || "重建中")
+                                      ? ((root.analysisController.analysisPhase || "计算中")
                                          + " · " + Math.round(root.analysisController.analysisProgress) + "%")
                                       : String(algorithmSummary.modeLine || root.caseState.trustLabel())
                                 tone: root.caseState.trustTone()
@@ -330,8 +330,8 @@ Item {
                                 scene: root.analysisController.capabilityScene || ({})
                                 selectedNode: root.focusState.focusedNode
                                 emptyText: root.analysisController.analyzing
-                                           ? "正在重建能力全景，画布会随着布局结果逐步刷新..."
-                                           : "选择项目并运行重建后，这里会显示 L2 能力域全景图。"
+                                           ? "正在生成能力全景，画布会随着布局结果逐步刷新..."
+                                           : "选择项目并运行快速建模或精确推演后，这里会显示 L2 能力域全景图。"
                                 onNodeSelected: root.focusState.setCapability(node)
                                 onNodeDrilled: root.openComponentLab(node)
                                 onBlankClicked: root.focusState.clear()
@@ -574,7 +574,7 @@ Item {
             spacing: 14
 
             Label {
-                text: "开始架构重建"
+                text: "开始架构建模"
                 color: tokens.text1
                 font.family: tokens.displayFontFamily
                 font.pixelSize: 26
@@ -584,7 +584,7 @@ Item {
             Label {
                 Layout.fillWidth: true
                 text: caseState.hasProject
-                      ? "项目已选择，但还没有重建结果。点击开始后，SAVT 会依次执行源码扫描、事实提取、能力聚合、证据校准和多层视图输出。"
+                      ? "项目已选择，但还没有建模结果。点击快速建模后，SAVT 会依次执行源码扫描、事实提取、能力聚合、证据校准和多层视图输出。"
                       : "选择一个 C/C++ 项目目录，SAVT 会把源码事实转成 L1/L2/L3 架构视图、证据链和可继续钻取的边界结果。"
                 wrapMode: Text.WordWrap
                 color: tokens.text3
@@ -602,7 +602,7 @@ Item {
 
                 ActionButton {
                     tokens: startOverlay.tokens
-                    text: analysisController.analyzing ? "重建中..." : "开始重建"
+                    text: analysisController.analyzing ? "计算中..." : "快速建模"
                     tone: "primary"
                     enabled: caseState.hasProject && !analysisController.analyzing
                     onClicked: analysisController.analyzeCurrentProject()
@@ -610,7 +610,7 @@ Item {
 
                 ActionButton {
                     tokens: startOverlay.tokens
-                    text: "高精度重建"
+                    text: "精确推演"
                     tone: "secondary"
                     enabled: caseState.hasProject && !analysisController.analyzing
                     onClicked: analysisController.analyzeCurrentProjectHighPrecision()

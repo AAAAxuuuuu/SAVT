@@ -289,7 +289,7 @@ ScrollView {
                 title: "系统上下文"
                 htmlText: root.contextHtml
                 rawText: root.analysisController.systemContextReport
-                emptyText: "运行重建后，这里会显示系统上下文报告。"
+                emptyText: "运行快速建模或精确推演后，这里会显示系统上下文报告。"
             }
 
             MarkdownCard {

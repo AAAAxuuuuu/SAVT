@@ -41,7 +41,7 @@ QString semanticFailureExplanation(const core::AnalysisReport& report) {
     const QString semanticStatusMessage =
         QString::fromStdString(report.semanticStatusMessage).trimmed();
     return semanticStatusMessage.isEmpty()
-               ? QStringLiteral("未能进入语义分析。请检查编译数据库、LLVM/Clang 和当前分析环境。")
+               ? QStringLiteral("未能进入精确推演。请检查编译数据库、LLVM/Clang 和当前分析环境。")
                : semanticStatusMessage;
 }
 
@@ -75,7 +75,7 @@ QString semanticActionHint(const core::AnalysisReport& report) {
         return QStringLiteral("请检查 compile_commands.json 中的编译命令是否和当前源码、编译器、工作目录一致。");
     }
     return QStringLiteral(
-        "如果你需要更深的类型和调用关系，请准备 compile_commands.json，并在后续分析入口启用语义优先模式后重跑。");
+        "如果你需要更深的类型和调用关系，请准备 compile_commands.json，并在后续入口启动精确推演。");
 }
 
 qulonglong visibleNodeCount(const core::CapabilityGraph& capabilityGraph) {
@@ -124,18 +124,18 @@ QVariantMap SemanticReadinessService::buildStatus(
 
     if (report.semanticAnalysisEnabled) {
         modeKey = QStringLiteral("semantic-ready");
-        modeLabel = QStringLiteral("语义就绪");
+        modeLabel = QStringLiteral("精确推演");
         badgeTone = QStringLiteral("success");
-        headline = QStringLiteral("当前为语义级分析");
+        headline = QStringLiteral("当前为精确推演结果");
         reason = QStringLiteral("已成功进入 Clang/LibTooling 语义后端。");
         impact = QStringLiteral("调用关系、类型信息和跨文件符号证据更完整，适合继续做结构判断。");
         action = QStringLiteral("可以继续依据能力地图和组件工作台下钻到更具体的代码入口。");
         confidenceSummary = QStringLiteral("当前结果更适合支撑结构判断与后续改造定位。");
     } else if (report.semanticAnalysisRequested) {
         modeKey = QStringLiteral("semantic-preferred");
-        modeLabel = QStringLiteral("语义优先");
+        modeLabel = QStringLiteral("精确推演受阻");
         badgeTone = QStringLiteral("warning");
-        headline = QStringLiteral("当前为语义优先分析（未就绪）");
+        headline = QStringLiteral("精确推演未就绪");
         reason = semanticFailureExplanation(report);
         impact = QStringLiteral("当前结果已回退到语法级，跨文件调用、类型归属和部分关系推断可能不完整。");
         action = semanticActionHint(report);
@@ -143,12 +143,12 @@ QVariantMap SemanticReadinessService::buildStatus(
         needsAttention = true;
     } else {
         modeKey = QStringLiteral("syntax-only");
-        modeLabel = QStringLiteral("语法级首扫");
+        modeLabel = QStringLiteral("快速建模");
         badgeTone = QStringLiteral("info");
-        headline = QStringLiteral("当前为语法级分析");
-        reason = QStringLiteral("当前首页首次分析固定走快速首扫模式，尚未请求语义后端。");
+        headline = QStringLiteral("当前为快速建模结果");
+        reason = QStringLiteral("当前首页首次分析固定走快速建模，尚未请求语义后端。");
         impact = QStringLiteral("当前结果更适合回答项目是什么、入口在哪、主模块有哪些，不适合过早下结论到类型与调用细节。");
-        action = QStringLiteral("如果你需要更深的类型和调用关系，请准备 compile_commands.json，并在后续分析入口启用语义优先模式后重跑。");
+        action = QStringLiteral("如果你需要更深的类型和调用关系，请准备 compile_commands.json，并在后续入口启动精确推演。");
         confidenceSummary = QStringLiteral("当前结果适合做新人导览和阅读路径，不适合直接当成最终精度结论。");
     }
 
@@ -163,7 +163,7 @@ QVariantMap SemanticReadinessService::buildStatus(
         } else if (report.semanticAnalysisRequested) {
             summary += QStringLiteral(" 当前未进入语义后端，结果回退到语法级分析。");
         } else {
-            summary += QStringLiteral(" 当前仍处于语法级快速首扫。");
+            summary += QStringLiteral(" 当前仍处于快速建模结果。");
         }
         if (overview.nodes.empty()) {
             summary += QStringLiteral(" 当前还没有提炼出稳定的高层模块。");

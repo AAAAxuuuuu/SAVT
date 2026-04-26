@@ -276,11 +276,11 @@ Rectangle {
             ActionButton {
                 Layout.fillWidth: true
                 tokens: root.tokens
-                text: root.analysisController.analyzing ? "停止" : "重建"
+                text: root.analysisController.analyzing ? "停止" : "快速建模"
                 hint: root.analysisController.analyzing
-                      ? "停止当前架构重建任务，保留已经生成的阶段结果。"
-                      : "以当前模式重新运行源码扫描、事实提取、能力聚合和视图重建。"
-                disabledHint: "先选择一个项目目录，才能开始重建。"
+                      ? "停止当前计算任务，保留已经生成的阶段结果。"
+                      : "快速整理源码事实、能力域和架构地图，适合先建立全景。"
+                disabledHint: "先选择一个项目目录，才能开始快速建模。"
                 compact: true
                 tone: root.analysisController.analyzing ? "danger" : "primary"
                 enabled: root.caseState.hasProject
@@ -295,11 +295,11 @@ Rectangle {
             ActionButton {
                 Layout.fillWidth: true
                 tokens: root.tokens
-                text: "高精度"
-                hint: "尝试接入 compile_commands.json 和语义后端，提升事实提取精度。"
+                text: "精确推演"
+                hint: "接入 compile_commands.json 和语义后端，提升关系推断精度。"
                 disabledHint: root.analysisController.analyzing
-                              ? "当前正在重建，请等待结束后再切换高精度模式。"
-                              : "先选择项目，再启动高精度重建。"
+                              ? "当前正在计算，请等待结束后再启动精确推演。"
+                              : "先选择项目，再启动精确推演。"
                 compact: true
                 tone: "secondary"
                 enabled: root.caseState.hasProject && !root.analysisController.analyzing

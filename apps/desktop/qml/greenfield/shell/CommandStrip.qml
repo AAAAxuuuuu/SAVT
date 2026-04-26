@@ -130,15 +130,15 @@ Rectangle {
 
         ActionButton {
             tokens: root.tokens
-            text: root.caseState.hasProject ? (root.analysisController.analyzing ? "停止" : "分析") : "选择项目"
+            text: root.caseState.hasProject ? (root.analysisController.analyzing ? "停止" : "快速建模") : "选择项目"
             hint: !root.caseState.hasProject
                   ? "先选择要分析的项目目录。"
                   : (root.analysisController.analyzing
                      ? "停止当前分析任务，保留已经产出的结果。"
-                     : "快速首扫当前项目，生成架构地图和报告。")
+                     : "快速整理当前项目，生成架构地图和报告。")
             compact: true
             tone: root.analysisController.analyzing ? "danger" : "primary"
-            fixedWidth: 92
+            fixedWidth: 104
             onClicked: {
                 if (!root.caseState.hasProject) {
                     root.chooseProjectRequested()

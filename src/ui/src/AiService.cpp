@@ -51,11 +51,15 @@ QString projectNameFromRootPath(const QString& rootPath) {
 QString inferAnalyzerPrecision(const QString& reportText) {
     if (reportText.contains(QStringLiteral("semantic-required"),
                             Qt::CaseInsensitive) ||
-        reportText.contains(QStringLiteral("语义优先"), Qt::CaseInsensitive)) {
+        reportText.contains(QStringLiteral("语义优先"), Qt::CaseInsensitive) ||
+        reportText.contains(QStringLiteral("精确推演回退"), Qt::CaseInsensitive) ||
+        reportText.contains(QStringLiteral("精确推演阻断"), Qt::CaseInsensitive) ||
+        reportText.contains(QStringLiteral("精确推演未就绪"), Qt::CaseInsensitive)) {
         return QStringLiteral("semantic_preferred");
     }
     if (reportText.contains(QStringLiteral("semantic"), Qt::CaseInsensitive) ||
-        reportText.contains(QStringLiteral("语义分析"), Qt::CaseInsensitive)) {
+        reportText.contains(QStringLiteral("语义分析"), Qt::CaseInsensitive) ||
+        reportText.contains(QStringLiteral("精确推演"), Qt::CaseInsensitive)) {
         return QStringLiteral("semantic_available");
     }
     return QStringLiteral("syntax_fallback");

@@ -161,11 +161,11 @@ ScrollView {
 
                         ActionButton {
                             tokens: root.tokens
-                            text: root.analysisController.analyzing ? "停止分析" : "重新分析"
+                            text: root.analysisController.analyzing ? "停止任务" : "快速建模"
                             hint: root.analysisController.analyzing
                                   ? "停止当前分析任务，保留已生成的结果。"
-                                  : "使用快速首扫重新生成当前项目的架构结果。"
-                            disabledHint: "先选择项目目录，才能重新分析。"
+                                  : "使用快速建模重新生成当前项目的架构结果。"
+                            disabledHint: "先选择项目目录，才能启动快速建模。"
                             tone: root.analysisController.analyzing ? "danger" : "primary"
                             enabled: root.caseState.hasProject
                             onClicked: {
@@ -178,11 +178,11 @@ ScrollView {
 
                         ActionButton {
                             tokens: root.tokens
-                            text: "高精度分析"
-                            hint: "检查或生成 compile_commands.json 后，重新执行语义优先分析。"
+                            text: "精确推演"
+                            hint: "检查或生成 compile_commands.json 后，执行精确推演。"
                             disabledHint: root.analysisController.analyzing
                                           ? "当前正在分析，请等待完成。"
-                                          : "先选择项目目录，再启动高精度分析。"
+                                          : "先选择项目目录，再启动精确推演。"
                             tone: "secondary"
                             enabled: root.caseState.hasProject && !root.analysisController.analyzing
                             onClicked: root.analysisController.analyzeCurrentProjectHighPrecision()
@@ -349,11 +349,11 @@ ScrollView {
                         Layout.fillWidth: true
                         tokens: root.tokens
                         tone: root.semanticTone()
-                        title: "语义分析状态"
+                        title: "精度状态"
                         body: root.textOr(root.readiness.headline || root.readiness.modeLabel,
                                           "等待分析结果。")
                         detail: root.textOr(root.readiness.summary || root.readiness.reason,
-                                            "SAVT 会在这里区分语法级推断、语义可用和阻断原因。")
+                                            "SAVT 会在这里区分快速建模、精确推演和阻断原因。")
                     }
 
                     InfoCard {
