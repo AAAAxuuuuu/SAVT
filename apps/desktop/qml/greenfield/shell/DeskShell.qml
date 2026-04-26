@@ -69,10 +69,11 @@ Item {
     RowLayout {
         anchors.fill: parent
         anchors.margins: 18
-        spacing: 18
+        spacing: root.caseState.hasProject ? 18 : 0
 
         CaseRail {
-            Layout.preferredWidth: 264
+            visible: root.caseState.hasProject
+            Layout.preferredWidth: visible ? 264 : 0
             Layout.fillHeight: true
             tokens: root.tokens
             analysisController: root.analysisController

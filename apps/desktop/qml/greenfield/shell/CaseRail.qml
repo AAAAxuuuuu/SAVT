@@ -82,88 +82,6 @@ Rectangle {
             font.weight: Font.DemiBold
         }
 
-        Rectangle {
-            Layout.fillWidth: true
-            radius: root.tokens.radiusXl
-            color: Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.1)
-            border.color: Qt.rgba(root.tokens.signalCobalt.r, root.tokens.signalCobalt.g, root.tokens.signalCobalt.b, 0.18)
-            implicitHeight: heroColumn.implicitHeight + 26
-
-            ColumnLayout {
-                id: heroColumn
-                anchors.fill: parent
-                anchors.margins: 13
-                spacing: 8
-
-                Label {
-                    text: "Algorithm Core"
-                    color: root.tokens.signalCobalt
-                    font.family: root.tokens.textFontFamily
-                    font.pixelSize: 11
-                    font.weight: Font.DemiBold
-                }
-
-                Label {
-                    Layout.fillWidth: true
-                    text: root.caseState.projectName()
-                    color: root.tokens.text1
-                    font.family: root.tokens.displayFontFamily
-                    font.pixelSize: 20
-                    font.weight: Font.DemiBold
-                    wrapMode: Text.WordWrap
-                    maximumLineCount: 2
-                    elide: Text.ElideRight
-                }
-
-                Label {
-                    Layout.fillWidth: true
-                    text: String(root.algorithmSummary.headline || "从源码事实到多粒度架构视图")
-                    color: root.tokens.text2
-                    wrapMode: Text.WordWrap
-                    font.family: root.tokens.textFontFamily
-                    font.pixelSize: 12
-                    lineHeight: 1.16
-                }
-
-                Label {
-                    Layout.fillWidth: true
-                    text: String(root.algorithmSummary.modeLine || root.caseState.trustLabel())
-                    color: root.tokens.text3
-                    wrapMode: Text.WordWrap
-                    font.family: root.tokens.textFontFamily
-                    font.pixelSize: 11
-                }
-
-                Label {
-                    Layout.fillWidth: true
-                    visible: text.length > 0
-                    text: String(root.algorithmSummary.cacheLine || "")
-                    color: root.tokens.text3
-                    wrapMode: Text.WordWrap
-                    font.family: root.tokens.textFontFamily
-                    font.pixelSize: 11
-                }
-
-                Rectangle {
-                    Layout.preferredHeight: 28
-                    Layout.preferredWidth: trustLabel.implicitWidth + 18
-                    radius: height / 2
-                    color: root.tokens.toneSoft(root.caseState.trustTone())
-                    border.color: root.tokens.toneColor(root.caseState.trustTone())
-
-                    Label {
-                        id: trustLabel
-                        anchors.centerIn: parent
-                        text: root.caseState.trustLabel()
-                        color: root.tokens.toneColor(root.caseState.trustTone())
-                        font.family: root.tokens.textFontFamily
-                        font.pixelSize: 11
-                        font.weight: Font.DemiBold
-                    }
-                }
-            }
-        }
-
         Repeater {
             model: [
                 {"route": "overview", "label": "重建全景"},
@@ -242,10 +160,11 @@ Rectangle {
             }
         }
 
+        Item { Layout.fillHeight: true }
+
         TextField {
             id: searchField
             Layout.fillWidth: true
-            Layout.topMargin: 8
             Layout.preferredHeight: 38
             placeholderText: "搜索能力域 / 证据..."
             selectByMouse: true
@@ -276,58 +195,6 @@ Rectangle {
                 }
             }
         }
-
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 8
-
-            ActionButton {
-                Layout.fillWidth: true
-                tokens: root.tokens
-                text: root.analysisController.analyzing ? "停止" : "重建"
-                hint: root.analysisController.analyzing
-                      ? "停止当前架构重建任务，保留已经生成的阶段结果。"
-                      : "以当前模式重新运行源码扫描、事实提取、能力聚合和视图重建。"
-                disabledHint: "先选择一个项目目录，才能开始重建。"
-                compact: true
-                tone: root.analysisController.analyzing ? "danger" : "primary"
-                enabled: root.caseState.hasProject
-                onClicked: {
-                    if (root.analysisController.analyzing)
-                        root.analysisController.stopAnalysis()
-                    else
-                        root.analysisController.analyzeCurrentProject()
-                }
-            }
-
-            ActionButton {
-                Layout.fillWidth: true
-                tokens: root.tokens
-                text: "高精度"
-                hint: "尝试接入 compile_commands.json 和语义后端，提升事实提取精度。"
-                disabledHint: root.analysisController.analyzing
-                              ? "当前正在重建，请等待结束后再切换高精度模式。"
-                              : "先选择项目，再启动高精度重建。"
-                compact: true
-                tone: "secondary"
-                enabled: root.caseState.hasProject && !root.analysisController.analyzing
-                onClicked: root.analysisController.analyzeCurrentProjectHighPrecision()
-            }
-        }
-
-        ActionButton {
-            Layout.fillWidth: true
-            tokens: root.tokens
-            text: "AI 复盘"
-            hint: "让 AI 基于当前重建结果总结算法亮点、证据薄弱点和下一步补强方向。"
-            disabledHint: "AI 服务未配置或当前不可用。"
-            compact: true
-            tone: "ai"
-            enabled: root.analysisController.aiAvailable
-            onClicked: root.requestProjectAiReview()
-        }
-
-        Item { Layout.fillHeight: true }
 
         Rectangle {
             Layout.fillWidth: true
@@ -400,6 +267,56 @@ Rectangle {
                     lineHeight: 1.16
                 }
             }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            ActionButton {
+                Layout.fillWidth: true
+                tokens: root.tokens
+                text: root.analysisController.analyzing ? "停止" : "重建"
+                hint: root.analysisController.analyzing
+                      ? "停止当前架构重建任务，保留已经生成的阶段结果。"
+                      : "以当前模式重新运行源码扫描、事实提取、能力聚合和视图重建。"
+                disabledHint: "先选择一个项目目录，才能开始重建。"
+                compact: true
+                tone: root.analysisController.analyzing ? "danger" : "primary"
+                enabled: root.caseState.hasProject
+                onClicked: {
+                    if (root.analysisController.analyzing)
+                        root.analysisController.stopAnalysis()
+                    else
+                        root.analysisController.analyzeCurrentProject()
+                }
+            }
+
+            ActionButton {
+                Layout.fillWidth: true
+                tokens: root.tokens
+                text: "高精度"
+                hint: "尝试接入 compile_commands.json 和语义后端，提升事实提取精度。"
+                disabledHint: root.analysisController.analyzing
+                              ? "当前正在重建，请等待结束后再切换高精度模式。"
+                              : "先选择项目，再启动高精度重建。"
+                compact: true
+                tone: "secondary"
+                enabled: root.caseState.hasProject && !root.analysisController.analyzing
+                onClicked: root.analysisController.analyzeCurrentProjectHighPrecision()
+            }
+        }
+
+        ActionButton {
+            Layout.fillWidth: true
+            tokens: root.tokens
+            text: "AI 复盘"
+            hint: "让 AI 基于当前重建结果总结算法亮点、证据薄弱点和下一步补强方向。"
+            disabledHint: "AI 服务未配置或当前不可用。"
+            compact: true
+            tone: "ai"
+            enabled: root.analysisController.aiAvailable
+            onClicked: root.requestProjectAiReview()
         }
     }
 

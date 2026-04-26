@@ -107,7 +107,7 @@ ApplicationWindow {
     height: 940
     minimumWidth: 1280
     minimumHeight: 780
-    visible: true
+    visible: false
     title: "SAVT"
     color: "#F6F7F9"
 

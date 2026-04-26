@@ -149,6 +149,7 @@ Item {
                 spacing: 8
 
                 Rectangle {
+                    visible: root.caseState.hasProject
                     Layout.fillWidth: true
                     radius: root.tokens.radius8
                     color: root.tokens.panelStrong
@@ -334,20 +335,6 @@ Item {
                                 onNodeSelected: root.focusState.setCapability(node)
                                 onNodeDrilled: root.openComponentLab(node)
                                 onBlankClicked: root.focusState.clear()
-                            }
-
-                            ActionButton {
-                                anchors.top: parent.top
-                                anchors.right: parent.right
-                                anchors.topMargin: 10
-                                anchors.rightMargin: 10
-                                z: 8
-                                tokens: root.tokens
-                                text: "复制摘要"
-                                tone: "ghost"
-                                compact: true
-                                enabled: overviewScroll.overviewSummary().length > 0
-                                onClicked: root.analysisController.copyTextToClipboard(overviewScroll.overviewSummary())
                             }
 
                             StartOverlay {
