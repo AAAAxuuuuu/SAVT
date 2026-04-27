@@ -28,11 +28,11 @@ Item {
     readonly property var overviewMindMapLayout: buildOverviewMindMapLayout()
     readonly property bool componentOverviewMode: componentMode
     readonly property var componentOverviewGroups: buildComponentOverviewGroups()
-    readonly property real componentOverviewGapX: 34
-    readonly property real componentOverviewGapY: 26
-    readonly property real componentOverviewSectionGap: 32
+    readonly property real componentOverviewGapX: 150
+    readonly property real componentOverviewGapY: 88
+    readonly property real componentOverviewSectionGap: 96
     readonly property real componentOverviewHeaderHeight: 34
-    readonly property real componentOverviewCardWidth: Math.max(500, Math.min(640,
+    readonly property real componentOverviewCardWidth: Math.max(420, Math.min(560,
                                                                                (Math.max(1480, width - 120) - 100 - Math.max(0, componentOverviewGroups.length - 1) * componentOverviewGapX) / Math.max(1, componentOverviewGroups.length)))
     readonly property real componentOverviewCardHeight: 330
     readonly property var componentOverviewPlacementLookup: buildComponentOverviewPlacementLookup()

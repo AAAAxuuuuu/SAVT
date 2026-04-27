@@ -429,7 +429,7 @@ function overviewSameLayerBusCandidate(config, fromRect, toRect, metrics, prefer
 
 function componentEndpointOffset(config, edge, endpointKey) {
     if (config.endpointPeerOffset)
-        return config.endpointPeerOffset(edge, endpointKey, 8)
+        return config.endpointPeerOffset(edge, endpointKey, 12)
     return 0
 }
 
@@ -537,27 +537,34 @@ function componentOverviewRoute(config) {
         var targetPort = EdgeUtils.portPoint(toRect, targetSide, targetOffset)
         var direction = forward ? 1 : -1
         var gap = Math.abs(targetPort.x - sourcePort.x)
-
-        if (gap > 46 && Math.abs(sourcePort.y - targetPort.y) < 10)
+        var sameRow = Math.abs(fromCenter.y - toCenter.y) < Math.min(fromRect.height, toRect.height) * 0.36
+        var adjacentGap = gap <= Math.max(150, Math.min(fromRect.width, toRect.width) * 0.42)
+        var railOffset = compactBundleOffset((targetOffset + sourceOffset) / 12, 7, 28)
+        if (sameRow && adjacentGap) {
+            sourcePort.y += railOffset
+            targetPort.y += railOffset
             return makePolylineRoute([sourcePort, targetPort], "orthogonal")
+        }
 
-        var railOffset = compactBundleOffset(targetOffset / 8, 5, 10)
-        var railX = targetPort.x - direction * (38 + railOffset)
-        if (forward && railX <= sourcePort.x + 32)
-            railX = sourcePort.x + Math.max(36, (targetPort.x - sourcePort.x) * 0.48)
-        else if (!forward && railX >= sourcePort.x - 32)
-            railX = sourcePort.x - Math.max(36, (sourcePort.x - targetPort.x) * 0.48)
+        var stub = Math.max(24, Math.min(48, gap * 0.32))
+        var sourceStubX = sourcePort.x + direction * stub
+        var targetStubX = targetPort.x - direction * stub
+        var railY = sameRow
+                ? fromRect.y + fromRect.height + 42 + railOffset
+                : (sourcePort.y + targetPort.y) / 2 + railOffset
 
         return makePolylineRoute([
                                      sourcePort,
-                                     Qt.point(railX, sourcePort.y),
-                                     Qt.point(railX, targetPort.y),
+                                     Qt.point(sourceStubX, sourcePort.y),
+                                     Qt.point(sourceStubX, railY),
+                                     Qt.point(targetStubX, railY),
+                                     Qt.point(targetStubX, targetPort.y),
                                      targetPort
                                  ],
                                  "orthogonal")
     }
 
-    return makePolylineRoute(config.bypassRoute(fromRect, toRect, config.laneIndex, true),
+    return makePolylineRoute(config.directRoute(edge, fromRect, toRect, config.laneIndex, true),
                              "orthogonal")
 }
 

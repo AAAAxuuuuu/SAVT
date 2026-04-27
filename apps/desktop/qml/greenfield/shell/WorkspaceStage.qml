@@ -374,8 +374,12 @@ Item {
                                 scene: root.analysisController.capabilityScene || ({})
                                 selectedNode: root.focusState.focusedNode
                                 emptyText: ""
-                                onNodeSelected: root.focusState.setCapability(node)
-                                onNodeDrilled: root.openComponentLab(node)
+                                onNodeSelected: function(node) {
+                                    root.focusState.setCapability(node)
+                                }
+                                onNodeDrilled: function(node) {
+                                    root.openComponentLab(node)
+                                }
                                 onBlankClicked: root.focusState.clear()
                             }
 
@@ -503,8 +507,12 @@ Item {
             emptyText: root.focusState.focusedCapability
                        ? "正在准备该能力域的组件图，或当前能力域暂时没有可继续钻取的组件。"
                        : "请在重建全景图中双击一个能力域进入边界钻取。"
-            onNodeSelected: root.focusState.setNode(node)
-            onNodeDrilled: root.focusState.setNode(node)
+            onNodeSelected: function(node) {
+                root.focusState.setNode(node)
+            }
+            onNodeDrilled: function(node) {
+                root.focusState.setNode(node)
+            }
             onBlankClicked: root.focusState.clearNodeFocus()
         }
     }
