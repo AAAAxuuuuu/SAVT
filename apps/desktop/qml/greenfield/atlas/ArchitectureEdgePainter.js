@@ -1,6 +1,31 @@
 .pragma library
 .import "ArchitectureEdgeUtils.js" as EdgeUtils
 
+var READABLE_DEBUG_TAG = "readable-single-layer-highlight-v8-large-readable-arrows"
+var READABLE_DEBUG_ENABLED = true
+
+function readableDebug(prefix, message) {
+    if (!READABLE_DEBUG_ENABLED)
+        return
+    console.log("[READABLE-" + String(prefix) + "]", READABLE_DEBUG_TAG, String(message))
+}
+
+function readablePointText(point) {
+    if (!point)
+        return "<null>"
+    return "(" + Math.round(Number(point.x) || 0) + "," + Math.round(Number(point.y) || 0) + ")"
+}
+
+function readableRouteText(route) {
+    if (!route)
+        return "<null-route>"
+    var pts = routePoints(route)
+    var parts = []
+    for (var i = 0; i < pts.length; ++i)
+        parts.push(readablePointText(pts[i]))
+    return "style=" + String(route.style || "") + " points=" + String(pts.length) + " " + parts.join(" -> ")
+}
+
 function segmentLength(startPoint, endPoint) {
     var dx = endPoint.x - startPoint.x
     var dy = endPoint.y - startPoint.y
@@ -82,8 +107,11 @@ function drawRoundedOrthogonalPath(ctx, points, desiredRadius) {
 }
 
 function drawRoutePath(ctx, route, componentMode, emphasized) {
-    if (!route)
+    if (!route) {
+        readableDebug("PAINTER", "drawRoutePath skip null-route")
         return
+    }
+    readableDebug("PAINTER", "drawRoutePath componentMode=" + String(!!componentMode) + " emphasized=" + String(!!emphasized) + " " + readableRouteText(route))
 
     if (route.style === "curved") {
         var control1 = curveLeadControl(route, true)
@@ -97,8 +125,10 @@ function drawRoutePath(ctx, route, componentMode, emphasized) {
 }
 
 function routeArrowTail(route) {
-    if (!route)
+    if (!route) {
+        readableDebug("PAINTER", "routeArrowTail null-route")
         return Qt.point(0, 0)
+    }
     if (route.style === "curved")
         return curveLeadControl(route, false)
 
@@ -108,7 +138,28 @@ function routeArrowTail(route) {
 
 function routeEndPoint(route) {
     var points = routePoints(route)
-    return points.length >= 1 ? points[points.length - 1] : Qt.point(0, 0)
+    var point = points.length >= 1 ? points[points.length - 1] : Qt.point(0, 0)
+    readableDebug("PAINTER", "routeEndPoint " + readablePointText(point) + " " + readableRouteText(route))
+    return point
+}
+
+function routeStartPoint(route) {
+    var points = routePoints(route)
+    var point = points.length >= 1 ? points[0] : Qt.point(0, 0)
+    readableDebug("PAINTER", "routeStartPoint " + readablePointText(point) + " " + readableRouteText(route))
+    return point
+}
+
+function routeStartTail(route) {
+    if (!route) {
+        readableDebug("PAINTER", "routeStartTail null-route")
+        return Qt.point(0, 0)
+    }
+    if (route.style === "curved")
+        return curveLeadControl(route, true)
+
+    var points = routePoints(route)
+    return points.length >= 2 ? points[1] : Qt.point(0, 0)
 }
 
 function sortRenderEntries(entries) {

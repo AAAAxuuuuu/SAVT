@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import "ArchitectureEdgePainter.js" as EdgePainter
+import "ArchitectureSceneLayout.js" as SceneLayout
 import "../foundation"
 import "ArchitectureEdgeRouter.js" as EdgeRouter
 import "ArchitectureEdgeUtils.js" as EdgeUtils
@@ -27,15 +28,15 @@ Item {
     readonly property var bounds: (scene.bounds || ({}))
     readonly property var overviewMindMapLayout: buildOverviewMindMapLayout()
     readonly property bool componentOverviewMode: componentMode
-    readonly property var componentOverviewGroups: buildComponentOverviewGroups()
-    readonly property real componentOverviewGapX: 150
-    readonly property real componentOverviewGapY: 88
-    readonly property real componentOverviewSectionGap: 96
-    readonly property real componentOverviewHeaderHeight: 34
-    readonly property real componentOverviewCardWidth: Math.max(420, Math.min(560,
-                                                                               (Math.max(1480, width - 120) - 100 - Math.max(0, componentOverviewGroups.length - 1) * componentOverviewGapX) / Math.max(1, componentOverviewGroups.length)))
-    readonly property real componentOverviewCardHeight: 330
-    readonly property var componentOverviewPlacementLookup: buildComponentOverviewPlacementLookup()
+    readonly property var componentOverviewLayout: buildComponentOverviewLayout()
+    readonly property var componentOverviewGroups: (componentOverviewLayout.groups || [])
+    readonly property real componentOverviewGapX: Number(componentOverviewLayout.gapX || 64)
+    readonly property real componentOverviewGapY: Number(componentOverviewLayout.gapY || 42)
+    readonly property real componentOverviewSectionGap: Number(componentOverviewLayout.sectionGap || 116)
+    readonly property real componentOverviewHeaderHeight: Number(componentOverviewLayout.headerHeight || 34)
+    readonly property real componentOverviewCardWidth: Number(componentOverviewLayout.cardWidth || 420)
+    readonly property real componentOverviewCardHeight: Number(componentOverviewLayout.cardHeight || 300)
+    readonly property var componentOverviewPlacementLookup: (componentOverviewLayout.positions || ({}))
     readonly property real sceneWidth: componentOverviewMode
                                        ? Math.max(980, componentOverviewSceneWidth())
                                        : Math.max(980, overviewMindMapLayout.width || 0, nodes.length === 0 ? (bounds.width || 980) : 0)
@@ -50,13 +51,17 @@ Item {
     readonly property var visibleEdges: collectVisibleEdges(edges, selectedNode, showAllEdges ? null : hoverNode, showAllEdges)
     readonly property var hoverConnectedNodeIds: buildHoverConnectedNodeIds(hoverNode, visibleEdges)
     readonly property var focusRailLayout: buildFocusRailLayout(manualNodePositions,
-                                                                activeDraggedNodeId,
-                                                                activeDragX,
-                                                                activeDragY)
+                                                               activeDraggedNodeId,
+                                                               activeDragX,
+                                                               activeDragY)
     readonly property var overviewHoverRailLayout: buildOverviewHoverRailLayout(manualNodePositions,
                                                                                 activeDraggedNodeId,
                                                                                 activeDragX,
                                                                                 activeDragY)
+    readonly property var overviewDragRailLayout: buildOverviewDragRailLayout(manualNodePositions,
+                                                                              activeDraggedNodeId,
+                                                                              activeDragX,
+                                                                              activeDragY)
     readonly property var endpointPeerOffsets: buildEndpointPeerOffsets(manualNodePositions,
                                                                         activeDraggedNodeId,
                                                                         activeDragX,
@@ -73,21 +78,46 @@ Item {
     property string activeDraggedNodeId: ""
     property real activeDragX: 0
     property real activeDragY: 0
-    readonly property var edgeRenderEntries: buildEdgeRenderEntries(visibleEdges,
-                                                                    hoverNode,
-                                                                    selectedNode,
-                                                                    manualNodePositions,
-                                                                    activeDraggedNodeId,
-                                                                    activeDragX,
-                                                                    activeDragY,
-                                                                    effectiveScale,
-                                                                    componentMode,
-                                                                    relationshipFocusActive,
-                                                                    scene)
+    // Readability-first renderer: keep edgeRenderEntries as a pure binding.
+    readonly property var edgeRenderEntries: buildEdgeRenderEntries()
 
     signal nodeSelected(var node)
     signal nodeDrilled(var node)
     signal blankClicked()
+
+
+    property bool readableVerboseLogs: true
+    readonly property string readableDebugVersion: "readable-single-layer-highlight-v8-large-readable-arrows"
+
+    function readableDebug(prefix, message) {
+        if (!readableVerboseLogs)
+            return
+        console.log("[READABLE-" + String(prefix) + "]", readableDebugVersion, String(message))
+    }
+
+    function readableEdgeLabel(edge) {
+        if (!edge)
+            return "<null-edge>"
+        var fromName = String(edge.fromName || edge.fromLabel || edge.fromId || "?")
+        var toName = String(edge.toName || edge.toLabel || edge.toId || "?")
+        return "id=" + String(edge.id !== undefined ? edge.id : "?") + " " + fromName + " -> " + toName + " bidirectional=" + String(!!edge.bidirectional)
+    }
+
+    function readablePointText(point) {
+        if (!point)
+            return "<null>"
+        return "(" + Math.round(Number(point.x) || 0) + "," + Math.round(Number(point.y) || 0) + ")"
+    }
+
+    function readableRouteText(route) {
+        if (!route)
+            return "<null-route>"
+        var pts = route.points && route.points.length >= 2 ? route.points : [route.p0, route.p1, route.p2, route.p3]
+        var values = []
+        for (var i = 0; i < pts.length; ++i)
+            values.push(readablePointText(pts[i]))
+        return "style=" + String(route.style || "") + " suppressArrow=" + String(!!route.suppressArrow) + " bidirectional=" + String(!!route.bidirectional) + " points=" + String(pts.length) + " " + values.join(" -> ")
+    }
 
     function previewText(rawText, fallbackText) {
         var text = String(rawText || "").trim()
@@ -233,7 +263,37 @@ Item {
     }
 
     function focusNode() {
-        return selectedNode || hoverNode
+        // Single-layer edge focus priority:
+        // dragging node > hovered node > selected node.
+        // Default focus is handled separately in buildEdgeRenderEntries().
+        var dragged = dragOverviewNode()
+        if (dragged)
+            return dragged
+        if (hoverNode)
+            return hoverNode
+        if (selectedNode)
+            return selectedNode
+        return null
+    }
+
+    function activeEdgeHighlightNode() {
+        var dragged = dragOverviewNode()
+        if (dragged)
+            return dragged
+        if (hoverNode)
+            return hoverNode
+        if (selectedNode)
+            return selectedNode
+        return null
+    }
+
+    function dragOverviewNode() {
+        if (componentMode || relationshipFocusActive)
+            return null
+        if (!draggingNodeCard || activeDraggedNodeId.length === 0)
+            return null
+        var draggedNode = nodeLookup[activeDraggedNodeId]
+        return draggedNode && draggedNode.id !== undefined ? draggedNode : null
     }
 
     function buildNodeLookup(nodeList) {
@@ -384,6 +444,15 @@ Item {
         var rootNode = overviewRootNode()
         if (!rootNode || rootNode.id === undefined)
             return {"positions": ({}), "primaryEdgeIds": ({}), "secondaryEdgeIds": ({})}
+
+        return SceneLayout.buildOverviewLayout({
+            "nodes": root.nodes,
+            "edges": root.edges,
+            "bounds": root.bounds,
+            "rootNode": rootNode,
+            "nodeWidth": function(node) { return root.nodeWidth(node) },
+            "nodeHeight": function(node) { return root.nodeHeight(node) }
+        })
 
         var positions = {}
         var primaryEdgeIds = {}
@@ -944,43 +1013,17 @@ Item {
         return "其他组件"
     }
 
-    function buildComponentOverviewGroups() {
-        var order = ["entry", "experience", "core", "support", "other"]
-        var groupsByKey = {}
-        for (var orderIndex = 0; orderIndex < order.length; ++orderIndex) {
-            groupsByKey[order[orderIndex]] = {
-                "key": order[orderIndex],
-                "title": componentOverviewGroupTitle(order[orderIndex]),
-                "nodes": []
-            }
-        }
-
-        for (var index = 0; index < nodes.length; ++index) {
-            var node = nodes[index]
-            groupsByKey[componentOverviewGroupKey(node)].nodes.push(node)
-        }
-
-        var groups = []
-        for (var groupIndex = 0; groupIndex < order.length; ++groupIndex) {
-            var group = groupsByKey[order[groupIndex]]
-            group.nodes.sort(function(left, right) {
-                var leftScore = componentNodeConnectivityScore(left)
-                var rightScore = componentNodeConnectivityScore(right)
-                if (Math.abs(leftScore - rightScore) > 0.01)
-                    return rightScore - leftScore
-
-                var leftScope = componentNodeScopeText(left)
-                var rightScope = componentNodeScopeText(right)
-                var scopeCompare = leftScope.localeCompare(rightScope)
-                if (scopeCompare !== 0)
-                    return scopeCompare
-
-                return componentNodeTitle(left).localeCompare(componentNodeTitle(right))
-            })
-            if (group.nodes.length > 0)
-                groups.push(group)
-        }
-        return groups
+    function buildComponentOverviewLayout() {
+        return SceneLayout.buildComponentLayout({
+            "nodes": root.nodes,
+            "edges": root.edges,
+            "viewWidth": root.width,
+            "groupKey": function(node) { return root.componentOverviewGroupKey(node) },
+            "groupTitle": function(groupKey) { return root.componentOverviewGroupTitle(groupKey) },
+            "connectivityScore": function(node) { return root.componentNodeConnectivityScore(node) },
+            "scopeText": function(node) { return root.componentNodeScopeText(node) },
+            "titleText": function(node) { return root.componentNodeTitle(node) }
+        })
     }
 
     function componentNodeConnectivityScore(node) {
@@ -1005,6 +1048,9 @@ Item {
     }
 
     function componentOverviewSectionLeft(groupIndex) {
+        var group = componentOverviewGroups[groupIndex]
+        if (group && group.left !== undefined)
+            return group.left
         var x = 72
         for (var index = 0; index < groupIndex; ++index)
             x += componentOverviewSectionWidth(index) + componentOverviewSectionGap
@@ -1020,6 +1066,8 @@ Item {
     }
 
     function componentOverviewGroupColumns(group) {
+        if (group && group.columns !== undefined)
+            return Math.max(1, Number(group.columns))
         var count = group && group.nodes ? group.nodes.length : 0
         if (count <= 0)
             return 1
@@ -1034,6 +1082,8 @@ Item {
     }
 
     function componentOverviewGroupRows(group) {
+        if (group && group.rows !== undefined)
+            return Math.max(1, Number(group.rows))
         var count = group && group.nodes ? group.nodes.length : 0
         if (count <= 0)
             return 1
@@ -1042,12 +1092,16 @@ Item {
 
     function componentOverviewSectionWidth(groupIndex) {
         var group = componentOverviewGroups[groupIndex]
+        if (group && group.width !== undefined)
+            return Number(group.width)
         var columns = componentOverviewGroupColumns(group)
         return columns * componentOverviewCardWidth
                + Math.max(0, columns - 1) * componentOverviewGapX
     }
 
     function componentOverviewMaxRows() {
+        if (componentOverviewLayout && componentOverviewLayout.maxRows !== undefined)
+            return Math.max(1, Number(componentOverviewLayout.maxRows))
         var maxRows = 1
         for (var index = 0; index < componentOverviewGroups.length; ++index) {
             maxRows = Math.max(maxRows, componentOverviewGroupRows(componentOverviewGroups[index]))
@@ -1055,65 +1109,6 @@ Item {
         return maxRows
     }
 
-    function componentOverviewSlot(index, columns, rows) {
-        var slots = []
-        var centerColumn = (columns - 1) / 2
-        var centerRow = (rows - 1) / 2
-
-        for (var row = 0; row < rows; ++row) {
-            for (var column = 0; column < columns; ++column) {
-                var dx = column - centerColumn
-                var dy = row - centerRow
-                slots.push({
-                    "column": column,
-                    "row": row,
-                    "distance": dx * dx + dy * dy,
-                    "vertical": Math.abs(dy),
-                    "horizontal": Math.abs(dx)
-                })
-            }
-        }
-
-        slots.sort(function(left, right) {
-            if (Math.abs(left.distance - right.distance) > 0.001)
-                return left.distance - right.distance
-            if (Math.abs(left.vertical - right.vertical) > 0.001)
-                return left.vertical - right.vertical
-            if (Math.abs(left.horizontal - right.horizontal) > 0.001)
-                return left.horizontal - right.horizontal
-            if (left.row !== right.row)
-                return left.row - right.row
-            return left.column - right.column
-        })
-
-        return slots[Math.max(0, Math.min(index, slots.length - 1))]
-               || {"column": index % Math.max(1, columns), "row": Math.floor(index / Math.max(1, columns))}
-    }
-
-    function buildComponentOverviewPlacementLookup() {
-        var lookup = ({})
-        for (var groupIndex = 0; groupIndex < componentOverviewGroups.length; ++groupIndex) {
-            var group = componentOverviewGroups[groupIndex]
-            var columns = componentOverviewGroupColumns(group)
-            var rows = componentOverviewGroupRows(group)
-            var left = componentOverviewSectionLeft(groupIndex)
-
-            for (var nodeIndex = 0; nodeIndex < group.nodes.length; ++nodeIndex) {
-                var node = group.nodes[nodeIndex]
-                if (!node || node.id === undefined)
-                    continue
-
-                var slot = componentOverviewSlot(nodeIndex, columns, rows)
-                lookup[String(node.id)] = {
-                    "x": left + slot.column * (componentOverviewCardWidth + componentOverviewGapX),
-                    "y": 96 + componentOverviewHeaderHeight + 16
-                         + slot.row * (componentOverviewCardHeight + componentOverviewGapY),
-                    "groupIndex": groupIndex
-                }
-            }
-        }
-        return lookup
-    }
 
     function componentOverviewPlacement(nodeId, fallbackIndex) {
         var cached = componentOverviewPlacementLookup[String(nodeId)]
@@ -1131,6 +1126,8 @@ Item {
     }
 
     function componentOverviewSceneWidth() {
+        if (componentOverviewLayout && componentOverviewLayout.sceneWidth !== undefined)
+            return Number(componentOverviewLayout.sceneWidth)
         var width = 72
         for (var index = 0; index < componentOverviewGroups.length; ++index) {
             width += componentOverviewSectionWidth(index)
@@ -1141,6 +1138,8 @@ Item {
     }
 
     function componentOverviewSceneHeight() {
+        if (componentOverviewLayout && componentOverviewLayout.sceneHeight !== undefined)
+            return Number(componentOverviewLayout.sceneHeight)
         var rows = componentOverviewMaxRows()
         return 96
                + componentOverviewHeaderHeight
@@ -1350,15 +1349,33 @@ Item {
     }
 
     function edgeTouchesFocus(edge) {
-        return EdgeUtils.edgeTouchesFocus(root.focusNode(), edge)
+        return EdgeUtils.edgeTouchesFocus(root.activeEdgeHighlightNode(), edge)
+    }
+
+    function readableDefaultFocusId() {
+        if (root.componentMode)
+            return undefined
+        var layout = root.overviewMindMapLayout || ({})
+        return layout.readableDefaultFocusId
+    }
+
+    function edgeTouchesReadableDefault(edge) {
+        var defaultId = root.readableDefaultFocusId()
+        return defaultId !== undefined && defaultId !== null && edge
+                && (String(edge.fromId) === String(defaultId) || String(edge.toId) === String(defaultId))
     }
 
     function overviewHoverRelation(edge) {
         return EdgeUtils.overviewHoverRelation(root.hoverNode, edge)
     }
 
+    function dragOverviewRelation(edge) {
+        return EdgeUtils.overviewHoverRelation(root.dragOverviewNode(), edge)
+    }
+
     function collectVisibleEdges(edgeList, selected, hovered, showAll) {
-        return EdgeUtils.collectVisibleEdges({
+        readableDebug("CANVAS", "collect-visible-start rawEdges=" + String(edgeList ? edgeList.length : 0) + " showAll=" + String(!!showAll) + " componentMode=" + String(!!root.componentMode) + " selected=" + String(selected && selected.id !== undefined ? selected.id : "") + " hovered=" + String(hovered && hovered.id !== undefined ? hovered.id : ""))
+        var collected = EdgeUtils.collectVisibleEdges({
             "edgeList": edgeList,
             "relationshipFocusActive": root.relationshipFocusActive,
             "componentMode": root.componentMode,
@@ -1370,6 +1387,10 @@ Item {
             "overviewMindMapLayout": root.overviewMindMapLayout,
             "isOverviewPrimaryEdge": function(edge) { return root.isOverviewPrimaryEdge(edge) }
         })
+        readableDebug("CANVAS", "collect-visible-complete count=" + String(collected.length))
+        for (var cvi = 0; cvi < collected.length; ++cvi)
+            readableDebug("CANVAS", "visibleEdge[" + cvi + "] lane=" + String(collected[cvi].laneIndex) + " " + readableEdgeLabel(collected[cvi].edge) + " originalEdgeIds=" + String(collected[cvi].edge && collected[cvi].edge.originalEdgeIds ? collected[cvi].edge.originalEdgeIds.join(",") : ""))
+        return collected
     }
 
     function buildEndpointPeerOffsets(_manualNodePositions, _activeDraggedNodeId, _activeDragX, _activeDragY) {
@@ -1525,6 +1546,17 @@ Item {
         })
     }
 
+    function buildOverviewDragRailLayout(_manualNodePositions, _activeDraggedNodeId, _activeDragX, _activeDragY) {
+        return EdgeUtils.buildOverviewHoverRailLayout({
+            "componentMode": root.componentMode,
+            "hoverNode": root.dragOverviewNode(),
+            "edges": root.edges,
+            "nodeRectById": function(nodeId) { return root.nodeRectById(nodeId) },
+            "isOverviewPrimaryEdge": function(candidate) { return root.isOverviewPrimaryEdge(candidate) },
+            "overviewHoverRelation": function(candidate) { return root.dragOverviewRelation(candidate) }
+        })
+    }
+
     function focusRailGroupKey(edge) {
         var focus = focusNode()
         if (!focus || !componentMode)
@@ -1544,6 +1576,10 @@ Item {
         return EdgeUtils.railPlacement(root.overviewHoverRailLayout, edge, overviewHoverRelation(edge))
     }
 
+    function dragOverviewRailPlacement(edge) {
+        return EdgeUtils.railPlacement(root.overviewDragRailLayout, edge, dragOverviewRelation(edge))
+    }
+
     function hoveredOverviewPrimaryRoute(edge) {
         return EdgeRouter.hoveredOverviewPrimaryRoute({
             "edge": edge,
@@ -1552,6 +1588,19 @@ Item {
             "isOverviewPrimaryEdge": function(candidate) { return root.isOverviewPrimaryEdge(candidate) },
             "overviewHoverRelation": function(candidate) { return root.overviewHoverRelation(candidate) },
             "overviewHoverRailPlacement": function(candidate) { return root.overviewHoverRailPlacement(candidate) },
+            "overviewMindMapLayout": root.overviewMindMapLayout,
+            "nodeRectById": function(nodeId) { return root.nodeRectById(nodeId) }
+        })
+    }
+
+    function draggedOverviewPrimaryRoute(edge) {
+        return EdgeRouter.hoveredOverviewPrimaryRoute({
+            "edge": edge,
+            "componentMode": root.componentMode,
+            "hoverNode": root.dragOverviewNode(),
+            "isOverviewPrimaryEdge": function(candidate) { return root.isOverviewPrimaryEdge(candidate) },
+            "overviewHoverRelation": function(candidate) { return root.dragOverviewRelation(candidate) },
+            "overviewHoverRailPlacement": function(candidate) { return root.dragOverviewRailPlacement(candidate) },
             "overviewMindMapLayout": root.overviewMindMapLayout,
             "nodeRectById": function(nodeId) { return root.nodeRectById(nodeId) }
         })
@@ -1639,11 +1688,15 @@ Item {
             "overviewHoverRailPlacement": function(candidate) { return root.overviewHoverRailPlacement(candidate) },
             "overviewMindMapLayout": root.overviewMindMapLayout,
             "nodeRectById": function(nodeId) { return root.nodeRectById(nodeId) },
+            "directRoute": function(candidate, fromRect, toRect, localLaneIndex, vertical) {
+                return root.directRoute(candidate, fromRect, toRect, localLaneIndex, vertical)
+            },
             "bypassRoute": function(fromRect, toRect, localLaneIndex, vertical) {
                 return root.bypassRoute(fromRect, toRect, localLaneIndex, vertical)
             },
             "routeObjectHitsModules": function(route, candidate) { return root.routeObjectHitsModules(route, candidate) },
-            "routeObjectHitStats": function(route, candidate) { return root.routeObjectHitStats(route, candidate) }
+            "routeObjectHitStats": function(route, candidate) { return root.routeObjectHitStats(route, candidate) },
+            "routeObjectAnyNodeHitStats": function(route, candidate) { return root.routeObjectAnyNodeHitStats(route, candidate) }
         })
     }
 
@@ -1653,6 +1706,7 @@ Item {
             "laneIndex": laneIndex,
             "componentMode": root.componentMode,
             "relationshipFocusActive": root.relationshipFocusActive,
+            "componentOverviewLayout": root.componentOverviewLayout,
             "nodeRectById": function(nodeId) { return root.nodeRectById(nodeId) },
             "directRoute": function(candidate, fromRect, toRect, localLaneIndex, vertical) {
                 return root.directRoute(candidate, fromRect, toRect, localLaneIndex, vertical)
@@ -1661,12 +1715,14 @@ Item {
                 return root.bypassRoute(fromRect, toRect, localLaneIndex, vertical)
             },
             "routeObjectHitsModules": function(route, candidate) { return root.routeObjectHitsModules(route, candidate) },
-            "routeObjectHitStats": function(route, candidate) { return root.routeObjectHitStats(route, candidate) }
+            "routeObjectHitStats": function(route, candidate) { return root.routeObjectHitStats(route, candidate) },
+            "routeObjectAnyNodeHitStats": function(route, candidate) { return root.routeObjectAnyNodeHitStats(route, candidate) }
         })
     }
 
     function routeEdge(edge, laneIndex) {
-        return EdgeRouter.routeEdge({
+        readableDebug("CANVAS", "route-wrapper-start lane=" + String(laneIndex) + " " + readableEdgeLabel(edge))
+        var resultRoute = EdgeRouter.routeEdge({
             "edge": edge,
             "laneIndex": laneIndex,
             "componentMode": root.componentMode,
@@ -1680,6 +1736,7 @@ Item {
             "overviewHoverRailPlacement": function(candidate) { return root.overviewHoverRailPlacement(candidate) },
             "focusRailPlacement": function(candidate) { return root.focusRailPlacement(candidate) },
             "overviewMindMapLayout": root.overviewMindMapLayout,
+            "componentOverviewLayout": root.componentOverviewLayout,
             "nodeRectById": function(nodeId) { return root.nodeRectById(nodeId) },
             "endpointPeerOffset": function(candidate, endpointKey, step) {
                 return root.endpointPeerOffset(candidate, endpointKey, step)
@@ -1692,8 +1749,11 @@ Item {
             },
             "routeHitsModules": function(points, candidate) { return root.routeHitsModules(points, candidate) },
             "routeObjectHitsModules": function(route, candidate) { return root.routeObjectHitsModules(route, candidate) },
-            "routeObjectHitStats": function(route, candidate) { return root.routeObjectHitStats(route, candidate) }
+            "routeObjectHitStats": function(route, candidate) { return root.routeObjectHitStats(route, candidate) },
+            "routeObjectAnyNodeHitStats": function(route, candidate) { return root.routeObjectAnyNodeHitStats(route, candidate) }
         })
+        readableDebug("CANVAS", "route-wrapper-complete lane=" + String(laneIndex) + " " + readableEdgeLabel(edge) + " " + readableRouteText(resultRoute))
+        return resultRoute
     }
 
     function portPoint(rect, side, lane) {
@@ -1705,8 +1765,8 @@ Item {
         if (!isFinite(angle))
             angle = -Math.PI / 2
 
-        return Qt.point(tip.x - size * Math.cos(angle + direction * Math.PI / 6),
-                        tip.y - size * Math.sin(angle + direction * Math.PI / 6))
+        return Qt.point(tip.x - size * Math.cos(angle + direction * Math.PI / 6.8),
+                        tip.y - size * Math.sin(angle + direction * Math.PI / 6.8))
     }
 
     function pointDistance(left, right) {
@@ -1730,11 +1790,17 @@ Item {
     }
 
     function edgeColor(edge) {
+        var highlightNode = root.activeEdgeHighlightNode()
+        if (!highlightNode && !root.componentMode) {
+            var defaultId = root.readableDefaultFocusId()
+            if (defaultId !== undefined && defaultId !== null)
+                highlightNode = { "id": defaultId }
+        }
         return EdgeUtils.edgeColor({
             "edge": edge,
             "componentMode": root.componentMode,
-            "focusNode": root.focusNode(),
-            "hoverNode": root.hoverNode,
+            "focusNode": highlightNode,
+            "hoverNode": highlightNode,
             "tokens": root.tokens,
             "isOverviewPrimaryEdge": function(candidate) { return root.isOverviewPrimaryEdge(candidate) }
         })
@@ -1763,10 +1829,187 @@ Item {
         }
     }
 
+    function cloneVisualState(visualState) {
+        if (!visualState)
+            return {
+                "lineOpacity": 1,
+                "haloOpacity": 0,
+                "haloColor": Qt.rgba(1, 1, 1, 0),
+                "haloStrokeWidth": 0,
+                "lineStrokeWidth": 1,
+                "z": 0
+            }
+
+        return {
+            "lineOpacity": visualState.lineOpacity,
+            "haloOpacity": visualState.haloOpacity,
+            "haloColor": visualState.haloColor,
+            "haloStrokeWidth": visualState.haloStrokeWidth,
+            "lineStrokeWidth": visualState.lineStrokeWidth,
+            "z": visualState.z
+        }
+    }
+
+    function cloneEntryRoute(points, suppressArrow, bundleRole, bundleKey) {
+        if (!points || points.length < 2)
+            return null
+
+        var routePoints = []
+        for (var pointIndex = 0; pointIndex < points.length; ++pointIndex) {
+            var point = points[pointIndex]
+            routePoints.push(Qt.point(point.x, point.y))
+        }
+
+        var route = {
+            "points": routePoints,
+            "style": "orthogonal",
+            "suppressArrow": !!suppressArrow
+        }
+        if (bundleRole)
+            route.bundleRole = bundleRole
+        if (bundleKey)
+            route.bundleKey = bundleKey
+        return route
+    }
+
+    function cloneRenderEntry(entry, overrides) {
+        var nextEntry = {
+            "edge": entry.edge,
+            "laneIndex": entry.laneIndex,
+            "route": entry.route,
+            "emphasized": entry.emphasized,
+            "lineColor": entry.lineColor,
+            "haloColor": entry.haloColor,
+            "overviewPrimary": entry.overviewPrimary,
+            "overviewRelation": entry.overviewRelation,
+            "bundleRelative": entry.bundleRelative,
+            "bundleCount": entry.bundleCount,
+            "interactiveOverviewRoute": entry.interactiveOverviewRoute,
+            "showArrow": entry.showArrow,
+            "visualState": cloneVisualState(entry.visualState),
+            "strokeScale": entry.strokeScale,
+            "arrowSize": entry.arrowSize,
+            "haloArrowSize": entry.haloArrowSize,
+            "sourceMarkerSuppressed": !!entry.sourceMarkerSuppressed
+        }
+
+        if (!overrides)
+            return nextEntry
+
+        for (var key in overrides)
+            nextEntry[key] = overrides[key]
+        return nextEntry
+    }
+
+    function buildOverviewBundleRenderEntries(entries, focus, hovered) {
+        if (!entries || !entries.length)
+            return entries
+
+        var bundleGroups = {}
+        for (var index = 0; index < entries.length; ++index) {
+            var entry = entries[index]
+            var route = entry.route
+            if (!route || !route.bundleKey || !route.bundleBranchPoints || !route.bundleTrunkPoints)
+                continue
+
+            var bundleKey = String(route.bundleKey)
+            if (!bundleGroups[bundleKey]) {
+                bundleGroups[bundleKey] = {
+                    "members": [],
+                    "emitted": false
+                }
+            }
+            bundleGroups[bundleKey].members.push(entry)
+        }
+
+        var output = []
+        for (index = 0; index < entries.length; ++index) {
+            entry = entries[index]
+            route = entry.route
+            if (!route || !route.bundleKey || !route.bundleBranchPoints || !route.bundleTrunkPoints) {
+                output.push(entry)
+                continue
+            }
+
+            bundleKey = String(route.bundleKey)
+            var group = bundleGroups[bundleKey]
+            if (!group || group.emitted)
+                continue
+            group.emitted = true
+
+            var members = group.members
+            var leaderEntry = members[0]
+            var trunkEmphasized = false
+            var trunkOverviewRelation = ""
+            for (var memberIndex = 0; memberIndex < members.length; ++memberIndex) {
+                var memberEntry = members[memberIndex]
+                if (memberEntry.showArrow !== false && !(memberEntry.route && memberEntry.route.suppressArrow))
+                    leaderEntry = memberEntry
+                if (memberEntry.emphasized)
+                    trunkEmphasized = true
+                if (!trunkOverviewRelation && memberEntry.overviewRelation)
+                    trunkOverviewRelation = memberEntry.overviewRelation
+            }
+
+            for (memberIndex = 0; memberIndex < members.length; ++memberIndex) {
+                memberEntry = members[memberIndex]
+                var branchRoute = cloneEntryRoute(memberEntry.route.bundleBranchPoints,
+                    true,
+                    "targetFanInBranch",
+                    bundleKey)
+                output.push(cloneRenderEntry(memberEntry, {
+                    "route": branchRoute,
+                    "showArrow": false
+                }))
+            }
+
+            var trunkRoute = cloneEntryRoute(leaderEntry.route.bundleTrunkPoints,
+                false,
+                "targetFanInTrunk",
+                bundleKey)
+            var trunkVisualState = EdgeUtils.edgeVisuals({
+                "componentMode": root.componentMode,
+                "hasFocus": !!focus,
+                "hasHover": !!hovered,
+                "emphasized": trunkEmphasized,
+                "overviewPrimary": leaderEntry.overviewPrimary,
+                "overviewRelation": trunkOverviewRelation,
+                "lineColor": leaderEntry.lineColor
+            })
+            trunkVisualState.z = (trunkVisualState.z !== undefined ? trunkVisualState.z : 0) + 0.18
+
+            output.push(cloneRenderEntry(leaderEntry, {
+                "route": trunkRoute,
+                "emphasized": trunkEmphasized,
+                "overviewRelation": trunkOverviewRelation,
+                "showArrow": true,
+                "visualState": trunkVisualState,
+                "sourceMarkerSuppressed": true
+            }))
+        }
+
+        return output
+    }
+
     function buildEdgeRenderEntries() {
+        readableDebug("CANVAS", "build-render-start nodes=" + String(root.nodes.length) + " rawEdges=" + String(root.edges.length) + " visibleEdges=" + String(root.visibleEdges.length) + " componentMode=" + String(!!root.componentMode) + " showAllEdges=" + String(!!root.showAllEdges) + " zoom=" + String(root.zoom) + " scale=" + String(root.effectiveScale))
+        for (var dbgNodeIndex = 0; dbgNodeIndex < root.nodes.length; ++dbgNodeIndex) {
+            var dbgNode = root.nodes[dbgNodeIndex]
+            if (!dbgNode || dbgNode.id === undefined)
+                continue
+            var dbgRect = root.nodeRectById(dbgNode.id)
+            readableDebug("CANVAS", "nodeRect[" + dbgNodeIndex + "] id=" + String(dbgNode.id) + " name=" + String(dbgNode.name || dbgNode.label || dbgNode.title || "") + " valid=" + String(!!dbgRect.valid) + " x=" + Math.round(Number(dbgRect.x) || 0) + " y=" + Math.round(Number(dbgRect.y) || 0) + " w=" + Math.round(Number(dbgRect.width) || 0) + " h=" + Math.round(Number(dbgRect.height) || 0))
+        }
         var entries = []
-        var focus = root.focusNode()
-        var hovered = root.hoverNode
+        var activeHighlightNode = root.activeEdgeHighlightNode()
+        var focus = activeHighlightNode
+        var hovered = activeHighlightNode
+        var defaultFocusId = (!activeHighlightNode && !root.componentMode) ? root.readableDefaultFocusId() : undefined
+        var defaultFocusActive = defaultFocusId !== undefined && defaultFocusId !== null
+        if (activeHighlightNode && activeHighlightNode.id !== undefined)
+            readableDebug("CANVAS", "active-highlight-node id=" + String(activeHighlightNode.id) + " dragging=" + String(!!root.dragOverviewNode()) + " hover=" + String(!!root.hoverNode))
+        if (defaultFocusActive)
+            readableDebug("CANVAS", "default-focus-active id=" + String(defaultFocusId))
         var strokeScale = Math.max(0.38, root.effectiveScale)
 
         for (var index = 0; index < root.visibleEdges.length; ++index) {
@@ -1775,18 +2018,28 @@ Item {
             if (!edge)
                 continue
 
+            readableDebug("CANVAS", "render-edge-start index=" + String(index) + " lane=" + String(edgeEntry.laneIndex) + " " + readableEdgeLabel(edge))
             var route = root.routeEdge(edge, edgeEntry.laneIndex)
-            var emphasized = root.edgeTouchesFocus(edge)
-            var overviewPrimary = root.isOverviewPrimaryEdge(edge)
-            var overviewRelation = root.overviewHoverRelation(edge)
+            if (route)
+                route.bidirectional = !!edge.bidirectional
+            readableDebug("CANVAS", "render-edge-route index=" + String(index) + " showStartArrowCandidate=" + String(!!edge.bidirectional) + " " + readableEdgeLabel(edge) + " " + readableRouteText(route))
+
+            var defaultEmphasized = defaultFocusActive && (String(edge.fromId) === String(defaultFocusId) || String(edge.toId) === String(defaultFocusId))
+            var activeEmphasized = activeHighlightNode && activeHighlightNode.id !== undefined
+                    && (String(edge.fromId) === String(activeHighlightNode.id) || String(edge.toId) === String(activeHighlightNode.id))
+            var emphasized = activeEmphasized || defaultEmphasized
+            var overviewPrimary = emphasized
+            var overviewRelation = activeHighlightNode && activeHighlightNode.id !== undefined
+                    ? (String(edge.toId) === String(activeHighlightNode.id) ? "incoming" : (String(edge.fromId) === String(activeHighlightNode.id) ? "outgoing" : ""))
+                    : ""
             var bundleMetrics = root.overviewBundleMetrics(edge)
+            var showArrow = !(route && route.suppressArrow)
             var lineColor = root.edgeColor(edge)
-            if (!root.componentMode && overviewPrimary)
-                lineColor = EdgeUtils.edgeBundleColor(lineColor, bundleMetrics.relative, bundleMetrics.count)
             var visualState = EdgeUtils.edgeVisuals({
                 "componentMode": root.componentMode,
                 "hasFocus": !!focus,
                 "hasHover": !!hovered,
+                "defaultFocusActive": defaultFocusActive,
                 "emphasized": emphasized,
                 "overviewPrimary": overviewPrimary,
                 "overviewRelation": overviewRelation,
@@ -1804,15 +2057,24 @@ Item {
                 "overviewRelation": overviewRelation,
                 "bundleRelative": bundleMetrics.relative,
                 "bundleCount": bundleMetrics.count,
+                "interactiveOverviewRoute": false,
+                "showArrow": showArrow,
+                "showStartArrow": !!edge.bidirectional,
                 "visualState": visualState,
                 "strokeScale": strokeScale,
-                "arrowSize": (root.componentMode ? 10.4 : 9.2) / strokeScale,
-                "haloArrowSize": (root.componentMode ? 14.0 : 12.2) / strokeScale
+                "arrowSize": (edge.bidirectional ? (root.componentMode ? 8.8 : 9.6) : (root.componentMode ? 7.8 : 8.6)) / strokeScale,
+                "haloArrowSize": (edge.bidirectional ? (root.componentMode ? 11.0 : 12.0) : (root.componentMode ? 9.8 : 10.8)) / strokeScale
             })
+            readableDebug("CANVAS", "render-entry-created index=" + String(index) + " showArrow=" + String(showArrow) + " showStartArrow=" + String(!!edge.bidirectional) + " emphasized=" + String(!!emphasized) + " overviewPrimary=" + String(!!overviewPrimary) + " overviewRelation=" + String(overviewRelation) + " lineColor=" + String(lineColor) + " " + readableEdgeLabel(edge))
         }
 
-        var sortedEntries = EdgePainter.sortRenderEntries(entries)
-        return sortedEntries
+        readableDebug("CANVAS", "build-render-complete entries=" + String(entries.length))
+        for (var dbgEntryIndex = 0; dbgEntryIndex < entries.length; ++dbgEntryIndex)
+            readableDebug("CANVAS", "entry[" + dbgEntryIndex + "] " + readableEdgeLabel(entries[dbgEntryIndex].edge) + " showArrow=" + String(entries[dbgEntryIndex].showArrow) + " showStartArrow=" + String(entries[dbgEntryIndex].showStartArrow) + " " + readableRouteText(entries[dbgEntryIndex].route))
+
+        // Bundling is intentionally disabled for the final readability-first graph.
+        // Bidirectional pairs are merged before routing; every remaining edge is independently readable.
+        return EdgePainter.sortRenderEntries(entries)
     }
 
     function edgeCanvasFrame(_manualNodePositions, _activeDraggedNodeId, _activeDragX, _activeDragY) {
@@ -2037,20 +2299,148 @@ Item {
 
                 var entries = root.edgeRenderEntries
 
+                function routePoints(route) {
+                    if (!route)
+                        return []
+                    if (route.points && route.points.length >= 2)
+                        return route.points
+                    return [route.p0, route.p1, route.p2, route.p3]
+                }
+
+                function pointAlong(fromPoint, toPoint, distance) {
+                    var dx = toPoint.x - fromPoint.x
+                    var dy = toPoint.y - fromPoint.y
+                    var length = Math.sqrt(dx * dx + dy * dy)
+                    if (length < 0.001)
+                        return Qt.point(fromPoint.x, fromPoint.y)
+                    var amount = Math.max(0, Math.min(length, distance)) / length
+                    return Qt.point(fromPoint.x + dx * amount, fromPoint.y + dy * amount)
+                }
+
+                function arrowMetrics(entry) {
+                    // v8: make arrowheads clearly recognizable at the default overview zoom.
+                    // The previous arrow was mathematically correct but too small after scene scaling,
+                    // so it looked like a blunt line cap instead of a real direction marker.
+                    var emphasized = !!entry.emphasized
+                    var bidirectional = !!(entry.showStartArrow === true || (entry.route && entry.route.bidirectional === true))
+                    var length = emphasized ? 22.0 : 18.0
+                    var halfWidth = emphasized ? 10.5 : 8.5
+                    if (bidirectional) {
+                        length += 1.5
+                        halfWidth += 0.7
+                    }
+                    var gap = emphasized ? 2.6 : 2.2
+                    return {
+                        "length": length,
+                        "halfWidth": halfWidth,
+                        "gap": gap,
+                        // Stop the stroke before the arrow base. This prevents the visual problem
+                        // where a thick rectangular line runs through the triangular arrowhead.
+                        "lineTrim": gap + length * 0.98,
+                        "haloExpand": emphasized ? 2.0 : 1.6
+                    }
+                }
+
+                function buildTrimmedRoute(route, trimStart, trimEnd) {
+                    var rawPoints = routePoints(route)
+                    if (rawPoints.length < 2)
+                        return null
+                    var points = []
+                    for (var pointIndex = 0; pointIndex < rawPoints.length; ++pointIndex)
+                        points.push(Qt.point(rawPoints[pointIndex].x, rawPoints[pointIndex].y))
+
+                    if (trimStart > 0 && points.length >= 2)
+                        points[0] = pointAlong(points[0], points[1], trimStart)
+                    if (trimEnd > 0 && points.length >= 2) {
+                        var lastIndex = points.length - 1
+                        points[lastIndex] = pointAlong(points[lastIndex], points[lastIndex - 1], trimEnd)
+                    }
+
+                    return {
+                        "points": points,
+                        "p0": points[0],
+                        "p1": points.length > 2 ? points[1] : points[0],
+                        "p2": points.length > 2 ? points[points.length - 2] : points[1],
+                        "p3": points[points.length - 1],
+                        "style": route.style || "orthogonal"
+                    }
+                }
+
+                function arrowTipAndTail(route, atStart, metrics) {
+                    var points = routePoints(route)
+                    if (points.length < 2)
+                        return null
+                    if (atStart) {
+                        return {
+                            "tip": pointAlong(points[0], points[1], metrics.gap),
+                            "tail": pointAlong(points[0], points[1], metrics.gap + metrics.length)
+                        }
+                    }
+
+                    var lastIndex = points.length - 1
+                    return {
+                        "tip": pointAlong(points[lastIndex], points[lastIndex - 1], metrics.gap),
+                        "tail": pointAlong(points[lastIndex], points[lastIndex - 1], metrics.gap + metrics.length)
+                    }
+                }
+
+                function drawTriangularArrow(entry, arrowInfo, metrics, halo) {
+                    if (!arrowInfo)
+                        return
+                    var tip = arrowInfo.tip
+                    var tail = arrowInfo.tail
+                    var dx = tip.x - tail.x
+                    var dy = tip.y - tail.y
+                    var length = Math.sqrt(dx * dx + dy * dy)
+                    if (length < 0.001)
+                        return
+                    var ux = dx / length
+                    var uy = dy / length
+                    var nx = -uy
+                    var ny = ux
+                    var arrowLength = metrics.length + (halo ? metrics.haloExpand : 0)
+                    var halfWidth = metrics.halfWidth + (halo ? metrics.haloExpand : 0)
+                    var baseX = tip.x - ux * arrowLength
+                    var baseY = tip.y - uy * arrowLength
+
+                    ctx.beginPath()
+                    ctx.moveTo(tip.x, tip.y)
+                    ctx.lineTo(baseX + nx * halfWidth, baseY + ny * halfWidth)
+                    ctx.lineTo(baseX - nx * halfWidth, baseY - ny * halfWidth)
+                    ctx.closePath()
+                    ctx.fillStyle = halo ? entry.haloColor : entry.lineColor
+                    ctx.fill()
+                    if (!halo) {
+                        // A very subtle edge outline keeps the triangular tip readable on pale lines
+                        // and prevents it from visually collapsing into the shaft.
+                        ctx.strokeStyle = entry.lineColor
+                        ctx.lineWidth = Math.max(0.8, 1.15 / Math.max(0.1, entry.strokeScale))
+                        ctx.stroke()
+                    }
+                }
+
                 function drawRouteStroke(entry, route) {
                     if (!route)
+                        return
+                    var metrics = arrowMetrics(entry)
+                    var trimStart = (entry.showStartArrow === true || route.bidirectional === true) ? metrics.lineTrim : 0
+                    var trimEnd = (route.suppressArrow === true || entry.showArrow === false) ? 0 : metrics.lineTrim
+                    var strokeRoute = buildTrimmedRoute(route, trimStart, trimEnd)
+                    if (!strokeRoute)
                         return
 
                     ctx.globalAlpha = entry.visualState.lineOpacity
 
-                    ctx.beginPath()
-                    EdgePainter.drawRoutePath(ctx, route, root.componentMode, entry.emphasized)
-                    ctx.strokeStyle = entry.haloColor
-                    ctx.lineWidth = entry.visualState.haloStrokeWidth / entry.strokeScale
-                    ctx.stroke()
+                    if (entry.visualState.haloStrokeWidth > 0.01 && entry.visualState.haloOpacity > 0.001) {
+                        ctx.beginPath()
+                        EdgePainter.drawRoutePath(ctx, strokeRoute, root.componentMode, entry.emphasized)
+                        ctx.strokeStyle = entry.haloColor
+                        ctx.lineWidth = entry.visualState.haloStrokeWidth / entry.strokeScale
+                        ctx.stroke()
+                    }
 
                     ctx.beginPath()
-                    EdgePainter.drawRoutePath(ctx, route, root.componentMode, entry.emphasized)
+                    EdgePainter.drawRoutePath(ctx, strokeRoute, root.componentMode, entry.emphasized)
                     ctx.strokeStyle = entry.lineColor
                     ctx.lineWidth = entry.visualState.lineStrokeWidth / entry.strokeScale
                     ctx.stroke()
@@ -2059,33 +2449,23 @@ Item {
                 function drawRouteArrow(entry, route) {
                     if (!route)
                         return
-
-                    var arrowTip = EdgePainter.routeEndPoint(route)
-                    var arrowTail = EdgePainter.routeArrowTail(route)
-                    var haloArrowLeft = root.arrowWing(arrowTip, arrowTail, entry.haloArrowSize, -1)
-                    var haloArrowRight = root.arrowWing(arrowTip, arrowTail, entry.haloArrowSize, 1)
-                    var arrowLeft = root.arrowWing(arrowTip, arrowTail, entry.arrowSize, -1)
-                    var arrowRight = root.arrowWing(arrowTip, arrowTail, entry.arrowSize, 1)
-
+                    var metrics = arrowMetrics(entry)
                     ctx.globalAlpha = entry.visualState.lineOpacity
 
-                    ctx.beginPath()
-                    ctx.moveTo(arrowTip.x, arrowTip.y)
-                    ctx.lineTo(haloArrowLeft.x, haloArrowLeft.y)
-                    ctx.lineTo(haloArrowRight.x, haloArrowRight.y)
-                    ctx.closePath()
-                    ctx.fillStyle = entry.haloColor
-                    ctx.fill()
+                    if (entry.visualState.haloOpacity > 0.001) {
+                        if (!(route.suppressArrow === true || entry.showArrow === false))
+                            drawTriangularArrow(entry, arrowTipAndTail(route, false, metrics), metrics, true)
+                        if (entry.showStartArrow === true || route.bidirectional === true)
+                            drawTriangularArrow(entry, arrowTipAndTail(route, true, metrics), metrics, true)
+                    }
 
-                    ctx.beginPath()
-                    ctx.moveTo(arrowTip.x, arrowTip.y)
-                    ctx.lineTo(arrowLeft.x, arrowLeft.y)
-                    ctx.lineTo(arrowRight.x, arrowRight.y)
-                    ctx.closePath()
-                    ctx.fillStyle = entry.lineColor
-                    ctx.fill()
+                    if (!(route.suppressArrow === true || entry.showArrow === false))
+                        drawTriangularArrow(entry, arrowTipAndTail(route, false, metrics), metrics, false)
+                    if (entry.showStartArrow === true || route.bidirectional === true)
+                        drawTriangularArrow(entry, arrowTipAndTail(route, true, metrics), metrics, false)
                 }
 
+                var entries = root.edgeRenderEntries
                 for (var index = 0; index < entries.length; ++index) {
                     var entry = entries[index]
                     if (!entry.route)
@@ -2402,8 +2782,177 @@ Item {
         }
 
         Canvas {
+            id: endpointCanvas
+            visible: false
+            z: 14
+            property var frame: root.edgeCanvasFrame(root.manualNodePositions,
+                                                    root.activeDraggedNodeId,
+                                                    root.activeDragX,
+                                                    root.activeDragY)
+            x: frame.x
+            y: frame.y
+            width: frame.width
+            height: frame.height
+            property bool repaintQueued: false
+
+            function schedulePaint() {
+                if (repaintQueued || !available || !visible)
+                    return
+                repaintQueued = true
+                Qt.callLater(function() {
+                    repaintQueued = false
+                    if (available && visible)
+                        endpointCanvas.requestPaint()
+                })
+            }
+
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+                ctx.lineJoin = "round"
+                ctx.lineCap = "round"
+                ctx.translate(-endpointCanvas.frame.x, -endpointCanvas.frame.y)
+
+                function drawSourceMarker(entry, route) {
+                    if (!route)
+                        return
+
+                    var routeStart = EdgePainter.routeStartPoint(route)
+                    var routeStartTail = EdgePainter.routeStartTail(route)
+                    var sourceDistance = EdgeUtils.pointDistance(routeStart, routeStartTail)
+                    var sourceCenter = sourceDistance > 0.5
+                            ? EdgePainter.pointToward(routeStart,
+                                                      routeStartTail,
+                                                      Math.min(sourceDistance * 0.34, 12 / entry.strokeScale))
+                            : routeStart
+                    var sourceRadius = 4.6 / entry.strokeScale
+                    var sourceHaloRadius = sourceRadius + 2.4 / entry.strokeScale
+
+                    if (sourceDistance > 0.5) {
+                        ctx.globalAlpha = Math.min(1.0, Math.max(0.84, entry.visualState.lineOpacity))
+                        ctx.beginPath()
+                        ctx.moveTo(routeStart.x, routeStart.y)
+                        ctx.lineTo(sourceCenter.x, sourceCenter.y)
+                        ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.92)
+                        ctx.lineWidth = Math.max(1.4 / entry.strokeScale, entry.visualState.lineStrokeWidth / entry.strokeScale)
+                        ctx.stroke()
+
+                        ctx.beginPath()
+                        ctx.moveTo(routeStart.x, routeStart.y)
+                        ctx.lineTo(sourceCenter.x, sourceCenter.y)
+                        ctx.strokeStyle = entry.lineColor
+                        ctx.lineWidth = Math.max(0.9 / entry.strokeScale, (entry.visualState.lineStrokeWidth - 0.4) / entry.strokeScale)
+                        ctx.stroke()
+                    }
+
+                    ctx.globalAlpha = 1.0
+                    ctx.beginPath()
+                    ctx.arc(sourceCenter.x, sourceCenter.y, sourceHaloRadius, 0, Math.PI * 2)
+                    ctx.fillStyle = Qt.rgba(1, 1, 1, 0.94)
+                    ctx.fill()
+
+                    ctx.beginPath()
+                    ctx.arc(sourceCenter.x, sourceCenter.y, sourceRadius, 0, Math.PI * 2)
+                    ctx.fillStyle = entry.lineColor
+                    ctx.fill()
+                }
+
+                function drawTargetArrow(entry, route) {
+                    if (!route || route.suppressArrow === true || entry.showArrow === false)
+                        return
+
+                    var routeEnd = EdgePainter.routeEndPoint(route)
+                    var routeTail = EdgePainter.routeArrowTail(route)
+                    var targetDistance = EdgeUtils.pointDistance(routeTail, routeEnd)
+                    var arrowTip = routeEnd
+                    if (targetDistance > 0.5)
+                        arrowTip = EdgePainter.pointToward(routeTail,
+                                                           routeEnd,
+                                                           targetDistance + 14 / entry.strokeScale)
+
+                    var haloArrowLeft = root.arrowWing(arrowTip, routeTail, entry.haloArrowSize + 1.1 / entry.strokeScale, -1)
+                    var haloArrowRight = root.arrowWing(arrowTip, routeTail, entry.haloArrowSize + 1.1 / entry.strokeScale, 1)
+                    var arrowLeft = root.arrowWing(arrowTip, routeTail, entry.arrowSize, -1)
+                    var arrowRight = root.arrowWing(arrowTip, routeTail, entry.arrowSize, 1)
+
+                    if (targetDistance > 0.5) {
+                        ctx.globalAlpha = Math.min(1.0, Math.max(0.88, entry.visualState.lineOpacity))
+                        ctx.beginPath()
+                        ctx.moveTo(routeEnd.x, routeEnd.y)
+                        ctx.lineTo(arrowTip.x, arrowTip.y)
+                        ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.92)
+                        ctx.lineWidth = (entry.visualState.haloStrokeWidth + 1.3) / entry.strokeScale
+                        ctx.stroke()
+
+                        ctx.beginPath()
+                        ctx.moveTo(routeEnd.x, routeEnd.y)
+                        ctx.lineTo(arrowTip.x, arrowTip.y)
+                        ctx.strokeStyle = entry.lineColor
+                        ctx.lineWidth = (entry.visualState.lineStrokeWidth + 0.2) / entry.strokeScale
+                        ctx.stroke()
+                    }
+
+                    ctx.globalAlpha = 1.0
+                    ctx.beginPath()
+                    ctx.moveTo(arrowTip.x, arrowTip.y)
+                    ctx.lineTo(haloArrowLeft.x, haloArrowLeft.y)
+                    ctx.lineTo(haloArrowRight.x, haloArrowRight.y)
+                    ctx.closePath()
+                    ctx.fillStyle = Qt.rgba(1, 1, 1, 0.94)
+                    ctx.fill()
+
+                    ctx.beginPath()
+                    ctx.moveTo(arrowTip.x, arrowTip.y)
+                    ctx.lineTo(arrowLeft.x, arrowLeft.y)
+                    ctx.lineTo(arrowRight.x, arrowRight.y)
+                    ctx.closePath()
+                    ctx.fillStyle = entry.lineColor
+                    ctx.fill()
+                }
+
+                var entries = root.edgeRenderEntries
+                for (var index = 0; index < entries.length; ++index) {
+                    var entry = entries[index]
+                    if (!entry.route)
+                        continue
+
+                    var showSourceMarker = !entry.sourceMarkerSuppressed
+                            && (root.componentMode || entry.emphasized || !!entry.overviewRelation)
+                    if (showSourceMarker)
+                        drawSourceMarker(entry, entry.route)
+                    drawTargetArrow(entry, entry.route)
+                }
+            }
+
+            onWidthChanged: schedulePaint()
+            onHeightChanged: schedulePaint()
+            onXChanged: schedulePaint()
+            onYChanged: schedulePaint()
+            onAvailableChanged: schedulePaint()
+            onVisibleChanged: schedulePaint()
+            Component.onCompleted: schedulePaint()
+
+            Connections {
+                target: root
+
+                function onVisibleEdgesChanged() { endpointCanvas.schedulePaint() }
+                function onHoverNodeChanged() { endpointCanvas.schedulePaint() }
+                function onSelectedNodeChanged() { endpointCanvas.schedulePaint() }
+                function onDraggingNodeCardChanged() { endpointCanvas.schedulePaint() }
+                function onActiveDraggedNodeIdChanged() { endpointCanvas.schedulePaint() }
+                function onActiveDragXChanged() { endpointCanvas.schedulePaint() }
+                function onActiveDragYChanged() { endpointCanvas.schedulePaint() }
+                function onManualNodePositionsChanged() { endpointCanvas.schedulePaint() }
+                function onEffectiveScaleChanged() { endpointCanvas.schedulePaint() }
+                function onComponentModeChanged() { endpointCanvas.schedulePaint() }
+                function onRelationshipFocusActiveChanged() { endpointCanvas.schedulePaint() }
+                function onSceneChanged() { endpointCanvas.schedulePaint() }
+            }
+        }
+
+        Canvas {
             id: hoverEdgeCanvas
-            visible: !!root.hoverNode && !root.relationshipFocusActive
+            visible: false // single-layer mode: hover only changes edgeRenderEntries visual state
             z: 16
             property var frame: root.edgeCanvasFrame(root.manualNodePositions,
                                                     root.activeDraggedNodeId,
@@ -2435,151 +2984,30 @@ Item {
 
                 var entries = root.edgeRenderEntries
 
-                function entryAvoidRects(entry) {
-                    var output = []
-                    if (!entry || !entry.edge)
-                        return output
-
-                    var padding = 10
-                    var nodeIds = [
-                        String(entry.edge.fromId),
-                        String(entry.edge.toId)
-                    ]
-
-                    for (var nodeIndex = 0; nodeIndex < nodeIds.length; ++nodeIndex) {
-                        var nodeId = nodeIds[nodeIndex]
-                        var rect = root.nodeRectById(nodeId)
-                        if (!rect.valid)
-                            continue
-
-                        output.push({
-                            "x": rect.x - padding,
-                            "y": rect.y - padding,
-                            "width": rect.width + padding * 2,
-                            "height": rect.height + padding * 2
-                        })
-                    }
-                    return output
-                }
-
-                function subtractInterval(intervals, start, end) {
-                    var next = []
-                    for (var intervalIndex = 0; intervalIndex < intervals.length; ++intervalIndex) {
-                        var interval = intervals[intervalIndex]
-                        if (end <= interval.start || start >= interval.end) {
-                            next.push(interval)
-                            continue
-                        }
-                        if (start > interval.start)
-                            next.push({"start": interval.start, "end": start})
-                        if (end < interval.end)
-                            next.push({"start": end, "end": interval.end})
-                    }
-                    return next
-                }
-
-                function visibleSegmentIntervals(startPoint, endPoint, avoidRects) {
-                    var intervals = [{"start": 0, "end": 1}]
-                    var dx = endPoint.x - startPoint.x
-                    var dy = endPoint.y - startPoint.y
-                    var horizontal = Math.abs(dy) < 0.5
-                    var vertical = Math.abs(dx) < 0.5
-                    if (!horizontal && !vertical)
-                        return intervals
-
-                    for (var rectIndex = 0; rectIndex < avoidRects.length; ++rectIndex) {
-                        var rect = avoidRects[rectIndex]
-                        var start = 0
-                        var end = 1
-
-                        if (horizontal) {
-                            if (startPoint.y < rect.y || startPoint.y > rect.y + rect.height || Math.abs(dx) < 0.001)
-                                continue
-                            start = (rect.x - startPoint.x) / dx
-                            end = (rect.x + rect.width - startPoint.x) / dx
-                        } else {
-                            if (startPoint.x < rect.x || startPoint.x > rect.x + rect.width || Math.abs(dy) < 0.001)
-                                continue
-                            start = (rect.y - startPoint.y) / dy
-                            end = (rect.y + rect.height - startPoint.y) / dy
-                        }
-
-                        var clippedStart = Math.max(0, Math.min(start, end))
-                        var clippedEnd = Math.min(1, Math.max(start, end))
-                        if (clippedEnd <= 0 || clippedStart >= 1 || clippedEnd <= clippedStart)
-                            continue
-                        intervals = subtractInterval(intervals, clippedStart, clippedEnd)
-                    }
-
-                    return intervals
-                }
-
-                function drawAvoidedRoutePath(route, avoidRects) {
-                    var points = EdgePainter.routePoints(route)
-                    if (!points || points.length < 2)
-                        return
-
-                    var gap = 4
-                    for (var pointIndex = 0; pointIndex < points.length - 1; ++pointIndex) {
-                        var startPoint = points[pointIndex]
-                        var endPoint = points[pointIndex + 1]
-                        var intervals = visibleSegmentIntervals(startPoint, endPoint, avoidRects)
-                        var segmentLength = EdgeUtils.pointDistance(startPoint, endPoint)
-                        var trim = segmentLength > gap * 3 ? gap / segmentLength : 0
-
-                        for (var intervalIndex = 0; intervalIndex < intervals.length; ++intervalIndex) {
-                            var interval = intervals[intervalIndex]
-                            var t0 = Math.min(interval.end, interval.start + trim)
-                            var t1 = Math.max(t0, interval.end - trim)
-                            if (t1 - t0 < 0.01)
-                                continue
-
-                            var segmentStart = EdgeUtils.interpolatePoint(startPoint, endPoint, t0)
-                            var segmentEnd = EdgeUtils.interpolatePoint(startPoint, endPoint, t1)
-                            ctx.moveTo(segmentStart.x, segmentStart.y)
-                            ctx.lineTo(segmentEnd.x, segmentEnd.y)
-                        }
-                    }
-                }
-
-                function drawHoverRouteStroke(entry, route, avoidRects) {
+                function drawHoverRouteStroke(entry, route) {
                     if (!route || !entry.emphasized)
                         return
 
                     ctx.globalAlpha = Math.min(1.0, Math.max(0.96, entry.visualState.lineOpacity))
 
                     ctx.beginPath()
-                    drawAvoidedRoutePath(route, avoidRects)
+                    EdgePainter.drawRoutePath(ctx, route, root.componentMode, true)
                     ctx.strokeStyle = Qt.rgba(1, 1, 1, root.componentMode ? 0.72 : 0.64)
                     ctx.lineWidth = (entry.visualState.haloStrokeWidth + 2.6) / entry.strokeScale
                     ctx.stroke()
 
                     ctx.beginPath()
-                    drawAvoidedRoutePath(route, avoidRects)
+                    EdgePainter.drawRoutePath(ctx, route, root.componentMode, true)
                     ctx.strokeStyle = entry.lineColor
                     ctx.lineWidth = (entry.visualState.lineStrokeWidth + 0.8) / entry.strokeScale
                     ctx.stroke()
                 }
 
-                function pointInsideAvoidRects(point, avoidRects) {
-                    for (var index = 0; index < avoidRects.length; ++index) {
-                        var rect = avoidRects[index]
-                        if (point.x >= rect.x && point.x <= rect.x + rect.width
-                                && point.y >= rect.y && point.y <= rect.y + rect.height) {
-                            return true
-                        }
-                    }
-                    return false
-                }
-
-                function drawHoverRouteArrow(entry, route, avoidRects) {
-                    if (!route || !entry.emphasized)
+                function drawHoverRouteArrow(entry, route) {
+                    if (!route || route.suppressArrow === true || !entry.emphasized || entry.showArrow === false)
                         return
 
                     var arrowTip = EdgePainter.routeEndPoint(route)
-                    if (pointInsideAvoidRects(arrowTip, avoidRects))
-                        return
-
                     var arrowTail = EdgePainter.routeArrowTail(route)
                     var arrowLeft = root.arrowWing(arrowTip, arrowTail, entry.arrowSize + 1.4, -1)
                     var arrowRight = root.arrowWing(arrowTip, arrowTail, entry.arrowSize + 1.4, 1)
@@ -2604,9 +3032,8 @@ Item {
 
                 for (var hoverIndex = 0; hoverIndex < hoverEntries.length; ++hoverIndex) {
                     entry = hoverEntries[hoverIndex]
-                    var avoidRects = entryAvoidRects(entry)
-                    drawHoverRouteStroke(entry, entry.route, avoidRects)
-                    drawHoverRouteArrow(entry, entry.route, avoidRects)
+                    drawHoverRouteStroke(entry, entry.route)
+                    drawHoverRouteArrow(entry, entry.route)
                 }
 
                 ctx.globalAlpha = 1.0

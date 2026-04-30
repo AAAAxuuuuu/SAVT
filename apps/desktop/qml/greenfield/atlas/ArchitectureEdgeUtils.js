@@ -1,5 +1,23 @@
 .pragma library
 
+var READABLE_DEBUG_TAG = "readable-single-layer-highlight-v8-large-readable-arrows"
+var READABLE_DEBUG_ENABLED = true
+
+function readableDebug(prefix, message) {
+    if (!READABLE_DEBUG_ENABLED)
+        return
+    console.log("[READABLE-" + String(prefix) + "]", READABLE_DEBUG_TAG, String(message))
+}
+
+function readableEdgeLabel(edge) {
+    if (!edge)
+        return "<null-edge>"
+    var fromName = String(edge.fromName || edge.fromLabel || edge.fromId || "?")
+    var toName = String(edge.toName || edge.toLabel || edge.toId || "?")
+    var id = edge.id !== undefined ? String(edge.id) : "?"
+    return "id=" + id + " " + fromName + " -> " + toName + " fromId=" + String(edge.fromId) + " toId=" + String(edge.toId)
+}
+
 function makePoint(x, y) {
     return Qt.point(x, y)
 }
@@ -203,8 +221,12 @@ function buildEndpointPeerOffsets(config) {
                     return left.sortSecondary - right.sortSecondary
                 return left.edgeId.localeCompare(right.edgeId)
             })
-            for (var edgeIndex = 0; edgeIndex < endpointMembers.length; ++edgeIndex)
-                output[key][endpointMembers[edgeIndex].edgeId] = edgeIndex - (endpointMembers.length - 1) / 2
+            for (var edgeIndex = 0; edgeIndex < endpointMembers.length; ++edgeIndex) {
+                output[key][endpointMembers[edgeIndex].edgeId] = {
+                    "relative": edgeIndex - (endpointMembers.length - 1) / 2,
+                    "count": endpointMembers.length
+                }
+            }
         }
     }
 
@@ -216,8 +238,17 @@ function endpointPeerOffset(offsets, edge, endpointKey, step) {
         return 0
 
     var endpointOffsets = offsets[endpointKey] || ({})
-    var relativeOffset = endpointOffsets[String(edge.id)]
-    return relativeOffset === undefined ? 0 : relativeOffset * step
+    var placement = endpointOffsets[String(edge.id)]
+    if (placement === undefined)
+        return 0
+
+    if (typeof placement === "number")
+        return placement * step
+
+    var count = Math.max(1, Number(placement.count) || 1)
+    var relative = Number(placement.relative)
+    var virtualSpan = step * (4.4 + Math.max(0, count - 1) * 1.9)
+    return distributedSideOffset(relative, count, virtualSpan, step * 0.6, 0.92)
 }
 
 function overviewDefaultEdgeScore(edge, layout) {
@@ -265,18 +296,122 @@ function edgeIdText(edge) {
     return String(edge && edge.id !== undefined ? edge.id : "")
 }
 
-function collectVisibleEdges(config) {
+
+function readableEdgeKey(edge) {
+    return String(edge && edge.id !== undefined ? edge.id : "")
+}
+
+function readableNodeKey(value) {
+    return String(value)
+}
+
+function cloneReadableEdge(edge) {
+    var output = ({})
+    for (var key in edge)
+        output[key] = edge[key]
+    return output
+}
+
+function mergeBidirectionalEdges(edgeEntries) {
+    readableDebug("EDGE-NORMALIZE", "merge-start rawEntries=" + String(edgeEntries ? edgeEntries.length : 0))
     var output = []
+    var pendingByPair = ({})
+    var usedByEdgeId = ({})
+
+    function pairKey(fromId, toId) {
+        var left = readableNodeKey(fromId)
+        var right = readableNodeKey(toId)
+        return left < right ? left + "<>" + right : right + "<>" + left
+    }
+
+    function directionKey(fromId, toId) {
+        return readableNodeKey(fromId) + "->" + readableNodeKey(toId)
+    }
+
+    for (var index = 0; index < edgeEntries.length; ++index) {
+        var entry = edgeEntries[index]
+        var edge = entry ? entry.edge : null
+        if (!edge)
+            continue
+
+        var edgeId = readableEdgeKey(edge)
+        if (usedByEdgeId[edgeId]) {
+            readableDebug("EDGE-NORMALIZE", "skip-used " + readableEdgeLabel(edge))
+            continue
+        }
+
+        var key = pairKey(edge.fromId, edge.toId)
+        var dir = directionKey(edge.fromId, edge.toId)
+        var reverseDir = directionKey(edge.toId, edge.fromId)
+        var bucket = pendingByPair[key]
+
+        if (bucket && bucket.byDirection && bucket.byDirection[reverseDir]) {
+            readableDebug("EDGE-NORMALIZE", "bidirectional-merge current=" + readableEdgeLabel(edge) + " reverseDir=" + reverseDir)
+            var reverseEntry = bucket.byDirection[reverseDir]
+            var reverseEdge = reverseEntry.edge
+            var mergedEdge = cloneReadableEdge(reverseEdge)
+            mergedEdge.id = "bi:" + readableNodeKey(reverseEdge.fromId) + "<->" + readableNodeKey(reverseEdge.toId)
+            mergedEdge.bidirectional = true
+            mergedEdge.reverseEdgeId = edgeId
+            mergedEdge.originalEdgeIds = [readableEdgeKey(reverseEdge), edgeId]
+            mergedEdge.fromName = reverseEdge.fromName || reverseEdge.fromLabel || reverseEdge.fromId
+            mergedEdge.toName = reverseEdge.toName || reverseEdge.toLabel || reverseEdge.toId
+            usedByEdgeId[readableEdgeKey(reverseEdge)] = true
+            usedByEdgeId[edgeId] = true
+            output[reverseEntry.outputIndex] = {
+                "edge": mergedEdge,
+                "laneIndex": reverseEntry.outputIndex
+            }
+            continue
+        }
+
+        readableDebug("EDGE-NORMALIZE", "single-direction " + readableEdgeLabel(edge) + " pairKey=" + key + " dir=" + dir)
+        var clonedEdge = cloneReadableEdge(edge)
+        clonedEdge.bidirectional = false
+        var outputIndex = output.length
+        output.push({
+            "edge": clonedEdge,
+            "laneIndex": outputIndex
+        })
+
+        if (!bucket) {
+            bucket = { "byDirection": ({}) }
+            pendingByPair[key] = bucket
+        }
+        bucket.byDirection[dir] = {
+            "edge": clonedEdge,
+            "outputIndex": outputIndex
+        }
+    }
+
+    var compact = []
+    for (var compactIndex = 0; compactIndex < output.length; ++compactIndex) {
+        if (!output[compactIndex] || !output[compactIndex].edge)
+            continue
+        output[compactIndex].laneIndex = compact.length
+        compact.push(output[compactIndex])
+    }
+    readableDebug("EDGE-NORMALIZE", "merge-complete output=" + String(compact.length))
+    for (var ci = 0; ci < compact.length; ++ci) {
+        var ce = compact[ci] && compact[ci].edge
+        readableDebug("EDGE-NORMALIZE", "merged[" + ci + "] bidirectional=" + String(!!(ce && ce.bidirectional)) + " originalEdgeIds=" + String(ce && ce.originalEdgeIds ? ce.originalEdgeIds.join(",") : "") + " " + readableEdgeLabel(ce))
+    }
+    return compact
+}
+
+function collectVisibleEdges(config) {
+    readableDebug("EDGE-COLLECT", "start componentMode=" + String(!!config.componentMode) + " showAll=" + String(!!config.showAll) + " relationshipFocusActive=" + String(!!config.relationshipFocusActive) + " edgeList=" + String(config.edgeList ? config.edgeList.length : 0) + " selected=" + String(config.selectedNode && config.selectedNode.id !== undefined ? config.selectedNode.id : "") + " hovered=" + String(config.hoveredNode && config.hoveredNode.id !== undefined ? config.hoveredNode.id : ""))
+    var rawOutput = []
     var edgeList = config.edgeList || []
     if (config.relationshipFocusActive)
-        return output
+        return rawOutput
 
     if (!config.componentMode) {
         var overviewNode = !config.showAll
                 && config.hoveredNode && config.hoveredNode.id !== undefined
                 ? config.hoveredNode
                 : null
-        var overviewLimit = Math.min(config.overviewEdgeLimit || 12, 12)
+        var overviewLimit = Math.min(config.overviewEdgeLimit || 18, 18)
 
         if (!config.showAll && !overviewNode) {
             var candidates = []
@@ -300,10 +435,10 @@ function collectVisibleEdges(config) {
 
             var outgoingCounts = {}
             var incomingCounts = {}
-            var maxOutgoingPerNode = 2
-            var maxIncomingPerNode = 2
+            var maxOutgoingPerNode = 4
+            var maxIncomingPerNode = 4
 
-            for (var pickIndex = 0; pickIndex < candidates.length && output.length < overviewLimit; ++pickIndex) {
+            for (var pickIndex = 0; pickIndex < candidates.length && rawOutput.length < overviewLimit; ++pickIndex) {
                 var pickedEdge = candidates[pickIndex].edge
                 var fromKey = String(pickedEdge.fromId)
                 var toKey = String(pickedEdge.toId)
@@ -314,22 +449,22 @@ function collectVisibleEdges(config) {
 
                 outgoingCounts[fromKey] = (outgoingCounts[fromKey] || 0) + 1
                 incomingCounts[toKey] = (incomingCounts[toKey] || 0) + 1
-                output.push({
+                rawOutput.push({
                     "edge": pickedEdge,
-                    "laneIndex": output.length
+                    "laneIndex": rawOutput.length
                 })
             }
 
-            if (output.length === 0 && candidates.length > 0) {
-                for (var fallbackIndex = 0; fallbackIndex < candidates.length && output.length < overviewLimit; ++fallbackIndex) {
-                    output.push({
+            if (rawOutput.length === 0 && candidates.length > 0) {
+                for (var fallbackIndex = 0; fallbackIndex < candidates.length && rawOutput.length < overviewLimit; ++fallbackIndex) {
+                    rawOutput.push({
                         "edge": candidates[fallbackIndex].edge,
-                        "laneIndex": output.length
+                        "laneIndex": rawOutput.length
                     })
                 }
             }
 
-            return output
+            return mergeBidirectionalEdges(rawOutput)
         }
 
         for (var overviewIndex = 0; overviewIndex < edgeList.length; ++overviewIndex) {
@@ -339,30 +474,36 @@ function collectVisibleEdges(config) {
             if (overviewNode && !(primaryEdge.fromId === overviewNode.id || primaryEdge.toId === overviewNode.id))
                 continue
 
-            output.push({
+            rawOutput.push({
                 "edge": primaryEdge,
-                "laneIndex": output.length
+                "laneIndex": rawOutput.length
             })
         }
-        return output
+        readableDebug("EDGE-COLLECT", "overview-rawOutput beforeMerge=" + String(rawOutput.length))
+        for (var ro = 0; ro < rawOutput.length; ++ro)
+            readableDebug("EDGE-COLLECT", "overview-raw[" + ro + "] lane=" + String(rawOutput[ro].laneIndex) + " " + readableEdgeLabel(rawOutput[ro].edge))
+        return mergeBidirectionalEdges(rawOutput)
     }
 
     if (!config.showAll)
-        return output
+        return rawOutput
 
     var node = config.selectedNode || config.hoveredNode
     var limit = node ? config.focusEdgeLimit : config.overviewEdgeLimit
-    for (var index = 0; index < edgeList.length && output.length < limit; ++index) {
+    for (var index = 0; index < edgeList.length && rawOutput.length < limit; ++index) {
         var edge = edgeList[index]
         if (node && !(edge.fromId === node.id || edge.toId === node.id))
             continue
 
-        output.push({
+        rawOutput.push({
             "edge": edge,
-            "laneIndex": output.length
+            "laneIndex": rawOutput.length
         })
     }
-    return output
+    readableDebug("EDGE-COLLECT", "component-rawOutput beforeMerge=" + String(rawOutput.length))
+    for (var cr = 0; cr < rawOutput.length; ++cr)
+        readableDebug("EDGE-COLLECT", "component-raw[" + cr + "] lane=" + String(rawOutput[cr].laneIndex) + " " + readableEdgeLabel(rawOutput[cr].edge))
+    return mergeBidirectionalEdges(rawOutput)
 }
 
 function edgeLane(laneIndex) {
@@ -379,6 +520,29 @@ function interpolatePoint(fromPoint, toPoint, amount) {
     var t = Math.max(0, Math.min(1, amount))
     return makePoint(fromPoint.x + (toPoint.x - fromPoint.x) * t,
                      fromPoint.y + (toPoint.y - fromPoint.y) * t)
+}
+
+function clampNumber(value, minimumValue, maximumValue) {
+    return Math.max(minimumValue, Math.min(maximumValue, value))
+}
+
+function distributedSideOffset(relativeIndex, count, span, minimumInset, coverageRatio) {
+    var numericRelative = Number(relativeIndex)
+    var numericCount = Math.max(1, Number(count) || 1)
+    var numericSpan = Math.max(1, Number(span) || 0)
+    if (!isFinite(numericRelative) || numericCount <= 1 || !isFinite(numericSpan))
+        return 0
+
+    var safeInset = minimumInset === undefined ? 18 : Math.max(0, Number(minimumInset))
+    var ratio = coverageRatio === undefined ? 0.72 : clampNumber(Number(coverageRatio), 0.24, 0.95)
+    var halfCount = Math.max(1, (numericCount - 1) / 2)
+    var normalized = clampNumber(numericRelative / halfCount, -1, 1)
+    var easedMagnitude = Math.pow(Math.abs(normalized), 0.92)
+    var eased = normalized < 0 ? -easedMagnitude : easedMagnitude
+    var availableSpan = Math.max(18, Math.min(numericSpan * ratio, numericSpan - safeInset * 2))
+    var desiredHalfSpread = 12 + Math.max(0, numericCount - 1) * 10
+    var halfSpread = Math.max(10, Math.min(availableSpan / 2, desiredHalfSpread))
+    return eased * halfSpread
 }
 
 function mixColor(left, right, amount) {
@@ -636,6 +800,52 @@ function colorWithAlpha(color, alpha) {
     return Qt.rgba(color.r, color.g, color.b, alpha)
 }
 
+function stringHash(text) {
+    var value = String(text || "")
+    var hash = 0
+    for (var index = 0; index < value.length; ++index)
+        hash = ((hash * 131) + value.charCodeAt(index)) % 2147483647
+    return Math.abs(hash)
+}
+
+function edgeIdentitySeed(edge) {
+    return String(edge && edge.fromId !== undefined ? edge.fromId : "")
+        + "->"
+        + String(edge && edge.toId !== undefined ? edge.toId : "")
+        + "#"
+        + String(edge && edge.kind ? edge.kind : "")
+        + "#"
+        + String(edge && edge.id !== undefined ? edge.id : "")
+}
+
+function edgeIdentityAccentColor(edge, alpha) {
+    var resolvedAlpha = alpha === undefined ? 1.0 : alpha
+    var palette = [
+        Qt.rgba(0.020, 0.540, 0.920, resolvedAlpha),
+        Qt.rgba(0.000, 0.670, 0.580, resolvedAlpha),
+        Qt.rgba(0.100, 0.620, 0.430, resolvedAlpha),
+        Qt.rgba(0.920, 0.580, 0.180, resolvedAlpha),
+        Qt.rgba(0.900, 0.380, 0.260, resolvedAlpha),
+        Qt.rgba(0.180, 0.640, 0.860, resolvedAlpha)
+    ]
+    return palette[stringHash(edgeIdentitySeed(edge)) % palette.length]
+}
+
+function applyEdgeIdentityTone(baseColor, edge, amount) {
+    if (!baseColor)
+        return baseColor
+
+    var mixAmount = amount === undefined ? 0.12 : clampNumber(amount, 0, 0.38)
+    var accent = edgeIdentityAccentColor(edge, baseColor.a)
+    var toned = mixColor(baseColor, accent, mixAmount)
+    var variant = stringHash(edgeIdentitySeed(edge) + ":variant") % 5
+    if (variant === 1)
+        return mixColor(toned, Qt.rgba(1, 1, 1, baseColor.a), 0.035)
+    if (variant >= 3)
+        return mixColor(toned, Qt.rgba(0.08, 0.12, 0.18, baseColor.a), 0.03)
+    return toned
+}
+
 function edgeSemanticColor(tokens, edge, alpha) {
     var kind = String(edge && edge.kind ? edge.kind : "").toLowerCase()
     var resolvedAlpha = alpha === undefined ? 0.82 : alpha
@@ -651,13 +861,18 @@ function edgeSemanticColor(tokens, edge, alpha) {
 
 function overviewEdgeBaseColor(edge, tokens) {
     var kind = String(edge && edge.kind ? edge.kind : "").toLowerCase()
+    var baseColor = null
     if (kind === "activates")
-        return edgeSemanticColor(tokens, edge, 0.94)
-    if (kind === "uses_infrastructure" || kind === "uses_support")
-        return edgeSemanticColor(tokens, edge, 0.92)
-    if (kind === "enables" || kind === "coordinates" || kind === "depends_on")
-        return edgeSemanticColor(tokens, edge, 0.90)
-    return edgeSemanticColor(tokens, edge, 0.88)
+        baseColor = edgeSemanticColor(tokens, edge, 0.94)
+    else if (kind === "uses_infrastructure" || kind === "uses_support")
+        baseColor = edgeSemanticColor(tokens, edge, 0.92)
+    else if (kind === "enables" || kind === "coordinates" || kind === "depends_on")
+        baseColor = edgeSemanticColor(tokens, edge, 0.90)
+    else
+        baseColor = edgeSemanticColor(tokens, edge, 0.88)
+
+    var toneAmount = kind === "uses_infrastructure" || kind === "uses_support" ? 0.10 : 0.16
+    return applyEdgeIdentityTone(baseColor, edge, toneAmount)
 }
 
 function edgeColor(config) {
@@ -672,8 +887,8 @@ function edgeColor(config) {
     }
 
     if (config.focusNode && edgeTouchesFocus(config.focusNode, edge))
-        return edgeSemanticColor(config.tokens, edge, 0.92)
-    return edgeSemanticColor(config.tokens, edge, 0.72)
+        return applyEdgeIdentityTone(edgeSemanticColor(config.tokens, edge, 0.92), edge, 0.08)
+    return applyEdgeIdentityTone(edgeSemanticColor(config.tokens, edge, 0.72), edge, 0.05)
 }
 
 function edgeBundleColor(baseColor, relativeIndex, count) {
@@ -683,7 +898,7 @@ function edgeBundleColor(baseColor, relativeIndex, count) {
     var halfSpan = Math.max(1, (count - 1) / 2)
     var normalized = Math.max(-1, Math.min(1, relativeIndex / halfSpan))
     var coolAccent = Qt.rgba(0.0, 0.478, 1.0, baseColor.a)
-    var warmAccent = Qt.rgba(0.345, 0.337, 0.839, baseColor.a)
+    var warmAccent = Qt.rgba(0.910, 0.430, 0.210, baseColor.a)
     var accent = normalized >= 0 ? coolAccent : warmAccent
     var accentMix = 0.02 + Math.abs(normalized) * 0.045
     var toned = mixColor(baseColor, accent, accentMix)
@@ -693,34 +908,36 @@ function edgeBundleColor(baseColor, relativeIndex, count) {
 }
 
 function edgeVisuals(config) {
+    var defaultFocusActive = !!config.defaultFocusActive
     var lineOpacity = config.componentMode
-            ? (config.hasFocus ? (config.emphasized ? 0.96 : 0.34) : 0.7)
-            : (config.overviewPrimary
-               ? (config.hasHover
-                  ? (config.overviewRelation === "incoming" || config.overviewRelation === "outgoing" ? 0.98 : 0.08)
-                  : 0.88)
-               : (config.hasHover ? (config.emphasized ? 0.90 : 0.07) : (config.emphasized ? 0.82 : 0.22)))
+            ? (config.hasFocus ? (config.emphasized ? 0.96 : 0.34) : 0.72)
+            : (config.hasHover
+               ? (config.emphasized ? 0.96 : 0.16)
+               : (defaultFocusActive
+                  ? (config.emphasized ? 0.96 : 0.34)
+                  : (config.emphasized ? 0.94 : 0.58)))
     var haloOpacity = config.componentMode
             ? (config.hasFocus ? (config.emphasized ? 0.24 : 0.09) : 0.16)
-            : (config.overviewPrimary
-               ? (config.hasHover
-                  ? (config.overviewRelation === "incoming" || config.overviewRelation === "outgoing" ? 0.24 : 0.03)
-                  : 0.18)
-               : (config.hasHover ? (config.emphasized ? 0.20 : 0.02) : (config.emphasized ? 0.1 : 0.04)))
+            : (config.hasHover
+               ? (config.emphasized ? 0.22 : 0.04)
+               : (defaultFocusActive
+                  ? (config.emphasized ? 0.24 : 0.08)
+                  : (config.emphasized ? 0.20 : 0.10)))
+    var isStrongOverview = !config.componentMode && (config.emphasized || config.overviewPrimary)
 
     return {
         "lineOpacity": lineOpacity,
         "haloOpacity": haloOpacity,
         "haloColor": config.componentMode
                 ? Qt.rgba(1, 1, 1, haloOpacity)
-                : Qt.rgba(config.lineColor.r, config.lineColor.g, config.lineColor.b, haloOpacity * 0.42),
+                : Qt.rgba(config.lineColor.r, config.lineColor.g, config.lineColor.b, haloOpacity * 0.55),
         "haloStrokeWidth": config.componentMode
                 ? (config.hasFocus ? 5.4 : 4.2)
-                : (config.hasHover && config.emphasized ? 5.2 : (config.overviewPrimary ? 4.0 : 3.0)),
+                : (isStrongOverview ? 4.2 : 2.8),
         "lineStrokeWidth": config.componentMode
                 ? (config.hasFocus ? 2.6 : 2.0)
-                : (config.hasHover && config.emphasized ? 2.8 : (config.overviewPrimary ? 2.25 : 1.5)),
-        "z": config.emphasized ? 3 : (config.overviewPrimary ? 1 : 0)
+                : (isStrongOverview ? 2.35 : 1.45),
+        "z": config.emphasized ? 4 : (config.overviewPrimary ? 2 : 0)
     }
 }
 

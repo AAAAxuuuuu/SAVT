@@ -10,8 +10,10 @@
 
 #include <QtGui/QClipboard>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QtGui/QGuiApplication>
+#include <QJsonDocument>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QRegularExpression>
@@ -61,6 +63,22 @@ QVariantMap findNodeById(
         }
     }
     return {};
+}
+
+void dumpComponentSceneVariant(const qulonglong capabilityId, const QVariantMap& sceneMap) {
+    QDir rootDir(QDir::currentPath());
+    const QString dumpDirPath = rootDir.filePath(QStringLiteral("tmp/component-scene-dumps"));
+    QDir().mkpath(dumpDirPath);
+
+    QFile dumpFile(
+        QDir(dumpDirPath).filePath(QStringLiteral("component-scene-%1.json").arg(capabilityId)));
+    if (!dumpFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        return;
+    }
+
+    const QJsonDocument document = QJsonDocument::fromVariant(sceneMap);
+    dumpFile.write(document.toJson(QJsonDocument::Indented));
+    dumpFile.close();
 }
 
 QString copyContextKindLabel(const QString& kind) {
@@ -468,9 +486,11 @@ void AnalysisController::ensureComponentSceneForCapability(const qulonglong capa
         static_cast<std::size_t>(capabilityId));
     const auto componentScene =
         SceneMapper::buildComponentSceneData(drilldown.graph, drilldown.layout);
+    const QVariantMap componentSceneMap = SceneMapper::toVariantMap(componentScene);
+    dumpComponentSceneVariant(capabilityId, componentSceneMap);
 
     QVariantMap updatedCatalog = m_componentSceneCatalog;
-    updatedCatalog.insert(capabilityKey, SceneMapper::toVariantMap(componentScene));
+    updatedCatalog.insert(capabilityKey, componentSceneMap);
     setComponentSceneCatalog(std::move(updatedCatalog));
     setStatusMessage(previousStatusMessage);
 }

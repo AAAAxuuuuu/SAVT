@@ -337,9 +337,6 @@ CapabilitySceneLayoutResult LayeredGraphLayout::layoutCapabilityScene(
     visibleNodes.reserve(graph.nodes.size());
     std::unordered_map<std::size_t, const savt::core::CapabilityNode*> nodeIndex;
     for (const savt::core::CapabilityNode& node : graph.nodes) {
-        if (!node.defaultVisible) {
-            continue;
-        }
         visibleNodes.push_back(&node);
         nodeIndex.emplace(node.id, &node);
     }

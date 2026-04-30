@@ -1632,6 +1632,24 @@ CapabilityGraph buildCapabilityGraph(const AnalysisReport& report, const Archite
             trace,
             flowNames);
     }
+
+    for (CapabilityNode& node : graph.nodes) {
+        if (node.kind != CapabilityNodeKind::Capability || node.defaultVisible) {
+            continue;
+        }
+
+        node.defaultVisible = true;
+        node.defaultCollapsed = false;
+        visibleNodeIds.emplace(node.id);
+
+        CapabilityNodeBuildTrace& trace = nodeBuildTraces[node.id];
+        const std::string rule =
+            "Visibility rule: top-level capability nodes stay visible in the default overview scene.";
+        if (std::find(trace.matchedRules.begin(), trace.matchedRules.end(), rule) == trace.matchedRules.end()) {
+            trace.matchedRules.push_back(rule);
+        }
+    }
+
     std::size_t nextGroupId = 1;
     auto makeGroup = [&](const CapabilityGroupKind kind,
                          std::string name,
