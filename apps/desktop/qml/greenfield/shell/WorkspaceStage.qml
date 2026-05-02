@@ -372,7 +372,10 @@ Item {
                                 anchors.margins: 4
                                 tokens: root.tokens
                                 scene: root.analysisController.capabilityScene || ({})
-                                selectedNode: root.focusState.focusedNode
+                                // The overview canvas renders capability-domain nodes.
+                                // Keep the selection in the same domain so returning from
+                                // drill-down does not dim the overview around a component node.
+                                selectedNode: root.focusState.focusedCapability
                                 emptyText: ""
                                 onNodeSelected: function(node) {
                                     root.focusState.setCapability(node)

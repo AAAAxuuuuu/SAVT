@@ -1,7 +1,7 @@
 .pragma library
 .import "ArchitectureEdgeUtils.js" as EdgeUtils
 
-var READABLE_DEBUG_TAG = "readable-single-layer-highlight-v8-large-readable-arrows"
+var READABLE_DEBUG_TAG = "readable-component-detail-v10-spaced-dimmed"
 var READABLE_DEBUG_ENABLED = true
 
 function readableDebug(prefix, message) {
@@ -1232,7 +1232,7 @@ function componentOverviewRoute(config) {
     var edge = config.edge
     if (!config.componentMode || config.relationshipFocusActive) {
         debugComponentRoute(edge,
-            "skip-component-overview",
+            "skip-component-detail-v9",
             "componentMode=" + String(!!config.componentMode)
             + " focusActive=" + String(!!config.relationshipFocusActive))
         return null
@@ -1243,148 +1243,16 @@ function componentOverviewRoute(config) {
     if (!fromRect.valid || !toRect.valid)
         return null
 
-    var layout = config.componentOverviewLayout || {}
-    var groupIndexByNodeId = layout.groupIndexByNodeId || {}
-    var fromGroup = groupIndexByNodeId[edge.fromId]
-    var toGroup = groupIndexByNodeId[edge.toId]
-    var sourceOffset = componentEndpointOffset(config, edge, "fromId")
-    var targetOffset = componentEndpointOffset(config, edge, "toId")
-    var fromCenter = EdgeUtils.nodeCenter(fromRect)
-    var toCenter = EdgeUtils.nodeCenter(toRect)
-    var trackPlacement = layoutPlacement(layout, "routeTrackByEdgeId", edge.id)
-    var trackRelative = placementRelative(trackPlacement)
-    var trackCount = trackPlacement && trackPlacement.count !== undefined
-        ? trackPlacement.count
-        : 1
-    var naturalDirectRoute = componentNaturalDirectRoute(config, edge, fromRect, toRect, {
-        "sourceOffset": sourceOffset,
-        "targetOffset": targetOffset,
-        "trackRelative": trackRelative,
-        "trackCount": trackCount
-    })
-
-    if (fromGroup === undefined || toGroup === undefined) {
-        debugComponentRoute(edge,
-            "missing-group",
-            "fromGroup=" + String(fromGroup) + " toGroup=" + String(toGroup))
-        return makePolylineRoute(config.bypassRoute(fromRect, toRect, config.laneIndex, true), "orthogonal")
-    }
-
-    var forward = toCenter.x >= fromCenter.x
-    var sourceSide = forward ? "right" : "left"
-    var targetSide = forward ? "left" : "right"
-    var sourcePort = EdgeUtils.portPoint(fromRect, sourceSide, sourceOffset)
-    var targetPort = EdgeUtils.portPoint(toRect, targetSide, targetOffset)
-    var sourceBusX = layoutNumber(layout,
-        toGroup > fromGroup ? "outgoingBusXByNodeId" : "incomingBusXByNodeId",
-        edge.fromId,
-        forward ? sourcePort.x + 52 : sourcePort.x - 52)
-    var targetBusX = layoutNumber(layout,
-        toGroup > fromGroup ? "incomingBusXByNodeId" : "outgoingBusXByNodeId",
-        edge.toId,
-        forward ? targetPort.x - 52 : targetPort.x + 52)
-
-    // Target-based bundling must run before ordinary tracks. It intentionally ignores
-    // fanOutBundleByEdgeId so a source node may still emit separate branches to different targets.
-    var targetFanInRoute = componentTargetFanInRoute(config, edge, fromRect, toRect, {
-        "sourceOffset": sourceOffset,
-        "targetOffset": targetOffset,
-        "trackRelative": trackRelative,
-        "trackCount": trackCount
-    })
-    if (preferNaturalRoute(config, edge, naturalDirectRoute, targetFanInRoute)) {
-        debugComponentRoute(edge,
-            "prefer-natural-over-bundle",
-            "fromGroup=" + String(fromGroup)
-            + " toGroup=" + String(toGroup))
-        return naturalDirectRoute
-    }
-    if (targetFanInRoute)
-        return targetFanInRoute
-
-    if (naturalDirectRoute) {
-        debugComponentRoute(edge,
-            "prefer-natural-direct",
-            "fromGroup=" + String(fromGroup)
-            + " toGroup=" + String(toGroup))
-        return naturalDirectRoute
-    }
-
-    if (fromGroup === toGroup) {
-        debugComponentRoute(edge,
-            "same-group",
-            "group=" + String(fromGroup))
-        var groupBounds = layout.groupBoundsByIndex && layout.groupBoundsByIndex[fromGroup]
-            ? layout.groupBoundsByIndex[fromGroup]
-            : null
-        var useRightRail = toCenter.y >= fromCenter.y
-        var localSourceSide = useRightRail ? "right" : "left"
-        var localTargetSide = localSourceSide
-        var localSourcePort = EdgeUtils.portPoint(fromRect, localSourceSide, sourceOffset)
-        var localTargetPort = EdgeUtils.portPoint(toRect, localTargetSide, targetOffset)
-        var localRailBaseX = groupBounds
-            ? (useRightRail ? groupBounds.right + 48 : groupBounds.left - 48)
-            : (useRightRail
-                ? Math.max(fromRect.x + fromRect.width, toRect.x + toRect.width) + 54
-                : Math.min(fromRect.x, toRect.x) - 54)
-        var localRailX = localRailBaseX + compactBundleOffset(trackRelative, trackCount, 18)
-        return makePolylineRoute([
-            localSourcePort,
-            Qt.point(localRailX, localSourcePort.y),
-            Qt.point(localRailX, localTargetPort.y),
-            localTargetPort
-        ],
-            "orthogonal")
-    }
-
-    forward = toGroup > fromGroup
-
-    var groupDistance = Math.abs(toGroup - fromGroup)
-    var sourceAboveTarget = sourcePort.y <= targetPort.y
-    var longHop = groupDistance > 1
-    var routeY = (sourcePort.y + targetPort.y) * 0.5
-    var trackOffset = compactBundleOffset(trackRelative, trackCount, longHop ? 72 : 44)
-
-    if (longHop) {
-        var topY = Math.min(fromRect.y, toRect.y)
-        var bottomY = Math.max(fromRect.y + fromRect.height, toRect.y + toRect.height)
-        if (sourceAboveTarget)
-            routeY = topY - 34 + trackOffset
-        else
-            routeY = bottomY + 34 + trackOffset
-    } else {
-        routeY += trackOffset
-    }
-
-    var directGap = forward ? (targetBusX - sourceBusX) : (sourceBusX - targetBusX)
-    if (directGap > 46 && Math.abs(sourcePort.y - targetPort.y) < 10) {
-        debugComponentRoute(edge,
-            "direct-bus",
-            "fromGroup=" + String(fromGroup)
-            + " toGroup=" + String(toGroup))
-        return makePolylineRoute([
-            sourcePort,
-            Qt.point(targetBusX, sourcePort.y),
-            Qt.point(targetBusX, targetPort.y),
-            targetPort
-        ],
-            "orthogonal")
-    }
-
+    // Component/detail mode now follows the same readability-first rule as the
+    // architecture overview: one independent straight relation per normalized edge.
+    // No fan-in/fan-out bundling, no group rails, no hover-only alternate route.
+    var route = readableStraightRoute(config, edge, fromRect, toRect)
+    route.componentDetailGraph = true
+    route.readableRouter = "component-detail-straight-v9"
     debugComponentRoute(edge,
-        "fallback-track",
-        "fromGroup=" + String(fromGroup)
-        + " toGroup=" + String(toGroup)
-        + " routeY=" + String(routeY))
-    return makePolylineRoute([
-        sourcePort,
-        Qt.point(sourceBusX, sourcePort.y),
-        Qt.point(sourceBusX, routeY),
-        Qt.point(targetBusX, routeY),
-        Qt.point(targetBusX, targetPort.y),
-        targetPort
-    ],
-        "orthogonal")
+        "component-detail-straight-v9",
+        readableRouteText(route))
+    return route
 }
 
 function dragPreviewRoute(config, edge, fromRect, toRect) {

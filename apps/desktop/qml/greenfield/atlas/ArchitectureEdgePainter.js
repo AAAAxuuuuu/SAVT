@@ -1,7 +1,7 @@
 .pragma library
 .import "ArchitectureEdgeUtils.js" as EdgeUtils
 
-var READABLE_DEBUG_TAG = "readable-single-layer-highlight-v8-large-readable-arrows"
+var READABLE_DEBUG_TAG = "readable-component-detail-v10-spaced-dimmed"
 var READABLE_DEBUG_ENABLED = true
 
 function readableDebug(prefix, message) {

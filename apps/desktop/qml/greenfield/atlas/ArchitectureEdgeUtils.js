@@ -1,6 +1,6 @@
 .pragma library
 
-var READABLE_DEBUG_TAG = "readable-single-layer-highlight-v8-large-readable-arrows"
+var READABLE_DEBUG_TAG = "readable-component-detail-v13-isolated-grid"
 var READABLE_DEBUG_ENABLED = true
 
 function readableDebug(prefix, message) {
@@ -489,10 +489,13 @@ function collectVisibleEdges(config) {
         return rawOutput
 
     var node = config.selectedNode || config.hoveredNode
-    var limit = node ? config.focusEdgeLimit : config.overviewEdgeLimit
+    // Component/detail mode is a relationship graph, not a small preview list.
+    // In showAll mode keep all edges visible and rely on single-layer emphasis
+    // to highlight the active/default node.
+    var limit = config.componentMode ? edgeList.length : (node ? config.focusEdgeLimit : config.overviewEdgeLimit)
     for (var index = 0; index < edgeList.length && rawOutput.length < limit; ++index) {
         var edge = edgeList[index]
-        if (node && !(edge.fromId === node.id || edge.toId === node.id))
+        if (!config.componentMode && node && !(edge.fromId === node.id || edge.toId === node.id))
             continue
 
         rawOutput.push({
@@ -909,35 +912,51 @@ function edgeBundleColor(baseColor, relativeIndex, count) {
 
 function edgeVisuals(config) {
     var defaultFocusActive = !!config.defaultFocusActive
-    var lineOpacity = config.componentMode
-            ? (config.hasFocus ? (config.emphasized ? 0.96 : 0.34) : 0.72)
-            : (config.hasHover
-               ? (config.emphasized ? 0.96 : 0.16)
-               : (defaultFocusActive
-                  ? (config.emphasized ? 0.96 : 0.34)
-                  : (config.emphasized ? 0.94 : 0.58)))
-    var haloOpacity = config.componentMode
-            ? (config.hasFocus ? (config.emphasized ? 0.24 : 0.09) : 0.16)
-            : (config.hasHover
-               ? (config.emphasized ? 0.22 : 0.04)
-               : (defaultFocusActive
-                  ? (config.emphasized ? 0.24 : 0.08)
-                  : (config.emphasized ? 0.20 : 0.10)))
-    var isStrongOverview = !config.componentMode && (config.emphasized || config.overviewPrimary)
+    var activeOrDefault = !!config.hasFocus || defaultFocusActive
+    var componentMode = !!config.componentMode
+    var emphasized = !!config.emphasized
+    var lineOpacity
+    var haloOpacity
+
+    if (componentMode) {
+        // v10: component/detail graphs can contain dozens of edges. Keep all relationships
+        // visible, but make non-focus edges genuinely background so the default/hover/drag
+        // focus reads as a clean subgraph instead of a dense hairball.
+        if (activeOrDefault) {
+            lineOpacity = emphasized ? 0.98 : 0.22
+            haloOpacity = emphasized ? 0.24 : 0.045
+        } else {
+            lineOpacity = emphasized ? 0.96 : 0.36
+            haloOpacity = emphasized ? 0.20 : 0.06
+        }
+    } else {
+        lineOpacity = config.hasHover
+           ? (emphasized ? 0.96 : 0.16)
+           : (defaultFocusActive
+              ? (emphasized ? 0.96 : 0.22)
+              : (emphasized ? 0.94 : 0.50))
+        haloOpacity = config.hasHover
+           ? (emphasized ? 0.22 : 0.035)
+           : (defaultFocusActive
+              ? (emphasized ? 0.24 : 0.045)
+              : (emphasized ? 0.20 : 0.08))
+    }
+
+    var isStrongOverview = !componentMode && (emphasized || config.overviewPrimary)
 
     return {
         "lineOpacity": lineOpacity,
         "haloOpacity": haloOpacity,
-        "haloColor": config.componentMode
+        "haloColor": componentMode
                 ? Qt.rgba(1, 1, 1, haloOpacity)
                 : Qt.rgba(config.lineColor.r, config.lineColor.g, config.lineColor.b, haloOpacity * 0.55),
-        "haloStrokeWidth": config.componentMode
-                ? (config.hasFocus ? 5.4 : 4.2)
+        "haloStrokeWidth": componentMode
+                ? (emphasized ? 4.9 : 1.8)
                 : (isStrongOverview ? 4.2 : 2.8),
-        "lineStrokeWidth": config.componentMode
-                ? (config.hasFocus ? 2.6 : 2.0)
+        "lineStrokeWidth": componentMode
+                ? (emphasized ? 2.75 : 1.05)
                 : (isStrongOverview ? 2.35 : 1.45),
-        "z": config.emphasized ? 4 : (config.overviewPrimary ? 2 : 0)
+        "z": emphasized ? 4 : (config.overviewPrimary ? 2 : 0)
     }
 }
 

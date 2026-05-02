@@ -1,6 +1,6 @@
 .pragma library
 
-var READABLE_DEBUG_TAG = "readable-single-layer-highlight-v8-large-readable-arrows"
+var READABLE_DEBUG_TAG = "readable-component-detail-v13-isolated-grid"
 var READABLE_DEBUG_ENABLED = true
 
 function readableDebug(prefix, message) {
@@ -329,8 +329,8 @@ function buildReadableOverviewLayout(config, empty) {
             mainIds.push(connectedId)
     }
 
-    var baseRadiusX = Math.max(maxNodeW * 1.62, 1040)
-    var baseRadiusY = Math.max(maxNodeH * 1.72, 680)
+    var baseRadiusX = Math.max(maxNodeW * 1.78, 1180)
+    var baseRadiusY = Math.max(maxNodeH * 1.92, 790)
     if (defaultFocusId !== undefined) {
         centerXById[defaultFocusId] = 0
         centerYById[defaultFocusId] = 0
@@ -425,8 +425,8 @@ function buildReadableOverviewLayout(config, empty) {
                 }
                 var nx = dx / distance
                 var ny = dy / distance
-                var desiredX = (widthById[aId] + widthById[bId]) / 2 + 310
-                var desiredY = (heightById[aId] + heightById[bId]) / 2 + 240
+                var desiredX = (widthById[aId] + widthById[bId]) / 2 + 390
+                var desiredY = (heightById[aId] + heightById[bId]) / 2 + 300
                 var overlapX = desiredX - Math.abs(dx)
                 var overlapY = desiredY - Math.abs(dy)
                 if (overlapX > 0 && overlapY > 0) {
@@ -511,8 +511,8 @@ function buildReadableOverviewLayout(config, empty) {
                 bId = movableIds[pj]
                 dx = centerXById[bId] - centerXById[aId]
                 dy = centerYById[bId] - centerYById[aId]
-                var minDX = (widthById[aId] + widthById[bId]) / 2 + 250
-                var minDY = (heightById[aId] + heightById[bId]) / 2 + 190
+                var minDX = (widthById[aId] + widthById[bId]) / 2 + 330
+                var minDY = (heightById[aId] + heightById[bId]) / 2 + 250
                 overlapX = minDX - Math.abs(dx)
                 overlapY = minDY - Math.abs(dy)
                 if (overlapX <= 0 || overlapY <= 0)
@@ -556,13 +556,47 @@ function buildReadableOverviewLayout(config, empty) {
         }
     }
 
-    var marginX = 120
-    var marginY = 110
-    var isolatedGapY = Math.max(96, maxNodeH * 0.34)
+    var marginX = 150
+    var marginY = 132
+    var isolatedGapX = Math.max(190, maxNodeW * 0.34)
+    var isolatedGapY = Math.max(136, maxNodeH * 0.45)
     var isolatedColumnW = 0
-    for (var isoSizeIndex = 0; isoSizeIndex < isolatedIds.length; ++isoSizeIndex)
+    var isolatedMaxH = 0
+    for (var isoSizeIndex = 0; isoSizeIndex < isolatedIds.length; ++isoSizeIndex) {
         isolatedColumnW = Math.max(isolatedColumnW, widthById[isolatedIds[isoSizeIndex]])
-    var graphOffsetX = marginX + (isolatedIds.length > 0 ? isolatedColumnW + 260 : 0) - (hasConnected ? connectedMinX : 0)
+        isolatedMaxH = Math.max(isolatedMaxH, heightById[isolatedIds[isoSizeIndex]])
+    }
+
+    function isolatedGridColumnCount(count, connectedPresent) {
+        if (count <= 0)
+            return 0
+        if (!connectedPresent) {
+            if (count <= 2)
+                return count
+            if (count <= 6)
+                return 3
+            if (count <= 12)
+                return 4
+            if (count <= 24)
+                return 4
+            return 5
+        }
+        if (count <= 3)
+            return 1
+        if (count <= 10)
+            return 2
+        return 3
+    }
+
+    var isolatedColumns = isolatedGridColumnCount(isolatedIds.length, hasConnected)
+    var isolatedRows = isolatedColumns > 0 ? Math.ceil(isolatedIds.length / isolatedColumns) : 0
+    var isolatedPanelWidth = isolatedColumns > 0
+        ? isolatedColumns * isolatedColumnW + Math.max(0, isolatedColumns - 1) * isolatedGapX
+        : 0
+
+    var graphOffsetX = marginX
+        + (hasConnected && isolatedIds.length > 0 ? isolatedPanelWidth + 300 : 0)
+        - (hasConnected ? connectedMinX : 0)
     var graphOffsetY = marginY - (hasConnected ? connectedMinY : 0)
 
     for (connectedIndex = 0; connectedIndex < connectedIds.length; ++connectedIndex) {
@@ -578,21 +612,29 @@ function buildReadableOverviewLayout(config, empty) {
         readableDebug("LAYOUT", "force-node id=" + String(connectedId) + " name=" + readableNodeLabel(nodeById[connectedId], connectedId) + " dist=" + String(distById[connectedId]) + " degree=" + String(degreeById[connectedId]) + " " + readablePositionText(positions[connectedId]))
     }
 
-    var isoX = marginX
-    var isoY = marginY
     for (var isoIndex = 0; isoIndex < isolatedIds.length; ++isoIndex) {
         var isoId = isolatedIds[isoIndex]
+        var isoColumn = isolatedColumns > 0 ? isoIndex % isolatedColumns : 0
+        var isoRow = isolatedColumns > 0 ? Math.floor(isoIndex / isolatedColumns) : isoIndex
+        var isoX = marginX + isoColumn * (isolatedColumnW + isolatedGapX)
+        var isoY = marginY + isoRow * (isolatedMaxH + isolatedGapY)
         positions[isoId] = {
             "x": isoX,
             "y": isoY,
             "width": widthById[isoId],
             "height": heightById[isoId],
-            "laneIndex": -1,
-            "order": isoIndex
+            "laneIndex": -1 + isoColumn,
+            "order": isoRow
         }
-        isoY += heightById[isoId] + isolatedGapY
-        readableDebug("LAYOUT", "isolated-node id=" + String(isoId) + " name=" + readableNodeLabel(nodeById[isoId], isoId) + " " + readablePositionText(positions[isoId]))
+        readableDebug("LAYOUT", "isolated-grid-node id=" + String(isoId) + " name=" + readableNodeLabel(nodeById[isoId], isoId) + " column=" + String(isoColumn) + " row=" + String(isoRow) + " " + readablePositionText(positions[isoId]))
     }
+
+    readableDebug("LAYOUT", "isolated-grid-summary isolated=" + String(isolatedIds.length)
+        + " connected=" + String(connectedIds.length)
+        + " columns=" + String(isolatedColumns)
+        + " rows=" + String(isolatedRows)
+        + " validEdges=" + String(validEdges.length)
+        + " rawEdges=" + String(edges.length))
 
     function sortPeerEdges(edgeList, peerField) {
         edgeList.sort(function(left, right) {
@@ -2171,17 +2213,23 @@ function buildComponentLayout(config) {
     if (!nodes.length)
         return empty
 
-    var order = ["entry", "experience", "core", "support", "other"]
-    var groupsByKey = {}
+    readableDebug("LAYOUT", "component-detail-v9-start nodes=" + String(nodes.length)
+        + " edges=" + String(edges.length)
+        + " viewWidth=" + String(config && config.viewWidth !== undefined ? config.viewWidth : ""))
+
+    var nodeById = {}
+    var validNodes = []
     var outgoingById = {}
     var incomingById = {}
+    var neighborById = {}
+    var directedDegreeById = {}
+    var degreeById = {}
+    var incomingCountByNodeId = {}
+    var outgoingCountByNodeId = {}
     var groupIndexByNodeId = {}
     var positions = {}
-    var fallbackYById = {}
     var outgoingSlotByEdgeId = {}
     var incomingSlotByEdgeId = {}
-    var outgoingCountByNodeId = {}
-    var incomingCountByNodeId = {}
     var outgoingBusXByNodeId = {}
     var incomingBusXByNodeId = {}
     var fanOutBundleByEdgeId = {}
@@ -2190,563 +2238,461 @@ function buildComponentLayout(config) {
     var routeTrackGroupKeyByEdgeId = {}
     var routeTrackCountByGroupKey = {}
     var groupBoundsByIndex = []
-    var marginX = 72
-    var marginY = 96
-    var sectionGap = 116
-    var gapX = 64
-    var gapY = 42
-    var headerHeight = 34
-    var cardHeight = 300
-    var viewWidth = Math.max(1320, numericOrFallback(config.viewWidth, 1320))
 
-    for (var orderIndex = 0; orderIndex < order.length; ++orderIndex) {
-        var key = order[orderIndex]
-        groupsByKey[key] = {
-            "key": key,
-            "title": config.groupTitle ? config.groupTitle(key) : key,
-            "nodes": [],
-            "left": 0,
-            "width": 0,
-            "columns": 1,
-            "rows": 1
-        }
-    }
+    var viewWidth = Math.max(980, numericOrFallback(config.viewWidth, 1320))
+    var nodeCount = nodes.length
+    var cardWidth = nodeCount > 42 ? 300 : (nodeCount > 28 ? 326 : (nodeCount > 18 ? 348 : 380))
+    var cardHeight = nodeCount > 42 ? 184 : (nodeCount > 28 ? 198 : (nodeCount > 18 ? 212 : 230))
+    // v10: detail graphs with 20-60 nodes need more breathing room than a file grid.
+    // Keep card size stable, but expand node-to-node spacing and ring radii so straight
+    // dependency lines do not all cut through the same central band.
+    var gapX = nodeCount > 42 ? 184 : (nodeCount > 28 ? 206 : (nodeCount > 18 ? 226 : 246))
+    var gapY = nodeCount > 42 ? 150 : (nodeCount > 28 ? 174 : (nodeCount > 18 ? 192 : 208))
+    var marginX = 150
+    var marginY = 140
+    var sectionGap = 260
+    var headerHeight = 34
 
     for (var nodeIndex = 0; nodeIndex < nodes.length; ++nodeIndex) {
         var node = nodes[nodeIndex]
         if (!node || node.id === undefined)
             continue
-        var groupKey = config.groupKey ? config.groupKey(node) : "other"
-        if (!groupsByKey[groupKey])
-            groupsByKey[groupKey] = { "key": groupKey, "title": groupKey, "nodes": [], "left": 0, "width": 0, "columns": 1, "rows": 1 }
-        groupsByKey[groupKey].nodes.push(node)
-        outgoingById[node.id] = []
-        incomingById[node.id] = []
-        fallbackYById[node.id] = numericOrFallback(node.y, 90 + nodeIndex * 120)
+        var key = safeNodeId(node.id)
+        nodeById[key] = node
+        validNodes.push(node)
+        outgoingById[key] = []
+        incomingById[key] = []
+        neighborById[key] = {}
+        directedDegreeById[key] = 0
+        degreeById[key] = 0
     }
 
     for (var edgeIndex = 0; edgeIndex < edges.length; ++edgeIndex) {
         var edge = edges[edgeIndex]
         if (!edge || edge.id === undefined)
             continue
-        if (!outgoingById[edge.fromId] || !incomingById[edge.toId])
+        var fromKey = safeNodeId(edge.fromId)
+        var toKey = safeNodeId(edge.toId)
+        if (!nodeById[fromKey] || !nodeById[toKey] || fromKey === toKey)
             continue
-        outgoingById[edge.fromId].push(edge)
-        incomingById[edge.toId].push(edge)
+        outgoingById[fromKey].push(edge)
+        incomingById[toKey].push(edge)
+        neighborById[fromKey][toKey] = true
+        neighborById[toKey][fromKey] = true
+        directedDegreeById[fromKey] = (directedDegreeById[fromKey] || 0) + 1
+        directedDegreeById[toKey] = (directedDegreeById[toKey] || 0) + 1
     }
 
-    var groups = []
-    for (var groupOrderIndex = 0; groupOrderIndex < order.length; ++groupOrderIndex) {
-        var orderedGroup = groupsByKey[order[groupOrderIndex]]
-        if (orderedGroup && orderedGroup.nodes.length)
-            groups.push(orderedGroup)
+    for (nodeIndex = 0; nodeIndex < validNodes.length; ++nodeIndex) {
+        node = validNodes[nodeIndex]
+        key = safeNodeId(node.id)
+        var neighborCount = 0
+        var neighbors = neighborById[key] || {}
+        for (var neighborKey in neighbors)
+            ++neighborCount
+        degreeById[key] = neighborCount
+        incomingCountByNodeId[node.id] = incomingById[key] ? incomingById[key].length : 0
+        outgoingCountByNodeId[node.id] = outgoingById[key] ? outgoingById[key].length : 0
+        readableDebug("LAYOUT", "component-degree id=" + key
+            + " name=" + safeNodeName(node)
+            + " undirected=" + String(neighborCount)
+            + " directed=" + String(directedDegreeById[key] || 0)
+            + " incoming=" + String(incomingCountByNodeId[node.id])
+            + " outgoing=" + String(outgoingCountByNodeId[node.id]))
     }
 
-    var groupCount = Math.max(1, groups.length)
-    var availableSectionWidth = (viewWidth - marginX * 2 - Math.max(0, groupCount - 1) * sectionGap) / groupCount
-    var cardWidth = boundedValue(Math.floor(availableSectionWidth - 84), 360, 452)
-
-    for (groupOrderIndex = 0; groupOrderIndex < groups.length; ++groupOrderIndex) {
-        orderedGroup = groups[groupOrderIndex]
-        for (nodeIndex = 0; nodeIndex < orderedGroup.nodes.length; ++nodeIndex)
-            groupIndexByNodeId[orderedGroup.nodes[nodeIndex].id] = groupOrderIndex
+    function nodeTitle(node) {
+        if (config.titleText)
+            return String(config.titleText(node) || "")
+        return safeNodeName(node)
     }
 
-    for (groupOrderIndex = 0; groupOrderIndex < groups.length; ++groupOrderIndex) {
-        orderedGroup = groups[groupOrderIndex]
-        orderedGroup.nodes.sort(function (left, right) {
-            var leftBias = componentNeighborBias(left.id, outgoingById, incomingById, groupIndexByNodeId, fallbackYById)
-            var rightBias = componentNeighborBias(right.id, outgoingById, incomingById, groupIndexByNodeId, fallbackYById)
-            if (leftBias !== null || rightBias !== null) {
-                if (leftBias === null)
-                    return 1
-                if (rightBias === null)
-                    return -1
-                if (Math.abs(leftBias - rightBias) > 0.5)
-                    return leftBias - rightBias
-            }
-
-            var leftScore = config.connectivityScore ? config.connectivityScore(left) : 0
-            var rightScore = config.connectivityScore ? config.connectivityScore(right) : 0
-            if (Math.abs(leftScore - rightScore) > 0.01)
-                return rightScore - leftScore
-
-            var leftScope = config.scopeText ? config.scopeText(left) : safeNodeName(left)
-            var rightScope = config.scopeText ? config.scopeText(right) : safeNodeName(right)
-            var scopeCompare = String(leftScope).localeCompare(String(rightScope))
-            if (scopeCompare !== 0)
-                return scopeCompare
-
-            var leftTitle = config.titleText ? config.titleText(left) : safeNodeName(left)
-            var rightTitle = config.titleText ? config.titleText(right) : safeNodeName(right)
-            return String(leftTitle).localeCompare(String(rightTitle))
-        })
+    function nodeScope(node) {
+        if (config.scopeText)
+            return String(config.scopeText(node) || "")
+        return safeNodeName(node)
     }
 
-    var maxRows = 1
-    var currentX = marginX
-    for (groupOrderIndex = 0; groupOrderIndex < groups.length; ++groupOrderIndex) {
-        orderedGroup = groups[groupOrderIndex]
-        var count = orderedGroup.nodes.length
-        var columns = 1
-        if (count >= 7)
-            columns = 3
-        else if (count >= 4)
-            columns = 2
-        if (groupCount <= 2 && count >= 5)
-            columns = Math.min(3, columns + 1)
-        if (groupCount >= 5)
-            columns = Math.min(columns, 2)
-
-        var rows = Math.max(1, Math.ceil(count / columns))
-        orderedGroup.columns = columns
-        orderedGroup.rows = rows
-        maxRows = Math.max(maxRows, rows)
-        orderedGroup.width = columns * cardWidth + Math.max(0, columns - 1) * gapX + 72
-        orderedGroup.left = currentX
-        currentX += orderedGroup.width
-        if (groupOrderIndex < groups.length - 1)
-            currentX += sectionGap
+    function nodeGroupKey(node) {
+        if (config.groupKey)
+            return String(config.groupKey(node) || "other")
+        return "other"
     }
 
-    var contentTop = marginY + headerHeight + 16
-    for (groupOrderIndex = 0; groupOrderIndex < groups.length; ++groupOrderIndex) {
-        orderedGroup = groups[groupOrderIndex]
-        var rowsPerColumn = Math.max(1, orderedGroup.rows)
-        var top = contentTop
-        var left = orderedGroup.left + 36
-        var right = left
-        var bottom = top
-
-        for (nodeIndex = 0; nodeIndex < orderedGroup.nodes.length; ++nodeIndex) {
-            node = orderedGroup.nodes[nodeIndex]
-            var column = Math.floor(nodeIndex / rowsPerColumn)
-            var row = nodeIndex % rowsPerColumn
-            var x = left + column * (cardWidth + gapX)
-            var y = top + row * (cardHeight + gapY)
-
-            positions[safeNodeId(node.id)] = {
-                "x": x,
-                "y": y,
-                "groupIndex": groupOrderIndex,
-                "column": column,
-                "row": row
-            }
-            right = Math.max(right, x + cardWidth)
-            bottom = Math.max(bottom, y + cardHeight)
+    function entryNameBonus(node) {
+        var text = (nodeTitle(node) + " " + nodeScope(node) + " " + safeNodeName(node)).toLowerCase()
+        var bonus = 0
+        var terms = ["main", "index", "app", "entry", "surface", "canvas", "view", "page", "router", "controller", "service", "shell"]
+        for (var i = 0; i < terms.length; ++i) {
+            if (text.indexOf(terms[i]) >= 0)
+                bonus += 18 - Math.min(12, i)
         }
+        return bonus
+    }
 
-        groupBoundsByIndex[groupOrderIndex] = {
-            "left": orderedGroup.left,
-            "right": orderedGroup.left + orderedGroup.width,
-            "top": marginY,
-            "bottom": bottom + 28
+    function focusScore(node) {
+        var nodeKey = safeNodeId(node.id)
+        var connectivity = config.connectivityScore ? Number(config.connectivityScore(node) || 0) : 0
+        return (degreeById[nodeKey] || 0) * 120
+            + (directedDegreeById[nodeKey] || 0) * 16
+            + (outgoingCountByNodeId[node.id] || 0) * 8
+            + (incomingCountByNodeId[node.id] || 0) * 5
+            + entryNameBonus(node)
+            + connectivity * 0.4
+    }
+
+    var connectedNodes = []
+    var isolatedNodes = []
+    var focusNode = null
+    var bestScore = -999999
+    for (nodeIndex = 0; nodeIndex < validNodes.length; ++nodeIndex) {
+        node = validNodes[nodeIndex]
+        key = safeNodeId(node.id)
+        if ((degreeById[key] || 0) > 0)
+            connectedNodes.push(node)
+        else
+            isolatedNodes.push(node)
+        var score = focusScore(node)
+        if ((degreeById[key] || 0) > 0 && (!focusNode || score > bestScore + 0.01)) {
+            focusNode = node
+            bestScore = score
         }
+    }
+    if (!focusNode && validNodes.length)
+        focusNode = validNodes[0]
+    var focusKey = focusNode ? safeNodeId(focusNode.id) : ""
+    readableDebug("LAYOUT", "component-default-focus id=" + focusKey
+        + " name=" + String(focusNode ? safeNodeName(focusNode) : "")
+        + " connected=" + String(connectedNodes.length)
+        + " isolated=" + String(isolatedNodes.length))
+
+    function bfsDistanceFromFocus() {
+        var distance = {}
+        if (!focusKey.length)
+            return distance
+        var queue = [focusKey]
+        distance[focusKey] = 0
+        for (var qi = 0; qi < queue.length; ++qi) {
+            var current = queue[qi]
+            var nextMap = neighborById[current] || {}
+            for (var nextKey in nextMap) {
+                if (distance[nextKey] !== undefined)
+                    continue
+                distance[nextKey] = distance[current] + 1
+                queue.push(nextKey)
+            }
+        }
+        return distance
+    }
+
+    var distanceById = bfsDistanceFromFocus()
+
+    function compareDetailNodes(left, right) {
+        var leftKey = safeNodeId(left.id)
+        var rightKey = safeNodeId(right.id)
+        var leftDist = distanceById[leftKey] !== undefined ? distanceById[leftKey] : 99
+        var rightDist = distanceById[rightKey] !== undefined ? distanceById[rightKey] : 99
+        if (leftDist !== rightDist)
+            return leftDist - rightDist
+        var leftGroup = nodeGroupKey(left)
+        var rightGroup = nodeGroupKey(right)
+        var groupCompare = leftGroup.localeCompare(rightGroup)
+        if (groupCompare !== 0)
+            return groupCompare
+        var leftScore = focusScore(left)
+        var rightScore = focusScore(right)
+        if (Math.abs(leftScore - rightScore) > 0.01)
+            return rightScore - leftScore
+        return nodeTitle(left).localeCompare(nodeTitle(right))
+    }
+
+    connectedNodes.sort(compareDetailNodes)
+    isolatedNodes.sort(function(left, right) {
+        var leftGroup = nodeGroupKey(left)
+        var rightGroup = nodeGroupKey(right)
+        var groupCompare = leftGroup.localeCompare(rightGroup)
+        if (groupCompare !== 0)
+            return groupCompare
+        return nodeTitle(left).localeCompare(nodeTitle(right))
+    })
+
+    var connectedPosition = {}
+    var movableKeys = []
+    var centerX = 0
+    var centerY = 0
+    if (focusNode) {
+        connectedPosition[focusKey] = { "cx": centerX, "cy": centerY, "fixed": true }
+        movableKeys.push(focusKey)
+    }
+
+    var ringNodes = []
+    for (nodeIndex = 0; nodeIndex < connectedNodes.length; ++nodeIndex) {
+        node = connectedNodes[nodeIndex]
+        key = safeNodeId(node.id)
+        if (key === focusKey)
+            continue
+        ringNodes.push(node)
+    }
+
+    var baseRadiusX = cardWidth * (connectedNodes.length > 35 ? 2.45 : 2.78) + gapX * 1.36
+    var baseRadiusY = cardHeight * (connectedNodes.length > 35 ? 2.30 : 2.62) + gapY * 1.30
+    var ringGapX = cardWidth * 1.94 + gapX * 1.48
+    var ringGapY = cardHeight * 1.84 + gapY * 1.42
+    var assigned = 0
+    var ring = 1
+    while (assigned < ringNodes.length) {
+        var radiusX = baseRadiusX + (ring - 1) * ringGapX
+        var radiusY = baseRadiusY + (ring - 1) * ringGapY
+        var capacity = Math.max(6, Math.floor(2 * Math.PI * Math.sqrt(radiusX * radiusX + radiusY * radiusY) / (cardWidth * 1.68)))
+        capacity = Math.min(capacity, ringNodes.length - assigned)
+        if (ring === 1)
+            capacity = Math.min(capacity, Math.max(6, Math.min(12, ringNodes.length - assigned)))
+        var startAngle = -Math.PI / 2 - (ring % 2) * Math.PI / Math.max(6, capacity * 2)
+        for (var ringIndex = 0; ringIndex < capacity; ++ringIndex) {
+            node = ringNodes[assigned + ringIndex]
+            key = safeNodeId(node.id)
+            var angle = startAngle + (2 * Math.PI * ringIndex / Math.max(1, capacity))
+            var dist = distanceById[key] !== undefined ? distanceById[key] : 99
+            var jitter = ((safeNodeId(node.id).length % 5) - 2) * 0.045
+            var cx = Math.cos(angle + jitter) * radiusX
+            var cy = Math.sin(angle + jitter) * radiusY
+            connectedPosition[key] = { "cx": cx, "cy": cy, "fixed": false }
+            movableKeys.push(key)
+            readableDebug("LAYOUT", "component-ring-node id=" + key
+                + " name=" + safeNodeName(node)
+                + " ring=" + String(ring)
+                + " dist=" + String(dist)
+                + " angle=" + String(Math.round(angle * 1000) / 1000)
+                + " cx=" + String(Math.round(cx))
+                + " cy=" + String(Math.round(cy)))
+        }
+        assigned += capacity
+        ++ring
+    }
+
+    function connectedRect(keyValue) {
+        var pos = connectedPosition[keyValue]
+        return {
+            "left": pos.cx - cardWidth / 2,
+            "right": pos.cx + cardWidth / 2,
+            "top": pos.cy - cardHeight / 2,
+            "bottom": pos.cy + cardHeight / 2,
+            "cx": pos.cx,
+            "cy": pos.cy
+        }
+    }
+
+    function resolveConnectedCollisions(iterations) {
+        var minGapX = Math.max(148, gapX * 0.92)
+        var minGapY = Math.max(118, gapY * 0.86)
+        for (var iter = 0; iter < iterations; ++iter) {
+            var moved = false
+            for (var a = 0; a < movableKeys.length; ++a) {
+                for (var b = a + 1; b < movableKeys.length; ++b) {
+                    var leftKey = movableKeys[a]
+                    var rightKey = movableKeys[b]
+                    var leftPos = connectedPosition[leftKey]
+                    var rightPos = connectedPosition[rightKey]
+                    if (!leftPos || !rightPos)
+                        continue
+                    var dx = rightPos.cx - leftPos.cx
+                    var dy = rightPos.cy - leftPos.cy
+                    var requiredX = cardWidth + minGapX
+                    var requiredY = cardHeight + minGapY
+                    var overlapX = requiredX - Math.abs(dx)
+                    var overlapY = requiredY - Math.abs(dy)
+                    if (overlapX <= 0 || overlapY <= 0)
+                        continue
+
+                    var pushX = 0
+                    var pushY = 0
+                    if (overlapX < overlapY) {
+                        pushX = (dx >= 0 ? 1 : -1) * (overlapX / 2 + 1)
+                    } else {
+                        pushY = (dy >= 0 ? 1 : -1) * (overlapY / 2 + 1)
+                    }
+
+                    if (leftPos.fixed) {
+                        rightPos.cx += pushX * 2
+                        rightPos.cy += pushY * 2
+                    } else if (rightPos.fixed) {
+                        leftPos.cx -= pushX * 2
+                        leftPos.cy -= pushY * 2
+                    } else {
+                        leftPos.cx -= pushX
+                        leftPos.cy -= pushY
+                        rightPos.cx += pushX
+                        rightPos.cy += pushY
+                    }
+                    moved = true
+                }
+            }
+            if (!moved)
+                break
+        }
+    }
+
+    resolveConnectedCollisions(90)
+
+    var connectedMinX = 0
+    var connectedMinY = 0
+    var connectedMaxX = 0
+    var connectedMaxY = 0
+    var hasConnectedBounds = false
+    for (var posKey in connectedPosition) {
+        var rect = connectedRect(posKey)
+        if (!hasConnectedBounds) {
+            connectedMinX = rect.left
+            connectedMaxX = rect.right
+            connectedMinY = rect.top
+            connectedMaxY = rect.bottom
+            hasConnectedBounds = true
+        } else {
+            connectedMinX = Math.min(connectedMinX, rect.left)
+            connectedMaxX = Math.max(connectedMaxX, rect.right)
+            connectedMinY = Math.min(connectedMinY, rect.top)
+            connectedMaxY = Math.max(connectedMaxY, rect.bottom)
+        }
+    }
+
+    function componentIsolatedColumnCount(count, connectedPresent) {
+        if (count <= 0)
+            return 0
+        if (!connectedPresent) {
+            if (count <= 2)
+                return count
+            if (count <= 8)
+                return 3
+            if (count <= 24)
+                return 4
+            return 5
+        }
+        if (count <= 3)
+            return 1
+        if (count <= 12)
+            return 2
+        return 3
+    }
+
+    var isolatedColumns = componentIsolatedColumnCount(isolatedNodes.length, hasConnectedBounds)
+    var isolatedPanelWidth = isolatedColumns > 0
+        ? isolatedColumns * cardWidth + Math.max(0, isolatedColumns - 1) * gapX + marginX
+        : 0
+    var connectedShiftX = marginX + (hasConnectedBounds ? isolatedPanelWidth : 0) + (hasConnectedBounds ? -connectedMinX : 0)
+    var connectedShiftY = marginY + (hasConnectedBounds ? -connectedMinY : 0)
+
+    for (posKey in connectedPosition) {
+        var connectedNode = nodeById[posKey]
+        if (!connectedNode)
+            continue
+        var finalX = connectedPosition[posKey].cx - cardWidth / 2 + connectedShiftX
+        var finalY = connectedPosition[posKey].cy - cardHeight / 2 + connectedShiftY
+        positions[posKey] = {
+            "x": finalX,
+            "y": finalY,
+            "groupIndex": 1,
+            "column": Math.round(finalX / Math.max(1, cardWidth + gapX)),
+            "row": Math.round(finalY / Math.max(1, cardHeight + gapY)),
+            "distance": distanceById[posKey] !== undefined ? distanceById[posKey] : 99,
+            "defaultFocus": posKey === focusKey,
+            "isolated": false
+        }
+        groupIndexByNodeId[connectedNode.id] = 1
+        readableDebug("LAYOUT", "component-position id=" + posKey
+            + " name=" + safeNodeName(connectedNode)
+            + " x=" + String(Math.round(finalX))
+            + " y=" + String(Math.round(finalY))
+            + " focus=" + String(posKey === focusKey)
+            + " distance=" + String(distanceById[posKey] !== undefined ? distanceById[posKey] : 99))
+    }
+
+    var isolatedRowsPerColumn = isolatedColumns > 0 ? Math.ceil(isolatedNodes.length / isolatedColumns) : 0
+    for (nodeIndex = 0; nodeIndex < isolatedNodes.length; ++nodeIndex) {
+        node = isolatedNodes[nodeIndex]
+        key = safeNodeId(node.id)
+        var isoColumn = isolatedColumns > 0 ? nodeIndex % isolatedColumns : 0
+        var isoRow = isolatedColumns > 0 ? Math.floor(nodeIndex / isolatedColumns) : nodeIndex
+        var isoX = marginX + isoColumn * (cardWidth + gapX)
+        var isoY = marginY + isoRow * (cardHeight + gapY)
+        positions[key] = {
+            "x": isoX,
+            "y": isoY,
+            "groupIndex": 0,
+            "column": isoColumn,
+            "row": isoRow,
+            "distance": 99,
+            "defaultFocus": false,
+            "isolated": true
+        }
+        groupIndexByNodeId[node.id] = 0
+        readableDebug("LAYOUT", "component-isolated id=" + key
+            + " name=" + safeNodeName(node)
+            + " x=" + String(Math.round(isoX))
+            + " y=" + String(Math.round(isoY)))
     }
 
     function sortPeerEdges(edgeList, peerField) {
-        edgeList.sort(function (left, right) {
-            var leftPeer = positions[safeNodeId(left[peerField])]
-            var rightPeer = positions[safeNodeId(right[peerField])]
-            var leftSortY = leftPeer ? leftPeer.y : 0
-            var rightSortY = rightPeer ? rightPeer.y : 0
-            if (Math.abs(leftSortY - rightSortY) > 0.5)
-                return leftSortY - rightSortY
-
-            var leftSortX = leftPeer ? leftPeer.x : 0
-            var rightSortX = rightPeer ? rightPeer.x : 0
-            if (Math.abs(leftSortX - rightSortX) > 0.5)
-                return leftSortX - rightSortX
-
+        edgeList.sort(function(left, right) {
+            var leftPeer = positions[safeNodeId(left[peerField])] || { "x": 0, "y": 0 }
+            var rightPeer = positions[safeNodeId(right[peerField])] || { "x": 0, "y": 0 }
+            if (Math.abs(leftPeer.y - rightPeer.y) > 0.5)
+                return leftPeer.y - rightPeer.y
+            if (Math.abs(leftPeer.x - rightPeer.x) > 0.5)
+                return leftPeer.x - rightPeer.x
             return safeNodeId(left.id).localeCompare(safeNodeId(right.id))
         })
     }
 
-    for (nodeIndex = 0; nodeIndex < nodes.length; ++nodeIndex) {
-        node = nodes[nodeIndex]
-        if (!node || node.id === undefined)
-            continue
-        var outgoingEdges = outgoingById[node.id] || []
-        var incomingEdges = incomingById[node.id] || []
+    for (nodeIndex = 0; nodeIndex < validNodes.length; ++nodeIndex) {
+        node = validNodes[nodeIndex]
+        key = safeNodeId(node.id)
+        var outgoingEdges = outgoingById[key] || []
+        var incomingEdges = incomingById[key] || []
         sortPeerEdges(outgoingEdges, "toId")
         sortPeerEdges(incomingEdges, "fromId")
         outgoingCountByNodeId[node.id] = outgoingEdges.length
         incomingCountByNodeId[node.id] = incomingEdges.length
-
         for (var outgoingIndex = 0; outgoingIndex < outgoingEdges.length; ++outgoingIndex)
             outgoingSlotByEdgeId[outgoingEdges[outgoingIndex].id] = { "index": outgoingIndex, "count": outgoingEdges.length }
         for (var incomingIndex = 0; incomingIndex < incomingEdges.length; ++incomingIndex)
             incomingSlotByEdgeId[incomingEdges[incomingIndex].id] = { "index": incomingIndex, "count": incomingEdges.length }
-
-        var placement = positions[safeNodeId(node.id)]
-        if (!placement)
-            continue
-        outgoingBusXByNodeId[node.id] = placement.x + cardWidth + 54
-        incomingBusXByNodeId[node.id] = placement.x - 54
-    }
-
-    function horizontalBundleSide(fromId, toId) {
-        var fromPlacement = positions[safeNodeId(fromId)]
-        var toPlacement = positions[safeNodeId(toId)]
-        if (!fromPlacement || !toPlacement)
-            return ""
-
-        var fromCenterX = fromPlacement.x + cardWidth / 2
-        var toCenterX = toPlacement.x + cardWidth / 2
-        return fromCenterX <= toCenterX ? "right" : "left"
-    }
-
-    var sceneHeight = Math.max(560,
-        contentTop + maxRows * cardHeight
-        + Math.max(0, maxRows - 1) * gapY + 72)
-    var bundleLaneYs = []
-    var outerLaneOffset = Math.max(38, gapY)
-    bundleLaneYs.push({
-        "y": contentTop - outerLaneOffset,
-        "outer": true
-    })
-    for (var laneRow = 0; laneRow < Math.max(0, maxRows - 1); ++laneRow) {
-        bundleLaneYs.push({
-            "y": contentTop + laneRow * (cardHeight + gapY) + cardHeight + gapY / 2,
-            "outer": false,
-            "row": laneRow
-        })
-    }
-    bundleLaneYs.push({
-        "y": contentTop + Math.max(0, maxRows - 1) * (cardHeight + gapY) + cardHeight + outerLaneOffset,
-        "outer": true
-    })
-
-    function nodeMetrics(nodeId) {
-        var placement = positions[safeNodeId(nodeId)] || { "x": 0, "y": 0, "row": 0 }
-        return {
-            "centerY": placement.y + cardHeight / 2,
-            "centerX": placement.x + cardWidth / 2,
-            "top": placement.y,
-            "bottom": placement.y + cardHeight,
-            "left": placement.x,
-            "right": placement.x + cardWidth,
-            "row": placement.row !== undefined ? Number(placement.row) : 0,
-            "column": placement.column !== undefined ? Number(placement.column) : 0,
-            "groupIndex": placement.groupIndex !== undefined ? Number(placement.groupIndex) : -1
+        var placement = positions[key]
+        if (placement) {
+            outgoingBusXByNodeId[node.id] = placement.x + cardWidth + 48
+            incomingBusXByNodeId[node.id] = placement.x - 48
         }
     }
 
-    function fanInSourceMetrics(edge) {
-        return nodeMetrics(edge.fromId)
+    var maxX = marginX + cardWidth
+    var maxY = marginY + cardHeight
+    for (posKey in positions) {
+        var p = positions[posKey]
+        maxX = Math.max(maxX, Number(p.x) + cardWidth)
+        maxY = Math.max(maxY, Number(p.y) + cardHeight)
     }
+    var sceneWidth = Math.max(980, maxX + marginX)
+    var sceneHeight = Math.max(560, maxY + marginY)
 
-    function fanOutTargetMetrics(edge) {
-        return nodeMetrics(edge.toId)
-    }
-
-    function componentEdgeGroupDistance(edge) {
-        if (!edge)
-            return 99
-        var fromMetrics = nodeMetrics(edge.fromId)
-        var toMetrics = nodeMetrics(edge.toId)
-        if (fromMetrics.groupIndex < 0 || toMetrics.groupIndex < 0)
-            return 99
-        return Math.abs(fromMetrics.groupIndex - toMetrics.groupIndex)
-    }
-
-    function componentEdgeDistanceBand(edge) {
-        var groupDistance = componentEdgeGroupDistance(edge)
-        if (groupDistance <= 1)
-            return "near"
-        if (groupDistance === 2)
-            return "mid"
-        return "far"
-    }
-
-    function componentSourceRegion(edge) {
-        if (!edge)
-            return ""
-        var sourceMetrics = nodeMetrics(edge.fromId)
-        var targetMetrics = nodeMetrics(edge.toId)
-        var upperThreshold = targetMetrics.top + cardHeight * 0.22
-        var lowerThreshold = targetMetrics.bottom - cardHeight * 0.22
-        if (sourceMetrics.centerY < upperThreshold)
-            return "upper"
-        if (sourceMetrics.centerY > lowerThreshold)
-            return "lower"
-        return "middle"
-    }
-
-    function isComponentLocalDirectEdge(edge) {
-        if (!edge || edge.fromId === undefined || edge.toId === undefined || edge.fromId === edge.toId)
-            return false
-
-        var sourceMetrics = nodeMetrics(edge.fromId)
-        var targetMetrics = nodeMetrics(edge.toId)
-        var groupDistance = componentEdgeGroupDistance(edge)
-        var horizontalGap = Math.max(0, Math.max(sourceMetrics.left, targetMetrics.left) - Math.min(sourceMetrics.right, targetMetrics.right))
-        var verticalGap = Math.max(0, Math.max(sourceMetrics.top, targetMetrics.top) - Math.min(sourceMetrics.bottom, targetMetrics.bottom))
-        var deltaX = Math.abs(sourceMetrics.centerX - targetMetrics.centerX)
-        var deltaY = Math.abs(sourceMetrics.centerY - targetMetrics.centerY)
-        var rowDelta = Math.abs(sourceMetrics.row - targetMetrics.row)
-        var directDistance = deltaX + deltaY
-
-        if (groupDistance === 0 && rowDelta <= 1 && directDistance <= cardWidth * 0.92 + cardHeight * 0.84)
-            return true
-
-        if (groupDistance === 1
-            && horizontalGap <= Math.max(150, sectionGap * 0.86)
-            && rowDelta <= 1
-            && deltaY <= cardHeight * 0.88) {
-            return true
-        }
-
-        if (groupDistance <= 1
-            && verticalGap <= Math.max(96, gapY + cardHeight * 0.10)
-            && deltaX <= cardWidth * 0.82) {
-            return true
-        }
-
-        return false
-    }
-
-    function fanInBundleKey(edge) {
-        if (!edge || edge.fromId === undefined || edge.toId === undefined || edge.fromId === edge.toId)
-            return ""
-        if (isComponentLocalDirectEdge(edge))
-            return ""
-        var side = horizontalBundleSide(edge.fromId, edge.toId)
-        if (!side.length)
-            return ""
-        var sourceRegion = componentSourceRegion(edge)
-        var distanceBand = componentEdgeDistanceBand(edge)
-        return safeNodeId(edge.toId) + ":" + side + ":" + sourceRegion + ":" + distanceBand
-    }
-
-    function fanOutBundleKey(edge) {
-        if (!edge || edge.fromId === undefined || edge.toId === undefined || edge.fromId === edge.toId)
-            return ""
-        var side = horizontalBundleSide(edge.fromId, edge.toId)
-        if (!side.length)
-            return ""
-        return safeNodeId(edge.fromId) + ":" + side
-    }
-
-    function bundlePreferredY(members) {
-        var weightedSum = 0
-        var weight = 0
-        var anchorDistance = Infinity
-        var anchorY = contentTop + cardHeight / 2
-
-        for (var memberIndex = 0; memberIndex < members.length; ++memberIndex) {
-            var metricsFrom = nodeMetrics(members[memberIndex].fromId)
-            var metricsTo = nodeMetrics(members[memberIndex].toId)
-            var midpointY = (metricsFrom.centerY + metricsTo.centerY) / 2
-            var distanceScore = Math.abs(metricsFrom.centerY - metricsTo.centerY)
-                + Math.abs(metricsFrom.centerX - metricsTo.centerX) * 0.22
-            weightedSum += midpointY
-            weight += 1
-            if (distanceScore < anchorDistance) {
-                anchorDistance = distanceScore
-                anchorY = midpointY
-            }
-        }
-
-        var averageY = weight > 0 ? weightedSum / weight : anchorY
-        return (averageY + anchorY) / 2
-    }
-
-    function bundleCorridorY(members) {
-        if (!members.length)
-            return contentTop + cardHeight / 2
-
-        var preferredY = bundlePreferredY(members)
-        var bestLane = bundleLaneYs[0]
-        var bestScore = Infinity
-
-        for (var laneIndex = 0; laneIndex < bundleLaneYs.length; ++laneIndex) {
-            var lane = bundleLaneYs[laneIndex]
-            var laneY = Number(lane.y)
-            var score = Math.abs(laneY - preferredY) * 1.35
-
-            for (var memberIndex = 0; memberIndex < members.length; ++memberIndex) {
-                var sourceMetrics = nodeMetrics(members[memberIndex].fromId)
-                var targetMetrics = nodeMetrics(members[memberIndex].toId)
-                score += Math.abs(laneY - sourceMetrics.centerY) * 0.88
-                score += Math.abs(laneY - targetMetrics.centerY) * 0.88
-            }
-
-            if (lane.outer)
-                score += 18
-
-            if (score < bestScore - 0.5) {
-                bestScore = score
-                bestLane = lane
-                continue
-            }
-
-            if (Math.abs(score - bestScore) <= 0.5
-                && Math.abs(laneY - preferredY) < Math.abs(Number(bestLane.y) - preferredY)) {
-                bestLane = lane
-            }
-        }
-
-        return Number(bestLane.y)
-    }
-
-    // Cluster fan-in source nodes by vertical proximity so that sources far apart
-    // from each other form separate incoming trunks to the same target, rather than
-    // being forced into one overcrowded bundle.
-    function clusterComponentFanInMembers(members) {
-        if (!members.length)
-            return []
-
-        var sorted = members.slice()
-        sorted.sort(function (left, right) {
-            var leftY = nodeMetrics(left.fromId).centerY
-            var rightY = nodeMetrics(right.fromId).centerY
-            if (Math.abs(leftY - rightY) > 0.5)
-                return leftY - rightY
-            var leftX = nodeMetrics(left.fromId).centerX
-            var rightX = nodeMetrics(right.fromId).centerX
-            if (Math.abs(leftX - rightX) > 0.5)
-                return leftX - rightX
-            return safeNodeId(left.id).localeCompare(safeNodeId(right.id))
-        })
-
-        // Threshold: sources more than ~1.4 rows apart start a new cluster
-        var threshold = cardHeight * 0.8 + gapY * 0.5;
-        var groups = []
-        var currentGroup = []
-        var currentMinY = 0
-        var currentMaxY = 0
-
-        for (var ci = 0; ci < sorted.length; ++ci) {
-            var memberY = nodeMetrics(sorted[ci].fromId).centerY
-            if (!currentGroup.length) {
-                currentGroup.push(sorted[ci])
-                currentMinY = memberY
-                currentMaxY = memberY
-                continue
-            }
-            var nextMinY = Math.min(currentMinY, memberY)
-            var nextMaxY = Math.max(currentMaxY, memberY)
-            var gapFromTail = Math.abs(memberY - currentMaxY)
-            if (nextMaxY - nextMinY > threshold && gapFromTail > threshold * 0.55) {
-                groups.push(currentGroup)
-                currentGroup = [sorted[ci]]
-                currentMinY = memberY
-                currentMaxY = memberY
-            } else {
-                currentGroup.push(sorted[ci])
-                currentMinY = nextMinY
-                currentMaxY = nextMaxY
-            }
-        }
-
-        if (currentGroup.length)
-            groups.push(currentGroup)
-
-        return groups
-    }
-
-    // Target-based edge bundling: do not create source-based fan-out bundles here.
-    // A source node may point to multiple different targets, so bundling by fromId
-    // would incorrectly collapse unrelated outgoing semantics into one line.
-    fanOutBundleByEdgeId = {}
-
-    var fanInGroups = {}
-    for (edgeIndex = 0; edgeIndex < edges.length; ++edgeIndex) {
-        edge = edges[edgeIndex]
-        if (!edge || edge.id === undefined)
-            continue
-        var fanInKey = fanInBundleKey(edge)
-        if (!fanInKey.length)
-            continue
-        if (!fanInGroups[fanInKey])
-            fanInGroups[fanInKey] = []
-        fanInGroups[fanInKey].push(edge)
-    }
-
-    for (fanInKey in fanInGroups) {
-        var fanInMembers = fanInGroups[fanInKey]
-        if (fanInMembers.length < 2)
-            continue
-
-        var sampleEdge = fanInMembers[0]
-        var targetApproachSide = horizontalBundleSide(sampleEdge.fromId, sampleEdge.toId) === "right"
-            ? "left"
-            : "right"
-
-        // Split into proximity clusters so distant sources form separate incoming trunks
-        var fanInClusters = clusterComponentFanInMembers(fanInMembers)
-        var fanInClusterCount = fanInClusters.length
-
-        for (var clusterIdx = 0; clusterIdx < fanInClusters.length; ++clusterIdx) {
-            var clusterMembers = fanInClusters[clusterIdx]
-            if (clusterMembers.length < 2)
-                continue
-            var corridorY = bundleCorridorY(clusterMembers)
-            var targetCenterY = nodeMetrics(sampleEdge.toId).centerY
-            var placeBelow = corridorY >= targetCenterY
-
-            // Leader: source node whose Y is closest to the target (shortest final trunk)
-            var fanInLeaderEdgeId = clusterMembers[0].id
-            var fanInLeaderScore = Infinity
-            var tgtMetrics = nodeMetrics(sampleEdge.toId)
-            for (var fiLi = 0; fiLi < clusterMembers.length; ++fiLi) {
-                var fiSrcMetrics = fanInSourceMetrics(clusterMembers[fiLi])
-                var fiScore = Math.abs(fiSrcMetrics.centerY - tgtMetrics.centerY)
-                    + Math.abs(fiSrcMetrics.centerX - tgtMetrics.centerX) * 0.15
-                if (fiScore < fanInLeaderScore) {
-                    fanInLeaderScore = fiScore
-                    fanInLeaderEdgeId = clusterMembers[fiLi].id
-                }
-            }
-
-            clusterMembers.sort(function (left, right) {
-                var leftMetrics = fanInSourceMetrics(left)
-                var rightMetrics = fanInSourceMetrics(right)
-                if (Math.abs(leftMetrics.centerY - rightMetrics.centerY) > 0.5)
-                    return leftMetrics.centerY - rightMetrics.centerY
-                if (Math.abs(leftMetrics.centerX - rightMetrics.centerX) > 0.5)
-                    return leftMetrics.centerX - rightMetrics.centerX
-                return safeNodeId(left.id).localeCompare(safeNodeId(right.id))
-            })
-
-            for (var memberIndex = 0; memberIndex < clusterMembers.length; ++memberIndex) {
-                fanInBundleByEdgeId[clusterMembers[memberIndex].id] = {
-                    "key": fanInKey + ":cluster:" + String(clusterIdx),
-                    "index": memberIndex,
-                    "count": clusterMembers.length,
-                    "corridorY": corridorY,
-                    "targetApproachSide": targetApproachSide,
-                    "placeBelow": placeBelow,
-                    "leaderEdgeId": fanInLeaderEdgeId,
-                    "clusterIndex": clusterIdx,
-                    "clusterCount": fanInClusterCount
-                }
-            }
-        }
-    }
+    var connectedGroup = { "key": "connected", "title": "关系图", "nodes": connectedNodes, "left": marginX + isolatedPanelWidth, "width": Math.max(1, sceneWidth - isolatedPanelWidth - marginX * 2), "columns": 1, "rows": 1 }
+    var isolatedGroup = { "key": "isolated", "title": "无关系节点", "nodes": isolatedNodes, "left": marginX, "width": Math.max(cardWidth, isolatedPanelWidth), "columns": isolatedColumns, "rows": isolatedRowsPerColumn }
+    var groups = isolatedNodes.length ? [isolatedGroup, connectedGroup] : [connectedGroup]
+    groupBoundsByIndex[0] = { "left": marginX, "right": marginX + isolatedPanelWidth, "top": marginY, "bottom": sceneHeight - marginY }
+    groupBoundsByIndex[1] = { "left": marginX + isolatedPanelWidth, "right": sceneWidth - marginX, "top": marginY, "bottom": sceneHeight - marginY }
 
     function routeTrackGroupKey(edge) {
-        var fromGroup = groupIndexByNodeId[edge.fromId]
-        var toGroup = groupIndexByNodeId[edge.toId]
-        if (fromGroup === undefined || toGroup === undefined)
+        if (!edge)
             return ""
-        if (fromGroup === toGroup)
-            return "local:" + fromGroup
-        if (toGroup > fromGroup)
-            return "forward:" + fromGroup + ":" + toGroup
-        return "backflow:" + fromGroup + ":" + toGroup
-    }
-
-    function routeTrackSortMetrics(edge) {
-        var fromPlacement = positions[safeNodeId(edge.fromId)] || { "x": 0, "y": 0 }
-        var toPlacement = positions[safeNodeId(edge.toId)] || { "x": 0, "y": 0 }
-        return {
-            "centerY": (fromPlacement.y + toPlacement.y) / 2,
-            "centerX": (fromPlacement.x + toPlacement.x) / 2,
-            "fromY": fromPlacement.y,
-            "toY": toPlacement.y
-        }
+        var fromPlacement = positions[safeNodeId(edge.fromId)]
+        var toPlacement = positions[safeNodeId(edge.toId)]
+        if (!fromPlacement || !toPlacement)
+            return ""
+        var fx = fromPlacement.x + cardWidth / 2
+        var fy = fromPlacement.y + cardHeight / 2
+        var tx = toPlacement.x + cardWidth / 2
+        var ty = toPlacement.y + cardHeight / 2
+        return Math.abs(tx - fx) >= Math.abs(ty - fy)
+            ? "h:" + String(Math.round((fy + ty) / 180))
+            : "v:" + String(Math.round((fx + tx) / 220))
     }
 
     var routeTrackGroups = {}
@@ -2754,44 +2700,42 @@ function buildComponentLayout(config) {
         edge = edges[edgeIndex]
         if (!edge || edge.id === undefined)
             continue
-        var groupKey = routeTrackGroupKey(edge)
-        if (!groupKey.length)
+        var routeKey = routeTrackGroupKey(edge)
+        if (!routeKey.length)
             continue
-        if (!routeTrackGroups[groupKey])
-            routeTrackGroups[groupKey] = []
-        routeTrackGroups[groupKey].push(edge)
+        if (!routeTrackGroups[routeKey])
+            routeTrackGroups[routeKey] = []
+        routeTrackGroups[routeKey].push(edge)
     }
 
-    for (var groupKey in routeTrackGroups) {
-        var trackMembers = routeTrackGroups[groupKey]
-        trackMembers.sort(function (left, right) {
-            var leftMetrics = routeTrackSortMetrics(left)
-            var rightMetrics = routeTrackSortMetrics(right)
-            if (Math.abs(leftMetrics.centerY - rightMetrics.centerY) > 0.5)
-                return leftMetrics.centerY - rightMetrics.centerY
-            if (Math.abs(leftMetrics.centerX - rightMetrics.centerX) > 0.5)
-                return leftMetrics.centerX - rightMetrics.centerX
-            if (Math.abs(leftMetrics.fromY - rightMetrics.fromY) > 0.5)
-                return leftMetrics.fromY - rightMetrics.fromY
-            if (Math.abs(leftMetrics.toY - rightMetrics.toY) > 0.5)
-                return leftMetrics.toY - rightMetrics.toY
+    for (var routeGroupKey in routeTrackGroups) {
+        var members = routeTrackGroups[routeGroupKey]
+        members.sort(function(left, right) {
+            var leftFrom = positions[safeNodeId(left.fromId)] || { "x": 0, "y": 0 }
+            var rightFrom = positions[safeNodeId(right.fromId)] || { "x": 0, "y": 0 }
+            if (Math.abs(leftFrom.y - rightFrom.y) > 0.5)
+                return leftFrom.y - rightFrom.y
+            if (Math.abs(leftFrom.x - rightFrom.x) > 0.5)
+                return leftFrom.x - rightFrom.x
             return safeNodeId(left.id).localeCompare(safeNodeId(right.id))
         })
-
-        routeTrackCountByGroupKey[groupKey] = trackMembers.length
-        for (var trackIndex = 0; trackIndex < trackMembers.length; ++trackIndex) {
-            routeTrackByEdgeId[trackMembers[trackIndex].id] = {
-                "index": trackIndex,
-                "count": trackMembers.length
-            }
-            routeTrackGroupKeyByEdgeId[trackMembers[trackIndex].id] = groupKey
+        routeTrackCountByGroupKey[routeGroupKey] = members.length
+        for (var trackIndex = 0; trackIndex < members.length; ++trackIndex) {
+            routeTrackByEdgeId[members[trackIndex].id] = { "index": trackIndex, "count": members.length }
+            routeTrackGroupKeyByEdgeId[members[trackIndex].id] = routeGroupKey
         }
     }
+
+    readableDebug("LAYOUT", "component-detail-v9-complete focus=" + focusKey
+        + " connected=" + String(connectedNodes.length)
+        + " isolated=" + String(isolatedNodes.length)
+        + " sceneWidth=" + String(Math.round(sceneWidth))
+        + " sceneHeight=" + String(Math.round(sceneHeight)))
 
     return {
         "groups": groups,
         "positions": positions,
-        "sceneWidth": Math.max(980, currentX + marginX),
+        "sceneWidth": sceneWidth,
         "sceneHeight": sceneHeight,
         "cardWidth": cardWidth,
         "cardHeight": cardHeight,
@@ -2799,7 +2743,7 @@ function buildComponentLayout(config) {
         "gapY": gapY,
         "sectionGap": sectionGap,
         "headerHeight": headerHeight,
-        "maxRows": maxRows,
+        "maxRows": Math.max(1, connectedNodes.length + isolatedNodes.length),
         "groupIndexByNodeId": groupIndexByNodeId,
         "outgoingSlotByEdgeId": outgoingSlotByEdgeId,
         "incomingSlotByEdgeId": incomingSlotByEdgeId,
@@ -2812,6 +2756,8 @@ function buildComponentLayout(config) {
         "routeTrackByEdgeId": routeTrackByEdgeId,
         "routeTrackGroupKeyByEdgeId": routeTrackGroupKeyByEdgeId,
         "routeTrackCountByGroupKey": routeTrackCountByGroupKey,
-        "groupBoundsByIndex": groupBoundsByIndex
+        "groupBoundsByIndex": groupBoundsByIndex,
+        "readableDefaultFocusId": focusKey,
+        "componentDetailGraph": true
     }
 }

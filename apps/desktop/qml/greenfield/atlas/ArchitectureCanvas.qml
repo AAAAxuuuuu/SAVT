@@ -30,12 +30,12 @@ Item {
     readonly property bool componentOverviewMode: componentMode
     readonly property var componentOverviewLayout: buildComponentOverviewLayout()
     readonly property var componentOverviewGroups: (componentOverviewLayout.groups || [])
-    readonly property real componentOverviewGapX: Number(componentOverviewLayout.gapX || 64)
-    readonly property real componentOverviewGapY: Number(componentOverviewLayout.gapY || 42)
+    readonly property real componentOverviewGapX: Math.max(96, Number(componentOverviewLayout.gapX || 64))
+    readonly property real componentOverviewGapY: Math.max(72, Number(componentOverviewLayout.gapY || 42))
     readonly property real componentOverviewSectionGap: Number(componentOverviewLayout.sectionGap || 116)
     readonly property real componentOverviewHeaderHeight: Number(componentOverviewLayout.headerHeight || 34)
-    readonly property real componentOverviewCardWidth: Number(componentOverviewLayout.cardWidth || 420)
-    readonly property real componentOverviewCardHeight: Number(componentOverviewLayout.cardHeight || 300)
+    readonly property real componentOverviewCardWidth: Math.max(520, Number(componentOverviewLayout.cardWidth || 420))
+    readonly property real componentOverviewCardHeight: Math.max(360, Number(componentOverviewLayout.cardHeight || 300))
     readonly property var componentOverviewPlacementLookup: (componentOverviewLayout.positions || ({}))
     readonly property real sceneWidth: componentOverviewMode
                                        ? Math.max(980, componentOverviewSceneWidth())
@@ -87,7 +87,7 @@ Item {
 
 
     property bool readableVerboseLogs: true
-    readonly property string readableDebugVersion: "readable-single-layer-highlight-v8-large-readable-arrows"
+    readonly property string readableDebugVersion: "readable-component-detail-v13-isolated-grid"
 
     function readableDebug(prefix, message) {
         if (!readableVerboseLogs)
@@ -288,7 +288,8 @@ Item {
     }
 
     function dragOverviewNode() {
-        if (componentMode || relationshipFocusActive)
+        // v9: drag highlighting is shared by overview and component/detail graphs.
+        if (relationshipFocusActive)
             return null
         if (!draggingNodeCard || activeDraggedNodeId.length === 0)
             return null
@@ -1186,15 +1187,15 @@ Item {
     function nodeWidth(item) {
         if (componentOverviewMode)
             return componentOverviewCardWidth
-        var preferredWidth = item && item.width ? item.width * 2.05 : 560
-        return Math.max(540, Math.min(680, preferredWidth))
+        var preferredWidth = item && item.width ? item.width * 2.18 : 620
+        return Math.max(600, Math.min(800, preferredWidth))
     }
 
     function nodeHeight(item) {
         if (componentOverviewMode)
             return componentOverviewCardHeight
-        var preferredHeight = item && item.height ? item.height * 2.25 : 330
-        return Math.max(320, Math.min(430, preferredHeight))
+        var preferredHeight = item && item.height ? item.height * 2.30 : 350
+        return Math.max(340, Math.min(490, preferredHeight))
     }
 
     function localizedMetaText(value) {
@@ -1353,9 +1354,7 @@ Item {
     }
 
     function readableDefaultFocusId() {
-        if (root.componentMode)
-            return undefined
-        var layout = root.overviewMindMapLayout || ({})
+        var layout = root.componentMode ? (root.componentOverviewLayout || ({})) : (root.overviewMindMapLayout || ({}))
         return layout.readableDefaultFocusId
     }
 
@@ -1791,7 +1790,7 @@ Item {
 
     function edgeColor(edge) {
         var highlightNode = root.activeEdgeHighlightNode()
-        if (!highlightNode && !root.componentMode) {
+        if (!highlightNode) {
             var defaultId = root.readableDefaultFocusId()
             if (defaultId !== undefined && defaultId !== null)
                 highlightNode = { "id": defaultId }
@@ -2004,7 +2003,7 @@ Item {
         var activeHighlightNode = root.activeEdgeHighlightNode()
         var focus = activeHighlightNode
         var hovered = activeHighlightNode
-        var defaultFocusId = (!activeHighlightNode && !root.componentMode) ? root.readableDefaultFocusId() : undefined
+        var defaultFocusId = !activeHighlightNode ? root.readableDefaultFocusId() : undefined
         var defaultFocusActive = defaultFocusId !== undefined && defaultFocusId !== null
         if (activeHighlightNode && activeHighlightNode.id !== undefined)
             readableDebug("CANVAS", "active-highlight-node id=" + String(activeHighlightNode.id) + " dragging=" + String(!!root.dragOverviewNode()) + " hover=" + String(!!root.hoverNode))
@@ -2634,7 +2633,7 @@ Item {
                                   ? root.componentNodeTitle(modelData)
                                   : (modelData.name || "未命名节点")
                             wrapMode: Text.WordWrap
-                            maximumLineCount: 2
+                            maximumLineCount: 3
                             elide: Text.ElideRight
                             color: root.tokens.text1
                             font.family: root.tokens.textFontFamily
@@ -2646,12 +2645,12 @@ Item {
 
                     Label {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: root.readableSceneSize(88, 102, 220)
+                        Layout.preferredHeight: root.readableSceneSize(104, 118, 240)
                         text: root.previewText(
                                   modelData.summary || modelData.responsibility || modelData.role,
                                   "暂无描述。")
                         wrapMode: Text.WordWrap
-                        maximumLineCount: 4
+                        maximumLineCount: 5
                         elide: Text.ElideRight
                         color: root.tokens.text3
                         font.family: root.tokens.textFontFamily
