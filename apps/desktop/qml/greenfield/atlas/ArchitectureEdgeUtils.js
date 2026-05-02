@@ -886,7 +886,7 @@ function edgeColor(config) {
             return colorWithAlpha(config.tokens ? config.tokens.signalCobalt : Qt.rgba(0.0, 0.478, 1.0, 1.0), 0.96)
         if (config.isOverviewPrimaryEdge(edge))
             return overviewEdgeBaseColor(edge, config.tokens)
-        return mixColor(Qt.rgba(0.455, 0.565, 0.690, 0.50), overviewEdgeBaseColor(edge, config.tokens), 0.30)
+        return mixColor(Qt.rgba(0.455, 0.565, 0.690, 0.62), overviewEdgeBaseColor(edge, config.tokens), 0.44)
     }
 
     if (config.focusNode && edgeTouchesFocus(config.focusNode, edge))
@@ -923,23 +923,23 @@ function edgeVisuals(config) {
         // visible, but make non-focus edges genuinely background so the default/hover/drag
         // focus reads as a clean subgraph instead of a dense hairball.
         if (activeOrDefault) {
-            lineOpacity = emphasized ? 0.98 : 0.22
-            haloOpacity = emphasized ? 0.24 : 0.045
+            lineOpacity = emphasized ? 0.98 : 0.30
+            haloOpacity = emphasized ? 0.24 : 0.070
         } else {
-            lineOpacity = emphasized ? 0.96 : 0.36
-            haloOpacity = emphasized ? 0.20 : 0.06
+            lineOpacity = emphasized ? 0.96 : 0.42
+            haloOpacity = emphasized ? 0.20 : 0.085
         }
     } else {
         lineOpacity = config.hasHover
-           ? (emphasized ? 0.96 : 0.16)
+           ? (emphasized ? 0.96 : 0.28)
            : (defaultFocusActive
-              ? (emphasized ? 0.96 : 0.22)
-              : (emphasized ? 0.94 : 0.50))
+              ? (emphasized ? 0.96 : 0.36)
+              : (emphasized ? 0.94 : 0.56))
         haloOpacity = config.hasHover
-           ? (emphasized ? 0.22 : 0.035)
+           ? (emphasized ? 0.22 : 0.055)
            : (defaultFocusActive
-              ? (emphasized ? 0.24 : 0.045)
-              : (emphasized ? 0.20 : 0.08))
+              ? (emphasized ? 0.24 : 0.075)
+              : (emphasized ? 0.20 : 0.10))
     }
 
     var isStrongOverview = !componentMode && (emphasized || config.overviewPrimary)
@@ -954,8 +954,8 @@ function edgeVisuals(config) {
                 ? (emphasized ? 4.9 : 1.8)
                 : (isStrongOverview ? 4.2 : 2.8),
         "lineStrokeWidth": componentMode
-                ? (emphasized ? 2.75 : 1.05)
-                : (isStrongOverview ? 2.35 : 1.45),
+                ? (emphasized ? 2.75 : 1.20)
+                : (isStrongOverview ? 2.35 : 1.62),
         "z": emphasized ? 4 : (config.overviewPrimary ? 2 : 0)
     }
 }

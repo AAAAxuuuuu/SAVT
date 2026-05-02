@@ -87,7 +87,7 @@ Item {
 
 
     property bool readableVerboseLogs: true
-    readonly property string readableDebugVersion: "readable-component-detail-v13-isolated-grid"
+    readonly property string readableDebugVersion: "readable-component-detail-v24-focus-bundled-right"
 
     function readableDebug(prefix, message) {
         if (!readableVerboseLogs)
@@ -1473,6 +1473,8 @@ Item {
 
     function relationAnchorPoint(direction, index, count) {
         var rect = focusRelationRect(direction, index, count)
+        // v24: keep the side-rail anchors symmetric. Incoming rails touch the right edge
+        // of the left cards; outgoing rails touch the left edge of the right cards.
         return Qt.point(direction === "incoming" ? rect.x + rect.width : rect.x,
                         rect.y + rect.height / 2)
     }
@@ -1766,6 +1768,14 @@ Item {
 
         return Qt.point(tip.x - size * Math.cos(angle + direction * Math.PI / 6.8),
                         tip.y - size * Math.sin(angle + direction * Math.PI / 6.8))
+    }
+
+    function relationshipFocusLineColor(edge) {
+        // Keep relationship-focus curves exactly aligned with the legend colors.
+        var kind = String(edge && edge.kind ? edge.kind : "").toLowerCase()
+        if (kind === "uses_infrastructure" || kind === "uses_support")
+            return Qt.rgba(1.0, 0.455, 0.075, 1.0)
+        return root.tokens.signalCobalt
     }
 
     function pointDistance(left, right) {
@@ -2262,7 +2272,7 @@ Item {
         scale: root.effectiveScale
         transformOrigin: Item.TopLeft
         z: 2
-        opacity: root.relationshipFocusActive ? (root.componentMode ? 0.08 : 0.04) : 1.0
+        opacity: root.relationshipFocusActive ? (root.componentMode ? 0.16 : 1.0) : 1.0
 
         Behavior on opacity { NumberAnimation { duration: 140 } }
 
@@ -3117,7 +3127,10 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            color: root.componentMode ? Qt.rgba(0.978, 0.984, 0.994, 0.94) : Qt.rgba(0.972, 0.978, 0.988, 0.84)
+            // v20: make the relationship-focus overlay fully opaque so the
+            // background overview lines do not bleed through and visually
+            // wash out the focused relationship lines.
+            color: root.componentMode ? Qt.rgba(0.978, 0.984, 0.994, 1.0) : Qt.rgba(0.972, 0.978, 0.988, 1.0)
         }
 
         Canvas {
@@ -3132,30 +3145,25 @@ Item {
                 var c1y = startPoint.y
                 var c2y = endPoint.y
 
-                ctx.beginPath()
-                ctx.moveTo(startPoint.x, startPoint.y)
-                ctx.bezierCurveTo(c1x, c1y, c2x, c2y, endPoint.x, endPoint.y)
-                ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.92)
-                ctx.lineWidth = 6
-                ctx.stroke()
+                // v19: relationship-focus side curves must use the same visual language
+                // as the legend. Do not wash them out with a large white halo; draw a
+                // compact soft shadow and then the full legend color at full opacity.
+                ctx.globalAlpha = 1.0
+                ctx.lineCap = "round"
+                ctx.lineJoin = "round"
 
+                // Draw the focus relationship line directly with the exact legend color.
+                // Do not add a pale halo or wide soft stroke here, because that makes the
+                // side rails look washed out compared with the legend.
                 ctx.beginPath()
                 ctx.moveTo(startPoint.x, startPoint.y)
                 ctx.bezierCurveTo(c1x, c1y, c2x, c2y, endPoint.x, endPoint.y)
                 ctx.strokeStyle = color
-                ctx.lineWidth = 2.6
+                ctx.lineWidth = 4.8
                 ctx.stroke()
 
-                var tail = Qt.point(endPoint.x + (direction === "incoming" ? -18 : 18), endPoint.y)
-                var arrowLeft = root.arrowWing(endPoint, tail, 11, -1)
-                var arrowRight = root.arrowWing(endPoint, tail, 11, 1)
-                ctx.beginPath()
-                ctx.moveTo(endPoint.x, endPoint.y)
-                ctx.lineTo(arrowLeft.x, arrowLeft.y)
-                ctx.lineTo(arrowRight.x, arrowRight.y)
-                ctx.closePath()
-                ctx.fillStyle = color
-                ctx.fill()
+                // v22: remove the large triangular arrowheads in the relationship-focus
+                // side rails. Keep only the clean colored curve.
             }
 
             onPaint: {
@@ -3168,17 +3176,21 @@ Item {
                                 ctx,
                                 root.relationAnchorPoint("incoming", index, root.focusedIncomingRelations.length),
                                 incomingTarget,
-                                EdgeUtils.edgeSemanticColor(root.tokens, root.focusedIncomingRelations[index].edge, 0.94),
+                                root.relationshipFocusLineColor(root.focusedIncomingRelations[index].edge),
                                 "incoming")
                 }
 
-                var outgoingStart = root.centerAnchorPoint("outgoing")
+                var outgoingTarget = root.centerAnchorPoint("outgoing")
                 for (var outIndex = 0; outIndex < root.focusedOutgoingRelations.length; ++outIndex) {
+                    // v24: render the right-side rails from the card side back toward the
+                    // center using the same visual grammar as the left-side rails. This
+                    // makes the outgoing bundle read as a clean converging fan rather than
+                    // a set of awkward center-originating hooks.
                     drawCurve(
                                 ctx,
-                                outgoingStart,
                                 root.relationAnchorPoint("outgoing", outIndex, root.focusedOutgoingRelations.length),
-                                EdgeUtils.edgeSemanticColor(root.tokens, root.focusedOutgoingRelations[outIndex].edge, 0.94),
+                                outgoingTarget,
+                                root.relationshipFocusLineColor(root.focusedOutgoingRelations[outIndex].edge),
                                 "outgoing")
                 }
             }
@@ -3201,7 +3213,11 @@ Item {
             width: metrics.width
             height: metrics.height
             radius: root.tokens.radiusXxl
-            color: root.componentMode ? Qt.rgba(root.tokens.panelStrong.r, root.tokens.panelStrong.g, root.tokens.panelStrong.b, 0.84) : root.tokens.panelStrong
+            // v21: keep the large relationship-focus frame as a structural border only.
+            // The actual relationship curves are drawn behind this frame; an opaque
+            // fill here masks their legend-color stroke and makes the side rails look
+            // pale. Let the opaque overlay behind the frame provide the background.
+            color: "transparent"
             border.color: Qt.rgba(0.12, 0.18, 0.28, 0.07)
 
             Label {
@@ -3450,6 +3466,119 @@ Item {
     }
 
     Rectangle {
+        id: edgeLegendCard
+        anchors.right: parent.right
+        anchors.bottom: zoomControlBar.top
+        anchors.rightMargin: 18
+        anchors.bottomMargin: 10
+        visible: root.nodes.length > 0 && !root.componentMode && !root.relationshipFocusActive
+        width: 244
+        height: 86
+        radius: root.tokens.radiusLg
+        color: root.tokens.panelStrong
+        border.color: root.tokens.border1
+        z: 30
+
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: root.tokens.panelStrong }
+            GradientStop { position: 1.0; color: root.tokens.panelSoft }
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 12
+            anchors.rightMargin: 12
+            anchors.topMargin: 10
+            anchors.bottomMargin: 10
+            spacing: 8
+
+            Label {
+                Layout.fillWidth: true
+                text: "连线图例"
+                color: root.tokens.text2
+                font.family: root.tokens.textFontFamily
+                font.pixelSize: 11
+                font.weight: Font.DemiBold
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Canvas {
+                    Layout.preferredWidth: 36
+                    Layout.preferredHeight: 14
+                    onPaint: {
+                        var ctx = getContext("2d")
+                        ctx.reset()
+                        ctx.lineCap = "round"
+                        ctx.lineWidth = 2.4
+                        ctx.strokeStyle = root.tokens.signalCobalt
+                        ctx.fillStyle = root.tokens.signalCobalt
+                        ctx.beginPath()
+                        ctx.moveTo(2, height / 2)
+                        ctx.lineTo(width - 10, height / 2)
+                        ctx.stroke()
+                        ctx.beginPath()
+                        ctx.moveTo(width - 4, height / 2)
+                        ctx.lineTo(width - 12, height / 2 - 4)
+                        ctx.lineTo(width - 12, height / 2 + 4)
+                        ctx.closePath()
+                        ctx.fill()
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: "蓝线：能力调用 / 激活 / 依赖"
+                    color: root.tokens.text2
+                    font.family: root.tokens.textFontFamily
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Canvas {
+                    Layout.preferredWidth: 36
+                    Layout.preferredHeight: 14
+                    onPaint: {
+                        var ctx = getContext("2d")
+                        ctx.reset()
+                        ctx.lineCap = "round"
+                        ctx.lineWidth = 2.4
+                        ctx.strokeStyle = Qt.rgba(1.0, 0.455, 0.075, 1.0)
+                        ctx.fillStyle = Qt.rgba(1.0, 0.455, 0.075, 1.0)
+                        ctx.beginPath()
+                        ctx.moveTo(2, height / 2)
+                        ctx.lineTo(width - 10, height / 2)
+                        ctx.stroke()
+                        ctx.beginPath()
+                        ctx.moveTo(width - 4, height / 2)
+                        ctx.lineTo(width - 12, height / 2 - 4)
+                        ctx.lineTo(width - 12, height / 2 + 4)
+                        ctx.closePath()
+                        ctx.fill()
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: "橙线：基础设施 / 支撑依赖"
+                    color: root.tokens.text2
+                    font.family: root.tokens.textFontFamily
+                    font.pixelSize: 11
+                    wrapMode: Text.WordWrap
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        id: zoomControlBar
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 18
